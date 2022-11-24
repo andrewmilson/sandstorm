@@ -1,0 +1,25 @@
+[package]
+name = "sandstorm"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+ministark = {path = "../ministark"}
+gpu-poly = { path = "../ministark/gpu-poly" }
+ark-std = { git = "https://github.com/arkworks-rs/std" }
+ark-ff = { git = "https://github.com/arkworks-rs/algebra" }
+
+# taken from https://github.com/recmo/uint
+# Compilation profile for any non-workspace member.
+# Dependencies are optimized, even in a dev build. This improves dev performance
+# while having neglible impact on incremental build times.
+[profile.dev.package."*"]
+opt-level = 3
+
+[profile.release]
+codegen-units = 1
+lto = true
+
+[profile.bench]
+codegen-units = 1
+lto = true
