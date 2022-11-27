@@ -8,6 +8,14 @@ ministark = {path = "../ministark"}
 gpu-poly = { path = "../ministark/gpu-poly" }
 ark-std = { git = "https://github.com/arkworks-rs/std" }
 ark-ff = { git = "https://github.com/arkworks-rs/algebra" }
+ark-serialize = { git = "https://github.com/arkworks-rs/algebra" }
+cairo-rs = { git = "https://github.com/lambdaclass/cairo-rs" }
+structopt = "0.3.26"
+bincode = "1.2.1"
+num-bigint = "0.4.3"
+ruint = { version = "1.7.0", features = [ "serde", "num-bigint" ] }
+serde = "1.0.147"
+serde_json = "1.0.89"
 
 # taken from https://github.com/recmo/uint
 # Compilation profile for any non-workspace member.

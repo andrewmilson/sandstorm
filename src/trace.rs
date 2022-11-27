@@ -1,4 +1,4 @@
-use ministark::Matrix;
+use ministark::{Matrix, Column};
 use gpu_poly::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481::Fp;
 use ministark::Trace;
 
@@ -28,42 +28,49 @@ impl Trace for CairoTrace {
 // Cairo trace layout
 // https://eprint.iacr.org/2021/1063.pdf section 9
 
-enum Flag {
+#[derive(Clone, Copy)]
+pub enum Flag {
     // dst reg
     DstReg,
 
     // op0 reg
-    Op0Reg, // Operand 0 register
+    Op0Reg,
 
     // op1_src
-    Op1Imm, // Operand 1 Immediate
-    Op1Fp,  // TODO: Operand 1 frame pointer?
-    Op1Ap,  // TODO: Operand 1 allocation pointer?
+    Op1Imm,
+    Op1Fp,
+    Op1Ap,
 
     // res_logic
-    ResAdd, // TODO: Result add?
-    ResMul, // TODO: Result multiply?
+    ResAdd,
+    ResMul,
 
     // pc_update
-    PcJumpAbs, // Jump absolute
-    PcJumpRel, // Jump relative
-    PcJnz,     // Conditional jump (if not zero)
+    PcJumpAbs,
+    PcJumpRel,
+    PcJnz,
 
     // ap_update
-    ApAdd,  // TODO: Allocation pointer add?
-    ApAdd1, // TODO: Allocation pointer add `1`?
+    ApAdd,
+    ApAdd1,
 
     // opcode
     OpcodeCall,
     OpcodeRet,
     OpcodeAssertEq,
 
-    // 0
-    _Unused, // Section 9 "pow-of-2 for technical reasons"
+    // 0 - to make flag cells a power-of-2
+    _Unused,
 }
 
-enum Offset {
-    Dst, // TODO:
-    Op0, // TODO:
-    Op1, // TODO:
+impl Column for Flag {
+    fn index(&self) -> usize {
+        *self as usize
+    }
 }
+
+// enum Offset {
+//     Dst, // TODO:
+//     Op0, // TODO:
+//     Op1, // TODO:
+// }
