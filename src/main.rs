@@ -1,9 +1,6 @@
-use sandstorm::ExecutionTrace;
+use sandstorm::trace::ExecutionTrace;
 use std::path::PathBuf;
 use structopt::StructOpt;
-
-mod air;
-mod trace;
 
 #[derive(StructOpt, Debug)]
 #[structopt(name = "sandstorm", about = "cairo prover")]
@@ -32,7 +29,4 @@ fn main() {
 
 fn prove(program_path: &PathBuf, trace_path: &PathBuf, memory_path: &PathBuf) {
     let execution_trace = ExecutionTrace::from_file(program_path, trace_path, memory_path);
-
-    // let trace = sandstorm::read_binary_trace(trace_path);
-    // println!("YOOO: {:?}", trace);
 }

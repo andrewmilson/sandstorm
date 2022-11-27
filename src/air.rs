@@ -5,7 +5,7 @@ use ministark::Air;
 use ministark::Constraint;
 use gpu_poly::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481::Fp;
 
-use crate::trace::Flag;
+use crate::Flag;
 
 pub struct CairoAir {
     transition_constraints: Vec<Constraint<Fp>>,
