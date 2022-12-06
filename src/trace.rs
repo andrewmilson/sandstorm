@@ -22,14 +22,14 @@ pub struct ExecutionTrace {
 
 impl ExecutionTrace {
     fn new(memory: Memory, register_states: RegisterStates, program: CompiledProgram) -> Self {
-        let trace_len = register_states.len().next_power_of_two();
+        let num_cycles = register_states.len().next_power_of_two();
 
         let mut flags_virtual_column = Vec::new_in(PageAlignedAllocator);
-        flags_virtual_column.resize(trace_len * NUM_FLAGS, Fp::zero());
+        flags_virtual_column.resize(num_cycles * NUM_FLAGS, Fp::zero());
 
         for (i, RegisterState { pc, .. }) in register_states.iter().enumerate() {
             let word = memory[*pc].unwrap();
-            assert!(!word.get_flag(Flag::_Unused));
+            assert!(!word.get_flag(Flag::Zero));
 
             // TODO: maybe bit sift all flags
             let flags_offset = i * NUM_FLAGS;

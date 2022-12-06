@@ -3,11 +3,18 @@ name = "sandstorm"
 version = "0.1.0"
 edition = "2021"
 
+[features]
+default = [ ]
+asm = [ "ministark/asm" ]
+gpu = [ "ministark/gpu" ]
+parallel = [ "ministark/parallel" ]
+
 [dependencies]
-ministark = {path = "../ministark"}
+ministark = { path = "../ministark" }
 gpu-poly = { path = "../ministark/gpu-poly" }
 ark-std = { git = "https://github.com/arkworks-rs/std" }
 ark-ff = { git = "https://github.com/arkworks-rs/algebra" }
+ark-poly = { git = "https://github.com/andrewmilson/algebra", branch = "vec-allocator" }
 ark-serialize = { git = "https://github.com/arkworks-rs/algebra" }
 cairo-rs = { git = "https://github.com/lambdaclass/cairo-rs" }
 structopt = "0.3.26"

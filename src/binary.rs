@@ -127,7 +127,7 @@ impl Word {
 
     /// Calculates $\tilde{f_i}$ - https://eprint.iacr.org/2021/1063.pdf
     pub fn get_flag_prefix(&self, flag: Flag) -> u64 {
-        if matches!(flag, Flag::_Unused) {
+        if flag == Flag::Zero {
             return 0;
         }
 

@@ -3,11 +3,12 @@ use strum_macros::EnumIter;
 
 mod air;
 mod binary;
+pub mod prover;
 pub mod trace;
 
 /// Cairo flag
 /// https://eprint.iacr.org/2021/1063.pdf section 9
-#[derive(Clone, Copy, EnumIter)]
+#[derive(Clone, Copy, EnumIter, PartialEq, Eq)]
 pub enum Flag {
     // Group: [FlagGroup::DstReg]
     DstReg,
@@ -39,7 +40,7 @@ pub enum Flag {
     OpcodeAssertEq,
 
     // 0 - padding to make flag cells a power-of-2
-    _Unused,
+    Zero,
 }
 
 /// Cairo flag group
