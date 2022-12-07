@@ -54,10 +54,18 @@ impl ExecutionTrace {
 
             // NPC
             let npc_virtual_row = &mut npc_column[trace_offset..trace_offset + cycle_height];
-            npc_virtual_row[NPC::FirstWord as usize] = word.into();
+            npc_virtual_row[Npc::FirstWord as usize] = word.into();
 
             // RANGE CHECK
             let rc_virtual_row = &mut range_check_column[trace_offset..trace_offset + cycle_height];
+            println!(
+                "W:{:064b}\nC:{:016b}{:016b}{:016b}{:016b}",
+                u64::try_from(word.0).unwrap(),
+                word.get_flag_prefix(Flag::DstReg),
+                word.get_off_op1(),
+                word.get_off_op0(),
+                word.get_off_dst(),
+            );
             rc_virtual_row[RangeCheck::OffDst as usize] = word.get_off_dst().into();
             rc_virtual_row[RangeCheck::OffOp1 as usize] = word.get_off_op1().into();
             rc_virtual_row[RangeCheck::OffOp0 as usize] = word.get_off_op0().into();
@@ -106,7 +114,8 @@ impl Trace for ExecutionTrace {
     }
 }
 
-enum NPC {
+// NPC? not sure what it means yet - next program counter?
+enum Npc {
     // TODO: first word of each instruction?
     FirstWord = 1,
 }

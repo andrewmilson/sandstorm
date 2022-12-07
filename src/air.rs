@@ -187,14 +187,19 @@ impl Air for CairoAir {
 
         // force constraint to apply every 16 trace cycles
         // e.g. (x - ω_0)(x - ω_16)(x - ω_32)(x - ω_48) for n=64
-        let zerofier = X.pow(n / 16) - &one;
+        let every_cycle_zerofier = X.pow(n / 16) - &one;
         let cpu_decode_opcode_rc_input = (Trace(5, 1)
             - (((flags * &offset_size_fp + Trace(7, 4)) * &offset_size_fp + Trace(7, 8))
                 * &offset_size_fp
                 + Trace(7, 0)))
-            * zerofier;
+            / &every_cycle_zerofier;
 
-        // cpu/decode/flag_op1_base_op0_bit
+        // // TODO: constraint for the Op1Src flag group? forces vals 000, 100, 010 ir
+        // 001 // cpu/decode/flag_op1_base_op0_bit
+        // let cpu_decode_flag_op1_base_op0_bit = (&cpu_decode_flag_op1_base_op0_0
+        //     * &cpu_decode_flag_op1_base_op0_0
+        //     - &cpu_decode_flag_op1_base_op0_0)
+        //     / every_cycle_zerofier;
 
         // NOTE: for composition OODs only seem to involve one random per constraint
         vec![

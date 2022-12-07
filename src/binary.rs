@@ -120,7 +120,7 @@ impl CompiledProgram {
 /// Value is a field element in the range `[0, Fp::MODULUS)`
 /// Stored as a U256 to make binary decompositions more efficient
 #[derive(Clone, Copy, Debug)]
-pub struct Word(U256);
+pub struct Word(pub U256);
 
 impl Word {
     pub fn new(word: U256) -> Self {
@@ -136,7 +136,7 @@ impl Word {
 
         let flag = flag as usize;
         let prefix = self.0 >> (FLAGS_BIT_OFFSET + flag);
-        let mask = (uint!(1_U256) << (14 - flag)) - uint!(1_U256);
+        let mask = (uint!(1_U256) << (15 - flag)) - uint!(1_U256);
         (prefix & mask).try_into().unwrap()
     }
 
