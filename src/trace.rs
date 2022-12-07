@@ -16,33 +16,68 @@ use std::io::BufReader;
 use std::path::PathBuf;
 
 pub struct ExecutionTrace {
-    flags_virtual_column: GpuVec<Fp>,
+    flags_column: GpuVec<Fp>,
+    npc_column: GpuVec<Fp>,
+    range_check_column: GpuVec<Fp>,
     base_trace: Matrix<Fp>,
 }
 
 impl ExecutionTrace {
     fn new(memory: Memory, register_states: RegisterStates, program: CompiledProgram) -> Self {
         let num_cycles = register_states.len().next_power_of_two();
+        let cycle_height = 16;
+        let trace_len = num_cycles * cycle_height;
 
-        let mut flags_virtual_column = Vec::new_in(PageAlignedAllocator);
-        flags_virtual_column.resize(num_cycles * NUM_FLAGS, Fp::zero());
+        let mut flags_column = Vec::new_in(PageAlignedAllocator);
+        flags_column.resize(trace_len, Fp::zero());
+
+        let mut zeros_column = Vec::new_in(PageAlignedAllocator);
+        zeros_column.resize(trace_len, Fp::zero());
+
+        // TODO: npc?
+        let mut npc_column = Vec::new_in(PageAlignedAllocator);
+        npc_column.resize(trace_len, Fp::zero());
+
+        let mut range_check_column = Vec::new_in(PageAlignedAllocator);
+        range_check_column.resize(trace_len, Fp::zero());
 
         for (i, RegisterState { pc, .. }) in register_states.iter().enumerate() {
             let word = memory[*pc].unwrap();
             assert!(!word.get_flag(Flag::Zero));
+            let trace_offset = i * cycle_height;
 
-            // TODO: maybe bit sift all flags
-            let flags_offset = i * NUM_FLAGS;
-            let virtual_row = &mut flags_virtual_column[flags_offset..flags_offset + NUM_FLAGS];
+            // FLAGS
+            let flags_virtual_row = &mut flags_column[trace_offset..trace_offset + cycle_height];
             for flag in Flag::iter() {
-                virtual_row[flag as usize] = word.get_flag_prefix(flag).into();
+                flags_virtual_row[flag as usize] = word.get_flag_prefix(flag).into();
             }
+
+            // NPC
+            let npc_virtual_row = &mut npc_column[trace_offset..trace_offset + cycle_height];
+            npc_virtual_row[NPC::FirstWord as usize] = word.into();
+
+            // RANGE CHECK
+            let rc_virtual_row = &mut range_check_column[trace_offset..trace_offset + cycle_height];
+            rc_virtual_row[RangeCheck::OffDst as usize] = word.get_off_dst().into();
+            rc_virtual_row[RangeCheck::OffOp1 as usize] = word.get_off_op1().into();
+            rc_virtual_row[RangeCheck::OffOp0 as usize] = word.get_off_op0().into();
         }
 
-        let base_trace = Matrix::new(vec![flags_virtual_column.to_vec_in(PageAlignedAllocator)]);
+        let base_trace = Matrix::new(vec![
+            flags_column.to_vec_in(PageAlignedAllocator),
+            zeros_column.to_vec_in(PageAlignedAllocator),
+            zeros_column.to_vec_in(PageAlignedAllocator),
+            zeros_column.to_vec_in(PageAlignedAllocator),
+            zeros_column.to_vec_in(PageAlignedAllocator),
+            npc_column.to_vec_in(PageAlignedAllocator),
+            zeros_column.to_vec_in(PageAlignedAllocator),
+            range_check_column.to_vec_in(PageAlignedAllocator),
+        ]);
 
         ExecutionTrace {
-            flags_virtual_column,
+            flags_column,
+            npc_column,
+            range_check_column,
             base_trace,
         }
     }
@@ -62,11 +97,22 @@ impl ExecutionTrace {
 }
 
 impl Trace for ExecutionTrace {
-    const NUM_BASE_COLUMNS: usize = 1;
+    const NUM_BASE_COLUMNS: usize = 8;
     type Fp = Fp;
     type Fq = Fp;
 
     fn base_columns(&self) -> &Matrix<Self::Fp> {
         &self.base_trace
     }
+}
+
+enum NPC {
+    // TODO: first word of each instruction?
+    FirstWord = 1,
+}
+
+enum RangeCheck {
+    OffDst = 0,
+    OffOp1 = 4,
+    OffOp0 = 8,
 }

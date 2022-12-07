@@ -58,7 +58,7 @@ impl Air for CairoAir {
     // =============
     // col0 - flags
     // col3 - pedersen
-    // col5 - npc?
+    // col5 - npc? next program counter?
     // col6 - memory
     // col7 - rc16 (range check 16 bit?)
     // col8 - ecdsa
@@ -157,7 +157,7 @@ impl Air for CairoAir {
         // x^(n/16) - ω^(n/16)^(15) = (x - ω_15)(x - ω_31)(x - ω_47)(x - ω_63)
         let flag0_offset = FieldConstant::Fp(g.pow([(Flag::Zero as usize * n / NUM_FLAGS) as u64]));
         let flag0_zerofier = X.pow(n / NUM_FLAGS) - flag0_offset;
-        let flags_zerofier = &flag0_zerofier / (X.pow(n) - one);
+        let flags_zerofier = &flag0_zerofier / (X.pow(n) - &one);
 
         // checks bits are 0 or 1
         // NOTE: can choose any cpu_decode_opcode_rc_b*
@@ -167,7 +167,40 @@ impl Air for CairoAir {
 
         let cpu_decode_opcode_rc_zero = Trace(0, 0) / flag0_zerofier;
 
+        // TODO: Trace(5, 1) First word of each instruction?
+        // ┌─────────────────────────────────────────────────────────────────────────┐
+        // │                     off_dst (biased representation)                     │
+        // ├─────────────────────────────────────────────────────────────────────────┤
+        // │                     off_op0 (biased representation)                     │
+        // ├─────────────────────────────────────────────────────────────────────────┤
+        // │                     off_op1 (biased representation)                     │
+        // ├─────┬─────┬───────┬───────┬───────────┬────────┬───────────────────┬────┤
+        // │ dst │ op0 │  op1  │  res  │    pc     │   ap   │      opcode       │ 0  │
+        // │ reg │ reg │  src  │ logic │  update   │ update │                   │    │
+        // ├─────┼─────┼───┬───┼───┬───┼───┬───┬───┼───┬────┼────┬────┬────┬────┼────┤
+        // │  0  │  1  │ 2 │ 3 │ 4 │ 5 │ 6 │ 7 │ 8 │ 9 │ 10 │ 11 │ 12 │ 13 │ 14 │ 15 │
+        // └─────┴─────┴───┴───┴───┴───┴───┴───┴───┴───┴────┴────┴────┴────┴────┴────┘
+        let flags = Trace(0, 0);
+        // TODO: let off_op1 = Trace(7, 4);
+        // TODO: let off_op0 = Trace(7, 8);
+        // TODO: let off_dst = Trace(7, 0);
+
+        // force constraint to apply every 16 trace cycles
+        // e.g. (x - ω_0)(x - ω_16)(x - ω_32)(x - ω_48) for n=64
+        let zerofier = X.pow(n / 16) - &one;
+        let cpu_decode_opcode_rc_input = (Trace(5, 1)
+            - (((flags * &offset_size_fp + Trace(7, 4)) * &offset_size_fp + Trace(7, 8))
+                * &offset_size_fp
+                + Trace(7, 0)))
+            * zerofier;
+
+        // cpu/decode/flag_op1_base_op0_bit
+
         // NOTE: for composition OODs only seem to involve one random per constraint
-        vec![cpu_decode_opcode_rc_b, cpu_decode_opcode_rc_zero]
+        vec![
+            cpu_decode_opcode_rc_b,
+            cpu_decode_opcode_rc_zero,
+            cpu_decode_opcode_rc_input,
+        ]
     }
 }

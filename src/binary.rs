@@ -27,6 +27,9 @@ pub const FLAGS_BIT_OFFSET: usize = 48;
 /// Number of Cairo instruction flags
 pub const NUM_FLAGS: usize = 16;
 
+// Mask for word offsets (16 bits each)
+pub const OFF_MASK: usize = 0xFFFF;
+
 pub struct RegisterStates(Vec<RegisterState>);
 
 impl RegisterStates {
@@ -141,6 +144,24 @@ impl Word {
         self.0.bit(FLAGS_BIT_OFFSET + flag as usize)
     }
 
+    pub fn get_off_dst(&self) -> u64 {
+        let prefix = self.0 >> OFF_DST_BIT_OFFSET;
+        let mask = U256::from(OFF_MASK);
+        (prefix & mask).try_into().unwrap()
+    }
+
+    pub fn get_off_op0(&self) -> u64 {
+        let prefix = self.0 >> OFF_OP0_BIT_OFFSET;
+        let mask = U256::from(OFF_MASK);
+        (prefix & mask).try_into().unwrap()
+    }
+
+    pub fn get_off_op1(&self) -> u64 {
+        let prefix = self.0 >> OFF_OP1_BIT_OFFSET;
+        let mask = U256::from(OFF_MASK);
+        (prefix & mask).try_into().unwrap()
+    }
+
     pub fn get_flag_group(&self, flag_group: FlagGroup) -> u8 {
         match flag_group {
             FlagGroup::DstReg => self.get_flag(Flag::DstReg) as u8,
@@ -167,5 +188,11 @@ impl Word {
                     + self.get_flag(Flag::OpcodeAssertEq) as u8 * 4
             }
         }
+    }
+}
+
+impl Into<Fp> for Word {
+    fn into(self) -> Fp {
+        BigUint::from(self.0).into()
     }
 }
