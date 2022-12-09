@@ -1,5 +1,4 @@
-use crate::Flag;
-use crate::FlagGroup;
+use crate::trace::Flag;
 use cairo_rs::vm::trace::trace_entry::RelocatedTraceEntry as RegisterState;
 use gpu_poly::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481::Fp;
 use num_bigint::BigUint;
@@ -281,4 +280,17 @@ impl Into<Fp> for Word {
     fn into(self) -> Fp {
         BigUint::from(self.0).into()
     }
+}
+
+/// Cairo flag group
+/// https://eprint.iacr.org/2021/1063.pdf section 9.4
+#[derive(Clone, Copy)]
+pub enum FlagGroup {
+    DstReg,
+    Op0Reg,
+    Op1Src,
+    ResLogic,
+    PcUpdate,
+    ApUpdate,
+    Opcode,
 }

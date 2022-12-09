@@ -1,6 +1,5 @@
 use ark_serialize::CanonicalDeserialize;
 use ark_serialize::CanonicalSerialize;
-use gpu_poly::GpuField;
 use ministark::ProofOptions;
 use ministark::TraceInfo;
 use ark_ff::One;
@@ -9,11 +8,13 @@ use ministark::constraints::AlgebraicExpression;
 use ark_poly::domain::EvaluationDomain;
 use ministark::Air;
 use gpu_poly::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481::Fp;
+use ministark::constraints::ExecutionTraceColumn;
 use ministark::constraints::FieldConstant;
-use num_bigint::BigUint;
-
-use crate::Flag;
-use crate::binary::NUM_FLAGS;
+use crate::trace::Auxiliary;
+use crate::trace::Flag;
+use crate::trace::CYCLE_HEIGHT;
+use crate::trace::Npc;
+use crate::trace::RangeCheck;
 
 pub struct CairoAir {
     info: TraceInfo,
@@ -66,7 +67,6 @@ impl Air for CairoAir {
     fn constraints(&self) -> Vec<AlgebraicExpression<Fp>> {
         use AlgebraicExpression::*;
         // TODO: figure out why this value
-        let cycle_height = 16;
         let trace_domain = self.trace_domain();
         let g = trace_domain.group_gen();
         let n = trace_domain.size();
@@ -75,41 +75,21 @@ impl Air for CairoAir {
         let offset_size = two.pow(16);
         let half_offset_size = two.pow(15);
 
-        let cpu_decode_opcode_rc_b0 = Trace(0, 0) - (Trace(0, 1) + Trace(0, 1));
-        let cpu_decode_opcode_rc_b1: AlgebraicExpression<Fp> =
-            Trace(0, 1) - (Trace(0, 2) + Trace(0, 2));
-        let cpu_decode_opcode_rc_b2 = Trace(0, 2) - (Trace(0, 3) + Trace(0, 3));
-        let cpu_decode_opcode_rc_b3 = Trace(0, 3) - (Trace(0, 4) + Trace(0, 4));
-        let cpu_decode_opcode_rc_b4 = Trace(0, 4) - (Trace(0, 5) + Trace(0, 5));
-        let cpu_decode_opcode_rc_b5 = Trace(0, 5) - (Trace(0, 6) + Trace(0, 6));
-        let cpu_decode_opcode_rc_b6 = Trace(0, 6) - (Trace(0, 7) + Trace(0, 7));
-        let cpu_decode_opcode_rc_b7 = Trace(0, 7) - (Trace(0, 8) + Trace(0, 8));
-        let cpu_decode_opcode_rc_b8 = Trace(0, 8) - (Trace(0, 9) + Trace(0, 9));
-        let cpu_decode_opcode_rc_b9 = Trace(0, 9) - (Trace(0, 10) + Trace(0, 10));
-        let cpu_decode_opcode_rc_b10: AlgebraicExpression<Fp> =
-            Trace(0, 10) - (Trace(0, 11) + Trace(0, 11));
-        let cpu_decode_opcode_rc_b11: AlgebraicExpression<Fp> =
-            Trace(0, 11) - (Trace(0, 12) + Trace(0, 12));
-        let cpu_decode_opcode_rc_b12 = Trace(0, 12) - (Trace(0, 13) + Trace(0, 13));
-        let cpu_decode_opcode_rc_b13 = Trace(0, 13) - (Trace(0, 14) + Trace(0, 14));
-        let cpu_decode_opcode_rc_b14: AlgebraicExpression<Fp> =
-            Trace(0, 14) - (Trace(0, 15) + Trace(0, 15));
-
         // cpu/decode/flag_op1_base_op0_0
         let cpu_decode_flag_op1_base_op0_0: AlgebraicExpression<Fp> =
-            &one - (&cpu_decode_opcode_rc_b2 + &cpu_decode_opcode_rc_b4 + &cpu_decode_opcode_rc_b3);
+            &one - (Flag::Op1Imm.curr() + Flag::Op1Ap.curr() + Flag::Op1Fp.curr());
         // cpu/decode/flag_res_op1_0
         let cpu_decode_flag_res_op1_0: AlgebraicExpression<Fp> =
-            &one - (&cpu_decode_opcode_rc_b5 + &cpu_decode_opcode_rc_b6 + &cpu_decode_opcode_rc_b9);
+            &one - (Flag::ResAdd.curr() + Flag::ResMul.curr() + Flag::PcJnz.curr());
         // cpu/decode/flag_pc_update_regular_0
         let cpu_decode_flag_pc_update_regular_0: AlgebraicExpression<Fp> =
-            &one - (&cpu_decode_opcode_rc_b7 + &cpu_decode_opcode_rc_b8 + &cpu_decode_opcode_rc_b9);
+            &one - (Flag::PcJumpAbs.curr() + Flag::PcJumpRel.curr() + Flag::PcJnz.curr());
         // cpu/decode/fp_update_regular_0
         let cpu_decode_fp_update_regular_0: AlgebraicExpression<Fp> =
-            &one - (&cpu_decode_opcode_rc_b12 + &cpu_decode_opcode_rc_b13);
+            &one - (Flag::OpcodeCall.curr() + Flag::OpcodeRet.curr());
 
         // pc + <instruction size>
-        let npc_reg_0 = Trace(5, 0) + &cpu_decode_opcode_rc_b2 + &one;
+        let npc_reg_0 = Npc::Pc.curr() + Flag::Op1Imm.curr() + &one;
 
         let memory_address_diff_0: AlgebraicExpression<Fp> = Trace(6, 2) - Trace(6, 0);
 
@@ -158,17 +138,25 @@ impl Air for CairoAir {
         // x^(n/16) - ω^(n/16)      = (x - ω_1)(x - ω_17)(x - ω_33)(x - ω_49)
         // x^(n/16) - ω^(n/16)^(15) = (x - ω_15)(x - ω_31)(x - ω_47)(x - ω_63)
         let flag0_offset =
-            FieldConstant::Fp(g.pow([(Flag::Zero as usize * n / cycle_height) as u64]));
-        let flag0_zerofier = X.pow(n / cycle_height) - flag0_offset;
+            FieldConstant::Fp(g.pow([(Flag::Zero as usize * n / CYCLE_HEIGHT) as u64]));
+        let flag0_zerofier = X.pow(n / CYCLE_HEIGHT) - flag0_offset;
         let flags_zerofier = &flag0_zerofier / (X.pow(n) - &one);
 
         // checks bits are 0 or 1
         // NOTE: can choose any cpu_decode_opcode_rc_b*
-        let cpu_decode_opcode_rc_b = (&cpu_decode_opcode_rc_b0 * &cpu_decode_opcode_rc_b0
-            - &cpu_decode_opcode_rc_b0)
-            * &flags_zerofier;
 
-        let cpu_decode_opcode_rc_zero = Trace(0, 0) / flag0_zerofier;
+        // NOTE: This expression is a bit confusing. The zerofier forces this constraint
+        // to apply in all rows of the trace therefore it applies to all flags (not just
+        // DstReg).
+        let cpu_decode_opcode_rc_b =
+            (Flag::DstReg.curr() * Flag::DstReg.curr() - Flag::DstReg.curr()) * &flags_zerofier;
+        //  (&cpu_decode_opcode_rc_b0 * &cpu_decode_opcode_rc_b0
+        //     - &cpu_decode_opcode_rc_b0)
+        //     * ;
+        // let cpu_decode_opcode_rc_b = (&cpu_decode_opcode_rc_b0 *
+        // &cpu_decode_opcode_rc_b0
+        //     - &cpu_decode_opcode_rc_b0)
+        //     * &flags_zerofier;
 
         // TODO: Trace(5, 1) First word of each instruction?
         // ┌─────────────────────────────────────────────────────────────────────────┐
@@ -183,17 +171,21 @@ impl Air for CairoAir {
         // ├─────┼─────┼───┬───┼───┬───┼───┬───┬───┼───┬────┼────┬────┬────┬────┼────┤
         // │  0  │  1  │ 2 │ 3 │ 4 │ 5 │ 6 │ 7 │ 8 │ 9 │ 10 │ 11 │ 12 │ 13 │ 14 │ 15 │
         // └─────┴─────┴───┴───┴───┴───┴───┴───┴───┴───┴────┴────┴────┴────┴────┴────┘
-        let flags = Trace(0, 0);
-        // TODO: let off_op1 = Trace(7, 4);
-        // TODO: let off_op0 = Trace(7, 8);
-        // TODO: let off_dst = Trace(7, 0);
+        let whole_flag_prefix = Trace(0, 0);
+        // NOTE: Forces the `0` flag prefix to =0 in every cycle.
+        let cpu_decode_opcode_rc_zero = &whole_flag_prefix / flag0_zerofier;
+        // TODO: let off_op1 = RangeCheck::OffOp1.curr();
+        // TODO: let off_op0 = RangeCheck::OffOp0.curr();
+        // TODO: let off_dst = RangeCheck::OffDst.curr();
 
         // force constraint to apply every 16 trace cycles (aka 1 cairo cycle)
         // e.g. (x - ω_0)(x - ω_16)(x - ω_32)(x - ω_48) for n=64
-        let all_cycle_zerofier = X.pow(n / cycle_height) - &one;
-        let cpu_decode_opcode_rc_input = (Trace(5, 1)
-            - (((flags * &offset_size + Trace(7, 4)) * &offset_size + Trace(7, 8)) * &offset_size
-                + Trace(7, 0)))
+        let all_cycle_zerofier = X.pow(n / CYCLE_HEIGHT) - &one;
+        let cpu_decode_opcode_rc_input = (Npc::FirstWord.curr()
+            - (((&whole_flag_prefix * &offset_size + RangeCheck::OffOp1.curr()) * &offset_size
+                + RangeCheck::OffOp0.curr())
+                * &offset_size
+                + RangeCheck::OffDst.curr()))
             / &all_cycle_zerofier;
 
         // TODO: constraint for the Op1Src flag group? forces vals 000, 100, 010 or 001
@@ -231,10 +223,10 @@ impl Air for CairoAir {
         //   dst = m(fp + offdst)
         // ```
         // NOTE: Trace(5, 8) dest mem address
-        let cpu_operands_mem_dst_addr = (Trace(5, 8) + &half_offset_size
-            - (&cpu_decode_opcode_rc_b0 * Trace(7, 11)
-                + (&one - &cpu_decode_opcode_rc_b0) * Trace(7, 3)
-                + Trace(7, 0)))
+        let cpu_operands_mem_dst_addr = (Npc::MemDstAddr.curr() + &half_offset_size
+            - (Flag::DstReg.curr() * RangeCheck::Fp.curr()
+                + (&one - Flag::DstReg.curr()) * RangeCheck::Ap.curr()
+                + RangeCheck::OffDst.curr()))
             / &all_cycle_zerofier;
 
         // whitepaper pseudocode
@@ -246,24 +238,26 @@ impl Air for CairoAir {
         // op0 = m(fp + offop0)
         // ```
         // NOTE: StarkEx contracts as: cpu_operands_mem0_addr
-        let cpu_operands_mem_op0_addr = (Trace(5, 4) + &half_offset_size
-            - (&cpu_decode_opcode_rc_b1 * Trace(7, 11)
-                + (&one - &cpu_decode_opcode_rc_b1) * Trace(7, 3)
-                + Trace(7, 8)))
+        let cpu_operands_mem_op0_addr = (Npc::MemOp0Addr.curr() + &half_offset_size
+            - (Flag::Op0Reg.curr() * RangeCheck::Fp.curr()
+                + (&one - Flag::Op0Reg.curr()) * RangeCheck::Ap.curr()
+                + RangeCheck::OffOp0.curr()))
             / &all_cycle_zerofier;
 
         // NOTE: StarkEx contracts as: cpu_operands_mem1_addr
-        let cpu_operands_mem_op1_addr = (Trace(5, 12) + &half_offset_size
-            - (&cpu_decode_opcode_rc_b2 * Trace(5, 0)
-                + &cpu_decode_opcode_rc_b4 * Trace(7, 3)
-                + &cpu_decode_opcode_rc_b3 * Trace(7, 11)
-                + &cpu_decode_flag_op1_base_op0_0 * Trace(5, 5)
-                + Trace(7, 4)))
+        let cpu_operands_mem_op1_addr = (Npc::MemOp1Addr.curr() + &half_offset_size
+            - (Flag::Op1Imm.curr() * Npc::Pc.curr()
+                + Flag::Op1Ap.curr() * RangeCheck::Ap.curr()
+                + Flag::Op1Fp.curr() * RangeCheck::Fp.curr()
+                + &cpu_decode_flag_op1_base_op0_0 * Npc::MemOp0.curr()
+                + RangeCheck::OffOp1.curr()))
             / &all_cycle_zerofier;
 
         // op1 * op0
         // NOTE: starkex cpu/operands/ops_mul
-        let cpu_operands_ops_mul = (Trace(7, 7) - Trace(5, 5) * Trace(5, 13)) / &all_cycle_zerofier;
+        let cpu_operands_ops_mul = (RangeCheck::Op0MulOp1.curr()
+            - Npc::MemOp0.curr() * Npc::MemOp1.curr())
+            / &all_cycle_zerofier;
 
         // From cairo whitepaper
         // ```
@@ -289,10 +283,10 @@ impl Air for CairoAir {
         //     case 1: res = op0 + op1
         //     case 2: res = op0 * op1
         // ```
-        let cpu_operands_res = ((&one - &cpu_decode_opcode_rc_b9) * Trace(7, 15)
-            - (&cpu_decode_opcode_rc_b5 * (Trace(5, 5) + Trace(5, 13))
-                + &cpu_decode_opcode_rc_b6 * Trace(7, 7)
-                + &cpu_decode_flag_res_op1_0 * Trace(5, 13)))
+        let cpu_operands_res = ((&one - Flag::PcJnz.curr()) * RangeCheck::Res.curr()
+            - (Flag::ResAdd.curr() * (Npc::MemOp0.curr() + Npc::MemOp1.curr())
+                + Flag::ResMul.curr() * RangeCheck::Op0MulOp1.curr()
+                + &cpu_decode_flag_res_op1_0 * Npc::MemOp1.curr()))
             / &all_cycle_zerofier;
 
         // helpful example for trace length n=64
@@ -301,7 +295,7 @@ impl Air for CairoAir {
         // X - ω^(16*(n/16 - 1))           = x - ω^n/w^16 = x - 1/w_16 = x - w_48
         // (X - w_48) / all_cycle_zerofier = (x - ω_0)(x - ω_16)(x - ω_32)
         let last_cycle_zerofier =
-            X - FieldConstant::Fp(g.pow([(cycle_height * (n / cycle_height - 1)) as u64]));
+            X - FieldConstant::Fp(g.pow([(CYCLE_HEIGHT * (n / CYCLE_HEIGHT - 1)) as u64]));
         let all_cycles_except_last_zerofier = &last_cycle_zerofier / &all_cycle_zerofier;
 
         // Updating the program counter
@@ -310,8 +304,8 @@ impl Air for CairoAir {
         // Updating pc to understand.
 
         // from whitepaper `t0 = fPC_JNZ * dst`
-        let cpu_update_registers_update_pc_tmp0 = (Trace(8, 0)
-            - &cpu_decode_opcode_rc_b9 * Trace(5, 9))
+        let cpu_update_registers_update_pc_tmp0 = (Auxiliary::Tmp0.curr()
+            - Flag::PcJnz.curr() * Npc::MemDst.curr())
             / &all_cycles_except_last_zerofier;
 
         // From the whitepaper "To verify that we make a regular update if dst = 0, we
@@ -320,8 +314,9 @@ impl Air for CairoAir {
         // 0` NOTE: if fPC_JNZ=1 then `res` is "unused" and repurposed as our
         // temporary variable `v`. The value assigned to v is `dst^(−1)`.
         // NOTE: `t1 = t0 * v`
-        let cpu_update_registers_update_pc_tmp1 =
-            (Trace(8, 8) - Trace(8, 0) * Trace(7, 15)) / &all_cycles_except_last_zerofier;
+        let cpu_update_registers_update_pc_tmp1 = (Auxiliary::Tmp1.curr()
+            - Auxiliary::Tmp0.curr() * RangeCheck::Res.curr())
+            / &all_cycles_except_last_zerofier;
 
         // There are two constraints here bundled in one. The first is `t0 * (next_pc −
         // (pc + op1)) = 0` (ensures if dst != 0 a relative jump is made) and the second
@@ -331,18 +326,23 @@ impl Air for CairoAir {
         // then the second constraint is trivially 0=0 and if jnz=0 then the first
         // constraint is trivially 0=0. For this reason we can bundle these constraints
         // into one.
-        let cpu_update_registers_update_pc_pc_cond_negative = ((&one - &cpu_decode_opcode_rc_b9)
-            * Trace(5, 16)
-            + Trace(8, 0) * (Trace(5, 16) - (Trace(5, 0) + Trace(5, 13)))
+        let cpu_update_registers_update_pc_pc_cond_negative = ((&one - Flag::PcJnz.curr())
+            * Npc::Pc.next()
+            + Auxiliary::Tmp0.curr() * (Npc::Pc.next() - (Npc::Pc.curr() + Npc::MemOp1.curr()))
             - (&cpu_decode_flag_pc_update_regular_0 * &npc_reg_0
-                + &cpu_decode_opcode_rc_b7 * Trace(7, 15)
-                + cpu_decode_opcode_rc_b8 * (Trace(5, 0) + Trace(7, 15))))
+                + Flag::PcJumpAbs.curr() * RangeCheck::Res.curr()
+                + Flag::PcJumpRel.curr() * (Npc::Pc.curr() + RangeCheck::Res.curr())))
             / &all_cycles_except_last_zerofier;
 
         // ensure `if dst == 0: pc + instruction_size == next_pc`
         let cpu_update_registers_update_pc_pc_cond_positive =
-            ((Trace(8, 8) - cpu_decode_opcode_rc_b9) * (Trace(5, 16) - npc_reg_0))
+            ((Auxiliary::Tmp1.curr() - Flag::PcJnz.curr()) * (Npc::Pc.next() - npc_reg_0))
                 / &all_cycles_except_last_zerofier;
+
+        // Updating the allocation pointer
+        // ===============================
+        // next_ap = Trace(7, 19)
+        // let cpu_update_registers_update_ap_ap_update = Trace(7, 19)
 
         // NOTE: for composition OODs only seem to involve one random per constraint
         vec![

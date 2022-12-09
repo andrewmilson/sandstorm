@@ -1,14 +1,15 @@
+use gpu_poly::GpuFftField;
+use strum_macros::EnumIter;
 use gpu_poly::GpuVec;
 use gpu_poly::prelude::PageAlignedAllocator;
 use ministark::Matrix;
 use gpu_poly::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481::Fp;
+use ministark::StarkExtensionOf;
 use ministark::Trace;
 use ark_ff::Zero;
+use ministark::constraints::AlgebraicExpression;
+use ministark::constraints::ExecutionTraceColumn;
 use strum::IntoEnumIterator;
-use crate::Flag;
-use crate::FlagGroup;
-use ark_ff::One;
-use crate::binary::NUM_FLAGS;
 use crate::binary::CompiledProgram;
 use crate::binary::Memory;
 use crate::binary::RegisterStates;
@@ -16,6 +17,8 @@ use cairo_rs::vm::trace::trace_entry::RelocatedTraceEntry as RegisterState;
 use std::fs::File;
 use std::io::BufReader;
 use std::path::PathBuf;
+
+pub const CYCLE_HEIGHT: usize = 16;
 
 pub struct ExecutionTrace {
     flags_column: GpuVec<Fp>,
@@ -29,8 +32,7 @@ impl ExecutionTrace {
     fn new(mem: Memory, register_states: RegisterStates, program: CompiledProgram) -> Self {
         let num_program_cycles = register_states.len();
         let num_trace_cycles = register_states.len().next_power_of_two();
-        let cycle_height = 16;
-        let trace_len = num_trace_cycles * cycle_height;
+        let trace_len = num_trace_cycles * CYCLE_HEIGHT;
         // let half_offset = 2isize.pow(15);
         // let half_offset = 2u32.pow(15);
 
@@ -51,7 +53,7 @@ impl ExecutionTrace {
         auxiliary_column.resize(trace_len, Fp::zero());
 
         for (i, &RegisterState { pc, ap, fp }) in register_states.iter().enumerate() {
-            let trace_offset = i * cycle_height;
+            let trace_offset = i * CYCLE_HEIGHT;
             let word = mem[pc].unwrap();
             assert!(!word.get_flag(Flag::Zero));
             let off_dst = (word.get_off_dst() as u64).into();
@@ -68,13 +70,13 @@ impl ExecutionTrace {
             let tmp1 = word.get_tmp1(pc, ap, fp, &mem);
 
             // FLAGS
-            let flags_virtual_row = &mut flags_column[trace_offset..trace_offset + cycle_height];
+            let flags_virtual_row = &mut flags_column[trace_offset..trace_offset + CYCLE_HEIGHT];
             for flag in Flag::iter() {
                 flags_virtual_row[flag as usize] = word.get_flag_prefix(flag).into();
             }
 
             // NPC
-            let npc_virtual_row = &mut npc_column[trace_offset..trace_offset + cycle_height];
+            let npc_virtual_row = &mut npc_column[trace_offset..trace_offset + CYCLE_HEIGHT];
             npc_virtual_row[Npc::Pc as usize] = (pc as u64).into();
             npc_virtual_row[Npc::MemOp0 as usize] = op0;
             npc_virtual_row[Npc::FirstWord as usize] = word.into();
@@ -85,7 +87,7 @@ impl ExecutionTrace {
             npc_virtual_row[Npc::MemOp1 as usize] = op1;
 
             // RANGE CHECK
-            let rc_virtual_row = &mut range_check_column[trace_offset..trace_offset + cycle_height];
+            let rc_virtual_row = &mut range_check_column[trace_offset..trace_offset + CYCLE_HEIGHT];
             rc_virtual_row[RangeCheck::OffDst as usize] = off_dst;
             rc_virtual_row[RangeCheck::Fp as usize] = (fp as u64).into();
             rc_virtual_row[RangeCheck::OffOp1 as usize] = off_op1;
@@ -95,7 +97,7 @@ impl ExecutionTrace {
             rc_virtual_row[RangeCheck::Res as usize] = res;
 
             // COL8 - TODO: better name
-            let aux_virtual_row = &mut auxiliary_column[trace_offset..trace_offset + cycle_height];
+            let aux_virtual_row = &mut auxiliary_column[trace_offset..trace_offset + CYCLE_HEIGHT];
             aux_virtual_row[Auxiliary::Tmp0 as usize] = tmp0;
             aux_virtual_row[Auxiliary::Tmp1 as usize] = tmp1;
         }
@@ -114,10 +116,10 @@ impl ExecutionTrace {
 
         // pad the execution trace by duplicating the trace cells for the last cycle
         for column in base_trace.iter_mut() {
-            let last_cycle_offset = (num_program_cycles - 1) * cycle_height;
+            let last_cycle_offset = (num_program_cycles - 1) * CYCLE_HEIGHT;
             let (_, trace_suffix) = column.split_at_mut(last_cycle_offset);
-            let (last_cycle, padding_rows) = trace_suffix.split_at_mut(cycle_height);
-            let padding_cycles = padding_rows.chunks_mut(cycle_height);
+            let (last_cycle, padding_rows) = trace_suffix.split_at_mut(CYCLE_HEIGHT);
+            let padding_cycles = padding_rows.chunks_mut(CYCLE_HEIGHT);
             padding_cycles.for_each(|padding_cycle| padding_cycle.copy_from_slice(last_cycle))
         }
 
@@ -154,9 +156,66 @@ impl Trace for ExecutionTrace {
     }
 }
 
+/// Cairo flag
+/// https://eprint.iacr.org/2021/1063.pdf section 9
+#[derive(Clone, Copy, EnumIter, PartialEq, Eq)]
+pub enum Flag {
+    // Group: [FlagGroup::DstReg]
+    DstReg = 0,
+
+    // Group: [FlagGroup::Op0]
+    Op0Reg = 1,
+
+    // Group: [FlagGroup::Op1Src]
+    Op1Imm = 2,
+    Op1Fp = 3,
+    Op1Ap = 4,
+
+    // Group: [FlagGroup::ResLogic]
+    ResAdd = 5,
+    ResMul = 6,
+
+    // Group: [FlagGroup::PcUpdate]
+    PcJumpAbs = 7,
+    PcJumpRel = 8,
+    PcJnz = 9,
+
+    // Group: [FlagGroup::ApUpdate]
+    ApAdd = 10,
+    ApAdd1 = 11,
+
+    // Group: [FlagGroup::Opcode]
+    OpcodeCall = 12,
+    OpcodeRet = 13,
+    OpcodeAssertEq = 14,
+
+    // 0 - padding to make flag cells a power-of-2
+    Zero = 15,
+}
+
+impl ExecutionTraceColumn for Flag {
+    fn index(&self) -> usize {
+        0
+    }
+
+    fn offset<Fp: GpuFftField, Fq: StarkExtensionOf<Fp>>(
+        &self,
+        cycle_offset: isize,
+    ) -> AlgebraicExpression<Fp, Fq> {
+        use AlgebraicExpression::Trace;
+        // Get the individual bit (as opposed to the bit prefix)
+        let col = self.index();
+        let trace_offset = CYCLE_HEIGHT as isize * cycle_offset;
+        let flag_offset = trace_offset + *self as isize;
+        Trace(col, flag_offset) - (Trace(col, flag_offset + 1) + Trace(col, flag_offset + 1))
+    }
+}
+
 // NPC? not sure what it means yet - next program counter?
 // Trace column 5
-enum Npc {
+// Perhaps control flow is a better name for this column
+#[derive(Clone, Copy)]
+pub enum Npc {
     // TODO: first word of each instruction?
     Pc = 0, // Program counter
     FirstWord = 1,
@@ -169,19 +228,66 @@ enum Npc {
     MemOp1 = 13,
 }
 
+impl ExecutionTraceColumn for Npc {
+    fn index(&self) -> usize {
+        5
+    }
+
+    fn offset<Fp: GpuFftField, Fq: StarkExtensionOf<Fp>>(
+        &self,
+        cycle_offset: isize,
+    ) -> AlgebraicExpression<Fp, Fq> {
+        let column = self.index();
+        let trace_offset = CYCLE_HEIGHT as isize * cycle_offset + *self as isize;
+        AlgebraicExpression::Trace(column, trace_offset)
+    }
+}
+
 // Trace column 7
-enum RangeCheck {
+#[derive(Clone, Copy)]
+pub enum RangeCheck {
     OffDst = 0,
     Ap = 3, // Allocation pointer (ap)
     OffOp1 = 4,
-    Op0MulOp1 = 7,
+    Op0MulOp1 = 7, // =op0*op1
     OffOp0 = 8,
     Fp = 11, // Frame pointer (fp)
     Res = 15,
 }
 
+impl ExecutionTraceColumn for RangeCheck {
+    fn index(&self) -> usize {
+        7
+    }
+
+    fn offset<Fp: GpuFftField, Fq: StarkExtensionOf<Fp>>(
+        &self,
+        cycle_offset: isize,
+    ) -> AlgebraicExpression<Fp, Fq> {
+        let column = self.index();
+        let trace_offset = CYCLE_HEIGHT as isize * cycle_offset + *self as isize;
+        AlgebraicExpression::Trace(column, trace_offset)
+    }
+}
+
 // Auxiliary column 8
-enum Auxiliary {
+#[derive(Clone, Copy)]
+pub enum Auxiliary {
     Tmp0 = 0,
     Tmp1 = 8,
+}
+
+impl ExecutionTraceColumn for Auxiliary {
+    fn index(&self) -> usize {
+        8
+    }
+
+    fn offset<Fp: GpuFftField, Fq: StarkExtensionOf<Fp>>(
+        &self,
+        cycle_offset: isize,
+    ) -> AlgebraicExpression<Fp, Fq> {
+        let column = self.index();
+        let trace_offset = CYCLE_HEIGHT as isize * cycle_offset + *self as isize;
+        AlgebraicExpression::Trace(column, trace_offset)
+    }
 }
