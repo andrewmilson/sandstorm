@@ -10,7 +10,9 @@ use serde::Serialize;
 use std::fs::File;
 use std::io::BufRead;
 use ark_ff::PrimeField;
+use ark_ff::Zero;
 use std::io::BufReader;
+use ark_ff::Field;
 use std::ops::Deref;
 use std::path::PathBuf;
 
@@ -29,6 +31,9 @@ pub const NUM_FLAGS: usize = 16;
 
 // Mask for word offsets (16 bits each)
 pub const OFF_MASK: usize = 0xFFFF;
+
+pub const OFFSET: usize = 2usize.pow(16);
+pub const HALF_OFFSET: usize = 2usize.pow(15);
 
 pub struct RegisterStates(Vec<RegisterState>);
 
@@ -140,23 +145,104 @@ impl Word {
         (prefix & mask).try_into().unwrap()
     }
 
+    pub fn get_tmp0(&self, ap: usize, fp: usize, mem: &Memory) -> Fp {
+        if self.get_flag(Flag::PcJnz) {
+            self.get_dst(ap, fp, mem)
+        } else {
+            // TODO: change
+            Fp::zero()
+        }
+    }
+
+    pub fn get_tmp1(&self, pc: usize, ap: usize, fp: usize, mem: &Memory) -> Fp {
+        self.get_tmp0(ap, fp, mem) * self.get_res(pc, ap, fp, mem)
+    }
+
+    pub fn get_op0_addr(&self, ap: usize, fp: usize) -> usize {
+        // TODO: put the if statement first good for rust quiz
+        self.get_off_op0() + if self.get_flag(Flag::Op0Reg) { fp } else { ap } - HALF_OFFSET
+    }
+
+    pub fn get_op0(&self, ap: usize, fp: usize, mem: &Memory) -> Fp {
+        mem[self.get_op0_addr(ap, fp)].unwrap().into()
+    }
+
+    pub fn get_dst_addr(&self, ap: usize, fp: usize) -> usize {
+        self.get_off_dst() + if self.get_flag(Flag::DstReg) { fp } else { ap } - HALF_OFFSET
+    }
+
+    pub fn get_dst(&self, ap: usize, fp: usize, mem: &Memory) -> Fp {
+        mem[self.get_dst_addr(ap, fp)].unwrap().into()
+    }
+
+    pub fn get_op1_addr(&self, pc: usize, ap: usize, fp: usize, mem: &Memory) -> usize {
+        self.get_off_op1()
+            + match self.get_flag_group(FlagGroup::Op1Src) {
+                0 => usize::try_from(mem[self.get_op0_addr(ap, fp)].unwrap().0).unwrap(),
+                1 => pc,
+                2 => fp,
+                4 => ap,
+                _ => unreachable!(),
+            }
+            - HALF_OFFSET
+    }
+
+    pub fn get_op1(&self, pc: usize, ap: usize, fp: usize, mem: &Memory) -> Fp {
+        mem[self.get_op1_addr(pc, ap, fp, mem)].unwrap().into()
+    }
+
+    pub fn get_res(&self, pc: usize, ap: usize, fp: usize, mem: &Memory) -> Fp {
+        let pc_update = self.get_flag_group(FlagGroup::PcUpdate);
+        let res_logic = self.get_flag_group(FlagGroup::ResLogic);
+        match pc_update {
+            4 => {
+                let opcode = self.get_flag_group(FlagGroup::Opcode);
+                let ap_update = self.get_flag_group(FlagGroup::ApUpdate);
+                if res_logic == 0 && opcode == 0 && ap_update != 1 {
+                    // From the Cairo whitepaper "We use the term Unused to
+                    // describe a variable that will not be used later in the
+                    // flow. As such, we don’t need to assign it a concrete
+                    // value.". Note `res` is repurposed when calculating next_pc and
+                    // stores the value of `dst^(-1)` (see air.rs for more details).
+                    self.get_dst(ap, fp, mem).inverse().unwrap_or_else(Fp::zero)
+                } else {
+                    unreachable!()
+                }
+            }
+            0 | 1 | 2 => {
+                let op0: Fp = mem[self.get_op0_addr(ap, fp)].unwrap().into();
+                let op1: Fp = mem[self.get_op1_addr(pc, ap, fp, mem)].unwrap().into();
+                match res_logic {
+                    0 => op1,
+                    1 => op0 + op1,
+                    2 => op0 * op1,
+                    _ => unreachable!(),
+                }
+            }
+            _ => unreachable!(),
+        }
+        // if pc_update == 4 {
+
+        // } else if pa
+    }
+
     pub fn get_flag(&self, flag: Flag) -> bool {
         self.0.bit(FLAGS_BIT_OFFSET + flag as usize)
     }
 
-    pub fn get_off_dst(&self) -> u64 {
+    pub fn get_off_dst(&self) -> usize {
         let prefix = self.0 >> OFF_DST_BIT_OFFSET;
         let mask = U256::from(OFF_MASK);
         (prefix & mask).try_into().unwrap()
     }
 
-    pub fn get_off_op0(&self) -> u64 {
+    pub fn get_off_op0(&self) -> usize {
         let prefix = self.0 >> OFF_OP0_BIT_OFFSET;
         let mask = U256::from(OFF_MASK);
         (prefix & mask).try_into().unwrap()
     }
 
-    pub fn get_off_op1(&self) -> u64 {
+    pub fn get_off_op1(&self) -> usize {
         let prefix = self.0 >> OFF_OP1_BIT_OFFSET;
         let mask = U256::from(OFF_MASK);
         (prefix & mask).try_into().unwrap()

@@ -11,36 +11,36 @@ pub mod trace;
 #[derive(Clone, Copy, EnumIter, PartialEq, Eq)]
 pub enum Flag {
     // Group: [FlagGroup::DstReg]
-    DstReg,
+    DstReg = 0,
 
     // Group: [FlagGroup::Op0]
-    Op0Reg,
+    Op0Reg = 1,
 
     // Group: [FlagGroup::Op1Src]
-    Op1Imm,
-    Op1Fp,
-    Op1Ap,
+    Op1Imm = 2,
+    Op1Fp = 3,
+    Op1Ap = 4,
 
     // Group: [FlagGroup::ResLogic]
-    ResAdd,
-    ResMul,
+    ResAdd = 5,
+    ResMul = 6,
 
     // Group: [FlagGroup::PcUpdate]
-    PcJumpAbs,
-    PcJumpRel,
-    PcJnz,
+    PcJumpAbs = 7,
+    PcJumpRel = 8,
+    PcJnz = 9,
 
     // Group: [FlagGroup::ApUpdate]
-    ApAdd,
-    ApAdd1,
+    ApAdd = 10,
+    ApAdd1 = 11,
 
     // Group: [FlagGroup::Opcode]
-    OpcodeCall,
-    OpcodeRet,
-    OpcodeAssertEq,
+    OpcodeCall = 12,
+    OpcodeRet = 13,
+    OpcodeAssertEq = 14,
 
     // 0 - padding to make flag cells a power-of-2
-    Zero,
+    Zero = 15,
 }
 
 /// Cairo flag group

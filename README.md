@@ -13,6 +13,17 @@
 
 # Decoding constraints
 
+```bash
+cargo run -r -F gpu,asm,parallel -- prove \
+    --memory ./tmp/memory.bin \
+    --program ./tmp/program.json \
+    --trace ./tmp/trace.bin
+
+source ~/cairo_venv/bin/activate
+cairo-compile tmp/program.cairo --output tmp/program.json
+cairo-run --program ./tmp/program.json --trace_file ./tmp/trace.bin --memory_file ./tmp/memory.bin
+```
+
 ```
 memory layout for constraint poly
 
