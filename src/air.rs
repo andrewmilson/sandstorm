@@ -62,7 +62,7 @@ impl Air for CairoAir {
     // col5 - npc? next program counter?
     // col6 - memory
     // col7 - rc16 (range check 16 bit?)
-    // col8 - ecdsa
+    // col8 - auxiliary fields?
 
     fn constraints(&self) -> Vec<AlgebraicExpression<Fp>> {
         use AlgebraicExpression::*;
@@ -341,8 +341,32 @@ impl Air for CairoAir {
 
         // Updating the allocation pointer
         // ===============================
-        // next_ap = Trace(7, 19)
-        // let cpu_update_registers_update_ap_ap_update = Trace(7, 19)
+        // TODO: seems fishy don't see how `next_ap = ap + fAP_ADD · res + fAP_ADD1 · 1
+        // + fOPCODE_CALL · 2` meets the pseudo code in the whitepaper
+        // Ok, it does kinda make sense. move the `opcode == 1` statement inside and
+        // move the switch to the outside and it's more clear.
+        let cpu_update_registers_update_ap_ap_update = (RangeCheck::Ap.next()
+            - (RangeCheck::Ap.curr()
+                + Flag::ApAdd.curr() * RangeCheck::Res.curr()
+                + Flag::ApAdd1.curr()
+                + Flag::OpcodeCall.curr() * &two))
+            / &all_cycles_except_last_zerofier;
+
+        // Updating the frame pointer
+        // ==========================
+        // This handles all fp update except the `op0 == pc + instruction_size`, `res =
+        // dst` and `dst == fp` assertions.
+        let cpu_update_registers_update_fp_fp_update = (RangeCheck::Fp.next()
+            - (&cpu_decode_fp_update_regular_0 * RangeCheck::Fp.curr()
+                + Flag::OpcodeRet.curr() * Npc::MemDst.curr()
+                + Flag::OpcodeCall.curr() * (RangeCheck::Ap.curr() + &two)))
+            / &all_cycles_except_last_zerofier;
+
+        // push fp register to memory see section 8.4 in the whitepaper
+        // TODO: What does Trace(7, 11) refer to? memory?
+        // let cpu_opcodes_call_push_fp =
+        //     (Flag::OpcodeCall.curr() * (Npc::MemDst.curr() - Trace(7, 11))) /
+        // &all_cycle_zerofier;
 
         // NOTE: for composition OODs only seem to involve one random per constraint
         vec![
@@ -362,6 +386,9 @@ impl Air for CairoAir {
             cpu_update_registers_update_pc_tmp1,
             cpu_update_registers_update_pc_pc_cond_negative,
             cpu_update_registers_update_pc_pc_cond_positive,
+            cpu_update_registers_update_ap_ap_update,
+            cpu_update_registers_update_fp_fp_update,
+            // cpu_opcodes_call_push_fp,
         ]
     }
 }
