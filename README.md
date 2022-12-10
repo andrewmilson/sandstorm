@@ -5,11 +5,13 @@
 
 # sandstorm
 
-**SHARP compatible Cairo prover**
+**SHARP (almost 😉) compatible Cairo prover**
 
 [![stability-experimental](https://img.shields.io/badge/stability-experimental-orange.svg)](https://github.com/mkenney/software-guides/blob/master/STABILITY-BADGES.md#experimental)
 
 </div>
+
+Sandstorm uses miniSTARK to generate (almost) SHARP compatible proofs for Cairo programs. The prover was built by reverse engineering StarkWare's Open-Source StarkEx Solidity verifier. So far Sandstorm uses exactly the same trace layout as SHARP ✅ but verifier challenges and contraint composition coefficients differ which prevent users from submitting Sandstorm's proofs to StarkWare's L1 smart contract. Fixing this is straighforward 👌.
 
 # Decoding constraints
 

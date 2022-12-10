@@ -1,5 +1,4 @@
 use crate::trace::Flag;
-use cairo_rs::vm::trace::trace_entry::RelocatedTraceEntry as RegisterState;
 use gpu_poly::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481::Fp;
 use num_bigint::BigUint;
 use ruint::aliases::U256;
@@ -8,6 +7,7 @@ use serde::Deserialize;
 use serde::Serialize;
 use std::fs::File;
 use std::io::BufRead;
+use std::str::FromStr;
 use ark_ff::PrimeField;
 use ark_ff::Zero;
 use std::io::BufReader;
@@ -33,6 +33,14 @@ pub const OFF_MASK: usize = 0xFFFF;
 
 pub const OFFSET: usize = 2usize.pow(16);
 pub const HALF_OFFSET: usize = 2usize.pow(15);
+
+/// Holds register values
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+pub struct RegisterState {
+    pub ap: usize,
+    pub fp: usize,
+    pub pc: usize,
+}
 
 pub struct RegisterStates(Vec<RegisterState>);
 
@@ -117,6 +125,14 @@ impl CompiledProgram {
             format!("{:#x}", BigUint::from(Fp::MODULUS)),
             self.prime.to_lowercase(),
         );
+    }
+
+    pub fn get_public_memory(&self) -> Vec<(usize, Word)> {
+        self.data
+            .iter()
+            .map(|value_str| Word::new(U256::from_str(value_str).expect("invalid data item")))
+            .enumerate()
+            .collect()
     }
 }
 
