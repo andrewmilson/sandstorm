@@ -154,7 +154,8 @@ impl Air for CairoAir {
         let cpu_decode_fp_update_regular_0: AlgebraicExpression<Fp> =
             &one - (Flag::OpcodeCall.curr() + Flag::OpcodeRet.curr());
 
-        // NOTE: = pc + <instruction size>
+        // NOTE: = pc + instruction_size
+        // NOTE: instruction_size = fOP1_IMM + 1
         let npc_reg_0 = Npc::Pc.curr() + Flag::Op1Imm.curr() + &one;
 
         let memory_address_diff_0: AlgebraicExpression<Fp> =
@@ -598,7 +599,7 @@ impl Air for CairoAir {
         let rc16_minimum = (Trace(7, 2) - RangeCheckMin.hint()) / &first_row_zerofier;
         let rc16_maximum = (Trace(7, 2) - RangeCheckMax.hint()) / &fourth_last_row_zerofier;
 
-        // Done 2,000 of 7,500 (26% - should take 6 days)
+        // Done 3,500 of 7,500 (46% - should take 3 days)
 
         // NOTE: for composition OODs only seem to involve one random per constraint
         vec![

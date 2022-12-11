@@ -33,13 +33,12 @@ strum_macros = "0.24"
 opt-level = 3
 
 [profile.release]
-# dev
-incremental = true
-codegen-units = 8
+codegen-units = 1
 lto = true
-# codegen-units = 1
+# dev
+# incremental = true
+# codegen-units = 8
 # lto = true
-
 
 
 [profile.bench]
