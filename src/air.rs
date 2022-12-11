@@ -28,6 +28,7 @@ use crate::trace::RangeCheck;
 pub const CYCLE_HEIGHT: usize = 16;
 pub const PUBLIC_MEMORY_STEP: usize = 8;
 pub const MEMORY_STEP: usize = 2;
+pub const RANGE_CHECK_STEP: usize = 4;
 
 pub struct CairoAir {
     info: TraceInfo,
@@ -197,8 +198,8 @@ impl Air for CairoAir {
             + Trace(7, 255) * two.pow(195)
             + Trace(7, 241) * two.pow(196);
 
-        // helpful example for trace length n=64
-        // =====================================
+        // example for trace length n=64
+        // =============================
         // x^(n/16)                 = (x - ω_0)(x - ω_16)(x - ω_32)(x - ω_48)
         // x^(n/16) - c             = (x - c*ω_0)(x - c*ω_16)(x - c*ω_32)(x - c*ω_48)
         // x^(n/16) - ω^(n/16)      = (x - ω_1)(x - ω_17)(x - ω_33)(x - ω_49)
@@ -347,8 +348,8 @@ impl Air for CairoAir {
                 + &cpu_decode_flag_res_op1_0 * Npc::MemOp1.curr()))
             / &all_cycles_zerofier;
 
-        // helpful example for trace length n=64
-        // =====================================
+        // example for trace length n=64
+        // =============================
         // all_cycles_zerofier              = (x - ω_0)(x - ω_16)(x - ω_32)(x - ω_48)
         // X - ω^(16*(n/16 - 1))           = x - ω^n/w^16 = x - 1/w_16 = x - w_48
         // (X - w_48) / all_cycles_zerofier = (x - ω_0)(x - ω_16)(x - ω_32)
@@ -487,8 +488,8 @@ impl Air for CairoAir {
         let final_fp = (RangeCheck::Fp.curr() - InitialAp.hint()) / &last_cycle_zerofier;
         let final_pc = (Npc::Pc.curr() - FinalPc.hint()) / &last_cycle_zerofier;
 
-        // helpful example for trace length n=8
-        // =====================================
+        // examples for trace length n=8
+        // =============================
         // x^(n/2) - 1             = (x - ω_0)(x - ω_2)(x - ω_4)(x - ω_6)
         // x - ω^(2*(n/2 - 1))     = x - ω^n/w^2 = x - 1/w_2 = x - w_6
         // (x - w_6) / x^(n/2) - 1 = (x - ω_0)(x - ω_2)(x - ω_4)
@@ -502,7 +503,6 @@ impl Air for CairoAir {
         // All these constraints make more sense once you understand how the permutation
         // column is calculated (look at get_ordered_memory_accesses()). Sections 9.8
         // and 9.7 of the Cairo paper justify these constraints.
-
         // memory permutation boundary constraint
         let memory_multi_column_perm_perm_init0 = ((MemoryPermutation::Z.challenge()
             - (Mem::Address.curr() + MemoryPermutation::A.challenge() * Mem::Value.curr()))
@@ -511,7 +511,6 @@ impl Air for CairoAir {
             + MemoryPermutation::A.challenge() * Npc::Instruction.curr()
             - MemoryPermutation::Z.challenge())
             / &first_row_zerofier;
-
         // memory permutation transition constraint
         // NOTE: memory entries are stacked in the trace like so:
         // ┌─────┬───────────┬─────┐
@@ -535,17 +534,15 @@ impl Air for CairoAir {
                     + MemoryPermutation::A.challenge() * Npc::PubMemVal.curr()))
                 * Permutation::Memory.curr())
             * &every_second_row_except_last_zerofier;
-
+        // Check the last permutation value to verify public memory
         let memory_multi_column_perm_perm_last =
             (Permutation::Memory.curr() - MemoryProduct.hint()) / &second_last_row_zerofier;
-
         // Constraint expression for memory/diff_is_bit
         // checks the address doesn't change or increases by 1
         // "Continuity" constraint in cairo whitepaper 9.7.2
         let memory_diff_is_bit = (&memory_address_diff_0 * &memory_address_diff_0
             - &memory_address_diff_0)
             * &every_second_row_except_last_zerofier;
-
         // if the address stays the same then the value stays the same
         // "Single-valued" constraint in cairo whitepaper 9.7.2.
         // cairo uses nondeterministic read-only memory so if the address is the same
@@ -553,14 +550,10 @@ impl Air for CairoAir {
         let memory_is_func = ((&memory_address_diff_0 - &one)
             * (Mem::Value.curr() - Mem::Value.next()))
             * &every_second_row_except_last_zerofier;
-
         // boundary condition stating the first memory address == 1
-        // TODO: add back once pedersen is complete
         let memory_initial_addr = (Mem::Address.curr() - &one) / &first_row_zerofier;
-
         // applies every 8 rows
         let every_eighth_row_zerofier = X.pow(n / 8) - &one;
-
         // Read cairo whitepaper section 9.8 as to why the public memory cells are 0.
         // The high level is that the way public memory works is that the prover is
         // forced (with these constraints) to exclude the public memory from one of
@@ -571,25 +564,25 @@ impl Air for CairoAir {
         let public_memory_addr_zero = Npc::PubMemAddr.curr() / &every_eighth_row_zerofier;
         let public_memory_value_zero = Npc::PubMemVal.curr() / &every_eighth_row_zerofier;
 
-        // Range check constraints
-        // =======================
-        // Look at memory to understand the general approach to permutation.
-        // More info in section 9.9 of the Cairo paper.
-
-        // RIIIIIGHT: stores the difference between the permutation products
-        // Then at the end checks that the difference is 0
-        let rc16_perm_init0 = ((RangeCheckPermutation::Z.challenge() - Trace(7, 2))
-            * Permutation::RangeCheck.curr()
-            + RangeCheck::OffDst.curr()
-            - RangeCheckPermutation::Z.challenge())
-            / &first_row_zerofier;
-
+        // examples for trace length n=16
+        // =====================================
+        // x^(n/4) - 1             = (x - ω_0)(x - ω_4)(x - ω_8)(x - ω_12)
+        // x - ω^(4*(n/4 - 1))     = x - ω^n/w^4 = x - 1/w_4 = x - w_12
+        // (x - w_12) / x^(n/4) - 1 = (x - ω_0)(x - ω_4)(x - ω_8)
         let every_fourth_row_zerofier = X.pow(n / 4) - &one;
         let fourth_last_row_zerofier = X - FieldConstant::Fp(g.pow([4 * (n as u64 / 4 - 1)]));
         let every_fourth_row_except_last_zerofier =
             &fourth_last_row_zerofier / &every_fourth_row_zerofier;
 
-        // rc16/perm/step0
+        // Range check constraints
+        // =======================
+        // Look at memory to understand the general approach to permutation.
+        // More info in section 9.9 of the Cairo paper.
+        let rc16_perm_init0 = ((RangeCheckPermutation::Z.challenge() - Trace(7, 2))
+            * Permutation::RangeCheck.curr()
+            + RangeCheck::OffDst.curr()
+            - RangeCheckPermutation::Z.challenge())
+            / &first_row_zerofier;
         let rc16_perm_step0 = ((RangeCheckPermutation::Z.challenge() - Trace(7, 6))
             * Permutation::RangeCheck.next()
             - (RangeCheckPermutation::Z.challenge() - RangeCheck::OffOp1.curr())
@@ -597,8 +590,11 @@ impl Air for CairoAir {
             * &every_fourth_row_except_last_zerofier;
         let rc16_perm_last =
             (Permutation::RangeCheck.curr() - RangeCheckProduct.hint()) / &fourth_last_row_zerofier;
+        // Check the value increases by 0 or 1
         let rc16_diff_is_bit =
             (&rc16_diff_0 * &rc16_diff_0 - &rc16_diff_0) * &every_fourth_row_except_last_zerofier;
+        // Prover sends the minimim and maximum as a public input.
+        // Verifier checks the RC min and max fall within [0, 2^16).
         let rc16_minimum = (Trace(7, 2) - RangeCheckMin.hint()) / &first_row_zerofier;
         let rc16_maximum = (Trace(7, 2) - RangeCheckMax.hint()) / &fourth_last_row_zerofier;
 
@@ -647,7 +643,12 @@ impl Air for CairoAir {
             memory_initial_addr,
             public_memory_addr_zero,
             public_memory_value_zero,
-            // rc16_perm_init0,
+            rc16_perm_init0,
+            rc16_perm_step0,
+            rc16_perm_last,
+            rc16_diff_is_bit,
+            rc16_minimum,
+            rc16_maximum,
         ]
     }
 }

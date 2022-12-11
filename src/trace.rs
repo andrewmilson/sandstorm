@@ -16,6 +16,8 @@ use crate::air::CYCLE_HEIGHT;
 use crate::air::MEMORY_STEP;
 use crate::air::MemoryPermutation;
 use crate::air::PUBLIC_MEMORY_STEP;
+use crate::air::RANGE_CHECK_STEP;
+use crate::air::RangeCheckPermutation;
 use crate::binary::CompiledProgram;
 use crate::binary::Memory;
 use crate::binary::RegisterState;
@@ -48,15 +50,6 @@ impl ExecutionTrace {
         let num_program_cycles = register_states.len();
         let num_trace_cycles = register_states.len().next_power_of_two();
         let trace_len = num_trace_cycles * CYCLE_HEIGHT;
-        // let half_offset = 2isize.pow(15);
-        // let half_offset = 2u32.pow(15);
-
-        for (i, v) in mem.iter().enumerate() {
-            if !v.is_some() {
-                println!("FOK {i}");
-            }
-        }
-
         let public_memory = program.get_public_memory();
 
         let mut flags_column = Vec::new_in(PageAlignedAllocator);
@@ -71,14 +64,18 @@ impl ExecutionTrace {
         let mut npc_column = Vec::new_in(PageAlignedAllocator);
         npc_column.resize(trace_len, public_memory_padding_value);
 
+        let (ordered_rc_vals, ordered_rc_padding_vals) =
+            ordered_range_check_values(&mem, &register_states);
+        let range_check_min = *ordered_rc_vals.first().unwrap();
+        let range_check_max = *ordered_rc_vals.last().unwrap();
+        let range_check_padding_value = Fp::from(range_check_max as u64);
+        let mut ordered_rc_vals = ordered_rc_vals.into_iter();
+        let mut ordered_rc_padding_vals = ordered_rc_padding_vals.into_iter();
         let mut range_check_column = Vec::new_in(PageAlignedAllocator);
-        range_check_column.resize(trace_len, Fp::zero());
+        range_check_column.resize(trace_len, range_check_padding_value);
 
         let mut auxiliary_column = Vec::new_in(PageAlignedAllocator);
         auxiliary_column.resize(trace_len, Fp::zero());
-
-        let mut range_check_min = 0;
-        let mut range_check_max = 0;
 
         for (i, &RegisterState { pc, ap, fp }) in register_states.iter().enumerate() {
             let trace_offset = i * CYCLE_HEIGHT;
@@ -86,15 +83,9 @@ impl ExecutionTrace {
             assert!(!word.get_flag(Flag::Zero));
 
             // range check all offset values
-            let off_dst = word.get_off_dst();
-            let off_op0 = word.get_off_op0();
-            let off_op1 = word.get_off_op1();
-            range_check_min = range_check_min.min(off_dst).min(off_op0).min(off_op1);
-            range_check_max = range_check_max.max(off_dst).max(off_op0).max(off_op1);
-
-            let off_dst = (off_dst as u64).into();
-            let off_op0 = (off_op0 as u64).into();
-            let off_op1 = (off_op1 as u64).into();
+            let off_dst = (word.get_off_dst() as u64).into();
+            let off_op0 = (word.get_off_op0() as u64).into();
+            let off_op1 = (word.get_off_op1() as u64).into();
             let dst_addr = (word.get_dst_addr(ap, fp) as u64).into();
             let op0_addr = (word.get_op0_addr(ap, fp) as u64).into();
             let op1_addr = (word.get_op1_addr(pc, ap, fp, &mem) as u64).into();
@@ -104,9 +95,6 @@ impl ExecutionTrace {
             let res = word.get_res(pc, ap, fp, &mem);
             let tmp0 = word.get_tmp0(ap, fp, &mem);
             let tmp1 = word.get_tmp1(pc, ap, fp, &mem);
-
-            println!("{:016b} ", pc);
-            // println!("{:016b} ", word.get_off_dst() as u64);
 
             // FLAGS
             let flags_virtual_row = &mut flags_column[trace_offset..trace_offset + CYCLE_HEIGHT];
@@ -118,34 +106,46 @@ impl ExecutionTrace {
             let npc_virtual_row = &mut npc_column[trace_offset..trace_offset + CYCLE_HEIGHT];
             npc_virtual_row[Npc::Pc as usize] = (pc as u64).into();
             npc_virtual_row[Npc::Instruction as usize] = word.into();
-            npc_virtual_row[Npc::PubMemAddr as usize] = Fp::zero();
-            npc_virtual_row[Npc::PubMemVal as usize] = Fp::zero();
             npc_virtual_row[Npc::MemOp0Addr as usize] = op0_addr;
             npc_virtual_row[Npc::MemOp0 as usize] = op0;
-            npc_virtual_row[PUBLIC_MEMORY_STEP + Npc::PubMemAddr as usize] = Fp::zero();
-            npc_virtual_row[PUBLIC_MEMORY_STEP + Npc::PubMemVal as usize] = Fp::zero();
             npc_virtual_row[Npc::MemDstAddr as usize] = dst_addr;
             npc_virtual_row[Npc::MemDst as usize] = dst;
             npc_virtual_row[Npc::MemOp1Addr as usize] = op1_addr;
             npc_virtual_row[Npc::MemOp1 as usize] = op1;
+            for offset in (0..CYCLE_HEIGHT).step_by(PUBLIC_MEMORY_STEP) {
+                npc_virtual_row[offset + Npc::PubMemAddr as usize] = Fp::zero();
+                npc_virtual_row[offset + Npc::PubMemVal as usize] = Fp::zero();
+            }
 
-            // MEMORY
+            // MEMORY - handled after this loop
 
             // RANGE CHECK
             let rc_virtual_row = &mut range_check_column[trace_offset..trace_offset + CYCLE_HEIGHT];
             rc_virtual_row[RangeCheck::OffDst as usize] = off_dst;
-            rc_virtual_row[RangeCheck::Fp as usize] = (fp as u64).into();
+            rc_virtual_row[RangeCheck::Ap as usize] = (ap as u64).into();
             rc_virtual_row[RangeCheck::OffOp1 as usize] = off_op1;
             rc_virtual_row[RangeCheck::Op0MulOp1 as usize] = op0 * op1;
             rc_virtual_row[RangeCheck::OffOp0 as usize] = off_op0;
-            rc_virtual_row[RangeCheck::Ap as usize] = (ap as u64).into();
+            rc_virtual_row[RangeCheck::Fp as usize] = (fp as u64).into();
             rc_virtual_row[RangeCheck::Res as usize] = res;
+            for offset in (0..CYCLE_HEIGHT).step_by(RANGE_CHECK_STEP) {
+                if let Some(val) = ordered_rc_vals.next() {
+                    rc_virtual_row[offset + RangeCheck::Ordered as usize] = (val as u64).into();
+                }
+            }
+            if let Some(val) = ordered_rc_padding_vals.next() {
+                // Last range check is currently unused so stuff in the padding values there
+                rc_virtual_row[RangeCheck::Unused as usize] = (val as u64).into();
+            }
 
             // COL8 - TODO: better name
             let aux_virtual_row = &mut auxiliary_column[trace_offset..trace_offset + CYCLE_HEIGHT];
             aux_virtual_row[Auxiliary::Tmp0 as usize] = tmp0;
             aux_virtual_row[Auxiliary::Tmp1 as usize] = tmp1;
         }
+
+        assert!(ordered_rc_vals.next().is_none());
+        assert!(ordered_rc_padding_vals.next().is_none());
 
         // pad the execution trace by duplicating
         // trace cells for the last cycle
@@ -225,6 +225,8 @@ impl Trace for ExecutionTrace {
     }
 
     fn build_extension_columns(&self, challenges: &Challenges<Fp>) -> Option<Matrix<Fp>> {
+        // Generate memory permutation product
+        // ===================================
         // see distinction between (a', v') and (a, v) in the Cairo paper.
         let z = challenges[MemoryPermutation::Z];
         let alpha = challenges[MemoryPermutation::A];
@@ -237,11 +239,30 @@ impl Trace for ExecutionTrace {
             running_mem_permutation.push(accumulator);
         }
 
-        // TODO: range check
+        // Generate range check permutation product
+        // ========================================
+        let z = challenges[RangeCheckPermutation::Z];
+        let range_check_chunks = self.range_check_column.array_chunks::<RANGE_CHECK_STEP>();
+        let mut running_rc_permutation = Vec::new();
+        let mut accumulator = Fp::one();
+        for chunk in range_check_chunks {
+            accumulator *= (z - chunk[RangeCheck::OffDst as usize])
+                / (z - chunk[RangeCheck::Ordered as usize]);
+            running_rc_permutation.push(accumulator);
+        }
+        assert!(accumulator.is_one());
+
         let mut permutation_column = Vec::new_in(PageAlignedAllocator);
         permutation_column.resize(self.base_columns().num_rows(), Fp::zero());
-        for (i, permutation) in running_mem_permutation.into_iter().enumerate() {
-            permutation_column[i * MEMORY_STEP] = permutation;
+
+        // Insert intermediate memory permutation results
+        for (i, p) in running_mem_permutation.into_iter().enumerate() {
+            permutation_column[i * MEMORY_STEP + Permutation::Memory as usize] = p;
+        }
+
+        // Insert intermediate range check results
+        for (i, p) in running_rc_permutation.into_iter().enumerate() {
+            permutation_column[i * RANGE_CHECK_STEP + Permutation::RangeCheck as usize] = p;
         }
 
         Some(Matrix::new(vec![permutation_column]))
@@ -370,12 +391,17 @@ impl ExecutionTraceColumn for Mem {
 #[derive(Clone, Copy)]
 pub enum RangeCheck {
     OffDst = 0,
-    Ap = 3, // Allocation pointer (ap)
+    Ordered = 2, // Stores ordered values for the range check
+    Ap = 3,      // Allocation pointer (ap)
     // TODO 2
     OffOp1 = 4,
+    // Ordered = 6 - trace step is 4
     Op0MulOp1 = 7, // =op0*op1
     OffOp0 = 8,
-    Fp = 11, // Frame pointer (fp)
+    // Ordered = 10 - trace step is 4
+    Fp = 11,     // Frame pointer (fp)
+    Unused = 12, // an unused range checked value (gets stuffed with padding)
+    // Ordered = 14 - trace step is 4
     Res = 15,
 }
 
@@ -462,6 +488,51 @@ fn public_memory_padding_address(mem: &Memory, register_states: &RegisterStates)
     highest_access + 1
 }
 
+/// Returns the (unpadded) range check column values
+/// Currently only offset (off_dst, off_op0, off_op1) are used
+/// Output is of the form `(ordered_vals, padding_vals)`
+fn ordered_range_check_values(
+    mem: &Memory,
+    register_states: &RegisterStates,
+) -> (Vec<usize>, Vec<usize>) {
+    let mut res = Vec::new();
+    for &RegisterState { pc, .. } in register_states.iter() {
+        // TODO: this seems wasteful. Could combine with public_memory_padding_address?
+        let word = mem[pc].unwrap();
+        let cycle_rc_values = [word.get_off_dst(), word.get_off_op0(), word.get_off_op1()];
+        res.push(cycle_rc_values);
+    }
+
+    // The trace is padded to a power-of-two by copying the trace rows of the last
+    // cycle. These copied values need to be accounted for in the range check.
+    let num_trace_cycles = res.len().next_power_of_two();
+    res.resize(num_trace_cycles, *res.last().unwrap());
+
+    // Get the individual range check values in order
+    let mut res = res.flatten().to_vec();
+    res.sort();
+
+    // range check values need to be continuos therefore any gaps
+    // e.g. [..., 3, 4, 7, 8, ...] need to be filled with [5, 6] as padding.
+    let mut padding = Vec::new();
+    for &[a, b] in res.array_windows() {
+        for v in a + 1..b {
+            padding.push(v);
+        }
+    }
+
+    // Add padding to the ordered vals (res)
+    for v in &padding {
+        res.push(*v);
+    }
+
+    // re-sort the values.
+    // padding is already sorted.
+    res.sort();
+
+    (res, padding)
+}
+
 // TODO: support input, output and builtins
 fn get_ordered_memory_accesses(
     trace_len: usize,
@@ -503,7 +574,7 @@ fn get_ordered_memory_accesses(
             );
         });
 
-    // Sandstorm uses the highest access as padding
+    // Sandstorm uses the `highest_access + 1` as padding
     let [padding_addr, padding_val] = ordered_accesses.last().unwrap();
     assert_eq!(padding_addr, padding_val);
     let mut res = ordered_accesses.flatten().to_vec_in(PageAlignedAllocator);
