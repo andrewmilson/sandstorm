@@ -18,11 +18,6 @@ Sandstorm uses [miniSTARK](https://github.com/andrewmilson/ministark/) to genera
 * Performance optimizations
 * Proof reccursion
 
-
-Sandstorm implements an exact subset of the constraints and trace layout that's used by [StarkWare's STARK prover (SHARP)](https://starknet.io/docs/sharp.html). This subset  is all the constraints outlined in the Cairo whitepaper (section 9.10) and is the minimal subset of constraints required to prove correct execution of Cairo programs (no builtins... yet). There are some other differences between Sandstorm and StarkWare's prover. For instance verifier challenges, proof serialization format and constraint composition coefficients all differ and would need to be the same to allow users from submitting a Sandstorm generated proof to StarkWare's Ethereum smart contract. 
-
-Those curious about how Sandstorm works can read the comments in [air.rs](src/air.rs). The comments expect some understanding of how STARK proofs work - [Anatomy of a STARK](https://aszepieniec.github.io/stark-anatomy/) by [Alan Szepieniec](https://twitter.com/aszepieniec) is a great resource for this. Also the [Cairo whitepaper](https://eprint.iacr.org/2021/1063.pdf) section 4.5 pseudo code provides a nice high level overview of how some pieces fit together.
-
 ## Demo - proving Cairo programs
 
 ```bash
@@ -36,4 +31,10 @@ cairo-compile tmp/program.cairo --output tmp/program.json
 cairo-run --program ./tmp/program.json --trace_file ./tmp/trace.bin --memory_file ./tmp/memory.bin
 ```
 
+## Differences between Sandstorm and SHARP
+
+Sandstorm implements an exact subset of the constraints and trace layout that's used by [StarkWare's STARK prover (SHARP)](https://starknet.io/docs/sharp.html). This subset is the set of all constraints outlined in the Cairo whitepaper (section 9.10) and is the set of constraints required to prove correct execution of Cairo programs (no builtins... yet). There are some other differences between Sandstorm and SHARP. Sandstorm has a different proof serialization format and calculates verifier randomness differently. These need to be the same to allow users to submit a Sandstorm generated proof to StarkWare's Ethereum STARK verifier. 
+
 ## How Sandstorm works
+
+Those curious about how Sandstorm works can read the comments in [air.rs](src/air.rs). The comments expect some understanding of how STARK proofs work - [Anatomy of a STARK](https://aszepieniec.github.io/stark-anatomy/) by [Alan Szepieniec](https://twitter.com/aszepieniec) is a great resource for this. Also the [Cairo whitepaper](https://eprint.iacr.org/2021/1063.pdf) section 4.5 pseudo code provides a nice high level overview of how some pieces fit together.
