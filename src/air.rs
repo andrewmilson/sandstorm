@@ -45,6 +45,8 @@ pub struct ExecutionInfo {
     pub range_check_min: usize,
     pub range_check_max: usize,
     pub public_memory: Vec<(usize, Fp)>,
+    pub public_memory_padding_address: usize,
+    pub public_memory_padding_value: Fp,
 }
 // pub struct ExecutionInfo {
 //     pub partial_mem: Vec<Fp>,
@@ -79,28 +81,40 @@ impl Air for CairoAir {
     fn get_hints(&self, challenges: &Challenges<Self::Fq>) -> Hints<Self::Fq> {
         use PublicInputHint::*;
 
+        let ExecutionInfo {
+            initial_ap,
+            initial_pc,
+            final_ap,
+            final_pc,
+            range_check_min,
+            range_check_max,
+            public_memory,
+            public_memory_padding_address,
+            public_memory_padding_value,
+        } = &self.inputs;
+
         let memory_product = utils::compute_public_memory_quotient(
             challenges[MemoryPermutation::Z],
             challenges[MemoryPermutation::A],
             self.trace_len(),
-            &self.inputs.public_memory,
+            public_memory,
+            (*public_memory_padding_address as u64).into(),
+            *public_memory_padding_value,
         );
 
-        let rc_min = self.inputs.range_check_min;
-        let rc_max = self.inputs.range_check_max;
-        assert!(rc_min <= rc_max);
-        assert!(rc_max < 2usize.pow(16));
+        assert!(range_check_min <= range_check_max);
+        assert!(*range_check_max < 2usize.pow(16));
 
         Hints::new(vec![
-            (InitialAp.index(), self.inputs.initial_ap),
-            (InitialPc.index(), self.inputs.initial_pc),
-            (FinalAp.index(), self.inputs.final_ap),
-            (FinalPc.index(), self.inputs.final_pc),
+            (InitialAp.index(), *initial_ap),
+            (InitialPc.index(), *initial_pc),
+            (FinalAp.index(), *final_ap),
+            (FinalPc.index(), *final_pc),
             // TODO: this is a wrong value. Must fix
             (MemoryProduct.index(), memory_product),
             (RangeCheckProduct.index(), Fp::one()),
-            (RangeCheckMin.index(), (rc_min as u64).into()),
-            (RangeCheckMax.index(), (rc_max as u64).into()),
+            (RangeCheckMin.index(), (*range_check_min as u64).into()),
+            (RangeCheckMax.index(), (*range_check_max as u64).into()),
         ])
     }
 
@@ -139,7 +153,7 @@ impl Air for CairoAir {
         let cpu_decode_fp_update_regular_0: AlgebraicExpression<Fp> =
             &one - (Flag::OpcodeCall.curr() + Flag::OpcodeRet.curr());
 
-        // pc + <instruction size>
+        // NOTE: = pc + <instruction size>
         let npc_reg_0 = Npc::Pc.curr() + Flag::Op1Imm.curr() + &one;
 
         let memory_address_diff_0: AlgebraicExpression<Fp> =
@@ -194,23 +208,15 @@ impl Air for CairoAir {
         let flag0_zerofier = X.pow(n / CYCLE_HEIGHT) - flag0_offset;
         let flags_zerofier = &flag0_zerofier / (X.pow(n) - &one);
 
-        // checks bits are 0 or 1
-        // NOTE: can choose any cpu_decode_opcode_rc_b*
-
+        // check decoded flag values are 0 or 1
         // NOTE: This expression is a bit confusing. The zerofier forces this constraint
         // to apply in all rows of the trace therefore it applies to all flags (not just
-        // DstReg).
+        // DstReg). Funnily enough any flag here would work (it just wouldn't be SHARP
+        // compatible).
         let cpu_decode_opcode_rc_b =
             (Flag::DstReg.curr() * Flag::DstReg.curr() - Flag::DstReg.curr()) * &flags_zerofier;
-        //  (&cpu_decode_opcode_rc_b0 * &cpu_decode_opcode_rc_b0
-        //     - &cpu_decode_opcode_rc_b0)
-        //     * ;
-        // let cpu_decode_opcode_rc_b = (&cpu_decode_opcode_rc_b0 *
-        // &cpu_decode_opcode_rc_b0
-        //     - &cpu_decode_opcode_rc_b0)
-        //     * &flags_zerofier;
 
-        // TODO: Trace(5, 1) First word of each instruction?
+        // The first word of each instruction:
         // ┌─────────────────────────────────────────────────────────────────────────┐
         // │                     off_dst (biased representation)                     │
         // ├─────────────────────────────────────────────────────────────────────────┤
@@ -230,7 +236,7 @@ impl Air for CairoAir {
         // TODO: let off_op0 = RangeCheck::OffOp0.curr();
         // TODO: let off_dst = RangeCheck::OffDst.curr();
 
-        // force constraint to apply every 16 trace cycles (aka 1 cairo cycle)
+        // force constraint to apply every 16 trace rows (every cairo cycle)
         // e.g. (x - ω_0)(x - ω_16)(x - ω_32)(x - ω_48) for n=64
         let all_cycles_zerofier = X.pow(n / CYCLE_HEIGHT) - &one;
         let cpu_decode_opcode_rc_input = (Npc::Instruction.curr()
@@ -633,15 +639,12 @@ impl Air for CairoAir {
             final_ap,
             final_fp,
             final_pc,
-            // TODO: memory constraints
             memory_multi_column_perm_perm_init0,
             memory_multi_column_perm_perm_step0,
-            // TODO: the calculation of the terminal could cause issue
             memory_multi_column_perm_perm_last,
             memory_diff_is_bit,
             memory_is_func,
-            // TODO: add back in once more clarity on memory stuff
-            // memory_initial_addr,
+            memory_initial_addr,
             public_memory_addr_zero,
             public_memory_value_zero,
             // rc16_perm_init0,

@@ -25,6 +25,8 @@ use std::io::BufReader;
 use std::path::PathBuf;
 
 pub struct ExecutionTrace {
+    pub public_memory_padding_address: usize,
+    pub public_memory_padding_value: Fp,
     pub range_check_min: usize,
     pub range_check_max: usize,
     pub public_memory: Vec<(usize, Fp)>,
@@ -63,9 +65,11 @@ impl ExecutionTrace {
         let mut zeros_column = Vec::new_in(PageAlignedAllocator);
         zeros_column.resize(trace_len, Fp::zero());
 
-        // TODO: npc?
+        // set `padding_address == padding_value` to make filling the column easy
+        let public_memory_padding_address = public_memory_padding_address(&mem, &register_states);
+        let public_memory_padding_value = Fp::from(public_memory_padding_address as u64);
         let mut npc_column = Vec::new_in(PageAlignedAllocator);
-        npc_column.resize(trace_len, Fp::zero());
+        npc_column.resize(trace_len, public_memory_padding_value);
 
         let mut range_check_column = Vec::new_in(PageAlignedAllocator);
         range_check_column.resize(trace_len, Fp::zero());
@@ -113,11 +117,13 @@ impl ExecutionTrace {
             // NPC
             let npc_virtual_row = &mut npc_column[trace_offset..trace_offset + CYCLE_HEIGHT];
             npc_virtual_row[Npc::Pc as usize] = (pc as u64).into();
+            npc_virtual_row[Npc::Instruction as usize] = word.into();
             npc_virtual_row[Npc::PubMemAddr as usize] = Fp::zero();
             npc_virtual_row[Npc::PubMemVal as usize] = Fp::zero();
-            npc_virtual_row[Npc::MemOp0 as usize] = op0;
-            npc_virtual_row[Npc::Instruction as usize] = word.into();
             npc_virtual_row[Npc::MemOp0Addr as usize] = op0_addr;
+            npc_virtual_row[Npc::MemOp0 as usize] = op0;
+            npc_virtual_row[PUBLIC_MEMORY_STEP + Npc::PubMemAddr as usize] = Fp::zero();
+            npc_virtual_row[PUBLIC_MEMORY_STEP + Npc::PubMemVal as usize] = Fp::zero();
             npc_virtual_row[Npc::MemDstAddr as usize] = dst_addr;
             npc_virtual_row[Npc::MemDst as usize] = dst;
             npc_virtual_row[Npc::MemOp1Addr as usize] = op1_addr;
@@ -157,7 +163,7 @@ impl ExecutionTrace {
         }
 
         // generate the memory column by ordering memory accesses
-        let memory_column = get_ordered_memory_accesses(&npc_column, &program);
+        let memory_column = get_ordered_memory_accesses(trace_len, &npc_column, &program);
 
         let base_trace = Matrix::new(vec![
             flags_column.to_vec_in(PageAlignedAllocator),
@@ -175,6 +181,8 @@ impl ExecutionTrace {
         let final_registers = *register_states.last().unwrap();
 
         ExecutionTrace {
+            public_memory_padding_address,
+            public_memory_padding_value,
             range_check_min,
             range_check_max,
             public_memory,
@@ -434,12 +442,37 @@ impl ExecutionTraceColumn for Permutation {
     }
 }
 
+/// Obtains an address that can be used for padding public memory accesses
+fn public_memory_padding_address(mem: &Memory, register_states: &RegisterStates) -> usize {
+    // find the highest memory address accessed during the execution of the program
+    let mut highest_access = 1;
+    for &RegisterState { ap, fp, pc } in register_states.iter() {
+        // TODO: this is pretty wasteful as this info is available in the trace
+        // generation loop
+        let word = mem[pc].unwrap();
+        let dst_addr = word.get_dst_addr(ap, fp);
+        let op0_addr = word.get_op0_addr(ap, fp);
+        let op1_addr = word.get_op1_addr(pc, ap, fp, mem);
+        highest_access = highest_access
+            .max(dst_addr)
+            .max(op0_addr)
+            .max(op1_addr)
+            .max(pc);
+    }
+    highest_access + 1
+}
+
 // TODO: support input, output and builtins
 fn get_ordered_memory_accesses(
+    trace_len: usize,
     npc_column: &[Fp],
     program: &CompiledProgram,
 ) -> Vec<Fp, PageAlignedAllocator> {
+    // the number of cells allocated for the public memory
+    let num_pub_mem_cells = trace_len / PUBLIC_MEMORY_STEP;
+
     let pub_mem = program.get_public_memory();
+    // the actual number of public memory cells
     let pub_mem_len = pub_mem.len();
     let pub_mem_accesses = pub_mem.iter().map(|&(a, v)| [(a as u64).into(), v.into()]);
 
@@ -454,8 +487,10 @@ fn get_ordered_memory_accesses(
 
     // remove the `pub_mem_len` dummy accesses to address `0`. The justification for
     // this is explained in section 9.8 of the Cairo paper https://eprint.iacr.org/2021/1063.pdf.
-    let (zeros, ordered_accesses) = ordered_accesses.split_at(pub_mem_len);
+    // SHARP requires the first address to start at address 1
+    let (zeros, ordered_accesses) = ordered_accesses.split_at(num_pub_mem_cells);
     assert!(zeros.iter().all(|[a, v]| a.is_zero() && v.is_zero()));
+    assert!(ordered_accesses[0][0].is_one());
 
     // check memory is "continuous" and "single valued"
     ordered_accesses
@@ -468,5 +503,10 @@ fn get_ordered_memory_accesses(
             );
         });
 
-    ordered_accesses.flatten().to_vec_in(PageAlignedAllocator)
+    // Sandstorm uses the highest access as padding
+    let [padding_addr, padding_val] = ordered_accesses.last().unwrap();
+    assert_eq!(padding_addr, padding_val);
+    let mut res = ordered_accesses.flatten().to_vec_in(PageAlignedAllocator);
+    res.resize(trace_len, *padding_val);
+    res
 }

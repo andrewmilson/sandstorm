@@ -32,6 +32,8 @@ impl Prover for CairoProver {
             public_memory: trace.public_memory.clone(),
             range_check_min: trace.range_check_min,
             range_check_max: trace.range_check_max,
+            public_memory_padding_address: trace.public_memory_padding_address,
+            public_memory_padding_value: trace.public_memory_padding_value,
         }
     }
 }
