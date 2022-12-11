@@ -12,7 +12,7 @@
 
 </div>
 
-Sandstorm uses [miniSTARK](https://github.com/andrewmilson/ministark/) to generate SHARP compatible (almost 😉) proofs for Cairo programs. The prover was built by reverse engineering [StarkWare's StarkEx verifier](https://github.com/starkware-libs/starkex-contracts). So far Sandstorm uses exactly the same trace layout as SHARP but the verifier challenges, proof serialization format and constraint composition coefficients differ. These differences prevent users from submitting Sandstorm's proofs to StarkWare's Ethereum smart contract. Fixing the differences should be straightforward.
+Sandstorm uses [miniSTARK](https://github.com/andrewmilson/ministark/) to generate SHARP compatible (almost 😉) proofs for Cairo programs. The prover was built by reverse engineering [StarkWare's StarkEx verifier](https://github.com/starkware-libs/starkex-contracts). So far Sandstorm uses exactly the same trace layout as SHARP but the verifier challenges, proof serialization format and constraint composition coefficients differ. These differences prevent users from submitting a Sandstorm generated proof to StarkWare's Ethereum smart contract.
 
 ## Demo - proving Cairo programs
 
