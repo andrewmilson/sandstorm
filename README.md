@@ -16,15 +16,40 @@ Sandstorm uses [miniSTARK](https://github.com/andrewmilson/ministark/) to genera
 
 ## Demo - proving Cairo programs
 
-```bash
-cargo run -r -F gpu,asm,parallel -- prove \
-    --memory ./tmp/memory.bin \
-    --program ./tmp/program.json \
-    --trace ./tmp/trace.bin
+| ![Generating a proof](https://raw.githubusercontent.com/andrewmilson/ministark/main/prover.gif) | ![Verifying a proof](https://raw.githubusercontent.com/andrewmilson/ministark/main/verifier.gif) |
+|:--:|:--:|
+| *Generating the proof* | *Verifying the proof* 
 
+In this example the prover generates a proof that proves integrity of a Cairo program that outputs "hello world". The verifier uses the proof, Cairo source code and output to verify execution integrity without executing the program at all. To run this demo locally:
+
+```bash
+# 1. Install Cairo and activate the venv
+# https://www.cairo-lang.org/docs/quickstart.html
 source ~/cairo_venv/bin/activate
-cairo-compile tmp/program.cairo --output tmp/program.json
-cairo-run --program ./tmp/program.json --trace_file ./tmp/trace.bin --memory_file ./tmp/memory.bin
+
+# 2. Compile and run the Cairo program
+cairo-compile array-sum.cairo --output program.json
+cairo-run --program program.json \
+          --trace_file trace.bin \
+          --memory_file memory.bin
+
+# 3. generate the proof
+cargo +nightly run -r -F parallel,asm -- \
+    prove --program program.json \
+          --trace trace.bin \
+          --memory memory.bin \
+          --output array-sum.proof
+
+# 4. verify the proof
+cargo +nightly run -r -F parallel,asm -- \
+    verify --program program.json \
+           --proof array-sum.proof
+
+# 5. GPU proof generation on M1 Mac (optional)
+# M1 Mac users can install miniSTARK locally
+# and generate Cairo proofs on the GPU. This
+# requires Xcode but is much faster
+# https://github.com/andrewmilson/ministark
 ```
 
 ## Differences between Sandstorm and SHARP

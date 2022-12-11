@@ -4,9 +4,6 @@ use ministark::ProofOptions;
 use ministark::TraceInfo;
 use ark_ff::One;
 use ark_ff::Field;
-use ark_ff::Zero;
-use ministark::challenges;
-use crate::binary::Word;
 use crate::utils;
 use ministark::challenges::Challenges;
 use ministark::constraints::AlgebraicExpression;
@@ -154,7 +151,7 @@ impl Air for CairoAir {
         let cpu_decode_fp_update_regular_0: AlgebraicExpression<Fp> =
             &one - (Flag::OpcodeCall.curr() + Flag::OpcodeRet.curr());
 
-        // NOTE: = pc + instruction_size
+        // NOTE: npc_reg_0 = pc + instruction_size
         // NOTE: instruction_size = fOP1_IMM + 1
         let npc_reg_0 = Npc::Pc.curr() + Flag::Op1Imm.curr() + &one;
 
@@ -163,9 +160,9 @@ impl Air for CairoAir {
 
         let rc16_diff_0: AlgebraicExpression<Fp> = Trace(7, 6) - Trace(7, 2);
 
+        // TODO: builtins
         let pedersen_hash0_ec_subset_sub_b0 = Trace(3, 0) - (Trace(3, 1) + Trace(3, 1));
-        let pedersen_hash0_ec_subset_sum_b0_neg = &one - &pedersen_hash0_ec_subset_sub_b0;
-
+        let _pedersen_hash0_ec_subset_sum_b0_neg = &one - &pedersen_hash0_ec_subset_sub_b0;
         let rc_builtin_value0_0 = Trace(7, 12);
         let rc_builtin_value1_0 = &rc_builtin_value0_0 * &offset_size + Trace(7, 44);
         let rc_builtin_value2_0 = &rc_builtin_value1_0 * &offset_size + Trace(7, 76);
@@ -173,15 +170,13 @@ impl Air for CairoAir {
         let rc_builtin_value4_0 = &rc_builtin_value3_0 * &offset_size + Trace(7, 140);
         let rc_builtin_value5_0 = &rc_builtin_value4_0 * &offset_size + Trace(7, 172);
         let rc_builtin_value6_0 = &rc_builtin_value5_0 * &offset_size + Trace(7, 204);
-        let rc_builtin_value7_0 = &rc_builtin_value6_0 * &offset_size + Trace(7, 236);
-
-        let ecdsa_sig0_doubling_key_x_squared: AlgebraicExpression<Fp> = Trace(8, 4) * Trace(8, 4);
+        let _rc_builtin_value7_0 = &rc_builtin_value6_0 * &offset_size + Trace(7, 236);
+        let _ecdsa_sig0_doubling_key_x_squared: AlgebraicExpression<Fp> = Trace(8, 4) * Trace(8, 4);
         let ecdsa_sig0_exponentiate_generator_b0 = Trace(8, 34) - (Trace(8, 162) + Trace(8, 162));
-        let ecdsa_sig0_exponentiate_generator_b0_neg = &one - ecdsa_sig0_exponentiate_generator_b0;
+        let _ecdsa_sig0_exponentiate_generator_b0_neg = &one - ecdsa_sig0_exponentiate_generator_b0;
         let ecdsa_sig0_exponentiate_key_b0 = Trace(8, 12) - (Trace(8, 76) + Trace(8, 76));
-        let ecdsa_sig0_exponentiate_key_b0_neg = &one - &ecdsa_sig0_exponentiate_key_b0;
-
-        let bitwise_sum_var_0_0: AlgebraicExpression<Fp> = Trace(7, 1)
+        let _ecdsa_sig0_exponentiate_key_b0_neg = &one - &ecdsa_sig0_exponentiate_key_b0;
+        let _bitwise_sum_var_0_0: AlgebraicExpression<Fp> = Trace(7, 1)
             + Trace(7, 17) * two.pow(1)
             + Trace(7, 33) * two.pow(2)
             + Trace(7, 49) * two.pow(3)
@@ -189,8 +184,7 @@ impl Air for CairoAir {
             + Trace(7, 81) * two.pow(65)
             + Trace(7, 97) * two.pow(66)
             + Trace(7, 113) * two.pow(67);
-
-        let bitwise_sum_var_8_0: AlgebraicExpression<Fp> = Trace(7, 129) * two.pow(129)
+        let _bitwise_sum_var_8_0: AlgebraicExpression<Fp> = Trace(7, 129) * two.pow(129)
             + Trace(7, 145) * two.pow(130)
             + Trace(7, 161) * two.pow(131)
             + Trace(7, 177) * two.pow(132)

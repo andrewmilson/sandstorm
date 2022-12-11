@@ -1,4 +1,5 @@
 use gpu_poly::GpuFftField;
+use ministark::TraceInfo;
 use ministark::challenges::Challenges;
 use strum_macros::EnumIter;
 use gpu_poly::GpuVec;
@@ -34,22 +35,26 @@ pub struct ExecutionTrace {
     pub public_memory: Vec<(usize, Fp)>,
     pub initial_registers: RegisterState,
     pub final_registers: RegisterState,
-    register_states: RegisterStates,
-    program: CompiledProgram,
-    mem: Memory,
-    flags_column: GpuVec<Fp>,
+    _register_states: RegisterStates,
+    _program: CompiledProgram,
+    _mem: Memory,
+    _flags_column: GpuVec<Fp>,
     npc_column: GpuVec<Fp>,
     memory_column: GpuVec<Fp>,
     range_check_column: GpuVec<Fp>,
-    auxiliary_column: GpuVec<Fp>,
+    _auxiliary_column: GpuVec<Fp>,
     base_trace: Matrix<Fp>,
 }
 
 impl ExecutionTrace {
     fn new(mem: Memory, register_states: RegisterStates, program: CompiledProgram) -> Self {
         let num_program_cycles = register_states.len();
-        let num_trace_cycles = register_states.len().next_power_of_two();
-        let trace_len = num_trace_cycles * CYCLE_HEIGHT;
+        let trace_len = std::cmp::max(
+            num_program_cycles.next_power_of_two() * CYCLE_HEIGHT,
+            TraceInfo::MIN_TRACE_LENGTH,
+        );
+        let num_trace_cycles = trace_len / CYCLE_HEIGHT;
+        assert!(num_trace_cycles.is_power_of_two());
         let public_memory = program.get_public_memory();
 
         let mut flags_column = Vec::new_in(PageAlignedAllocator);
@@ -188,15 +193,15 @@ impl ExecutionTrace {
             public_memory,
             initial_registers,
             final_registers,
-            flags_column,
             npc_column,
             memory_column,
             range_check_column,
-            auxiliary_column,
             base_trace,
-            mem,
-            register_states,
-            program,
+            _flags_column: flags_column,
+            _auxiliary_column: auxiliary_column,
+            _mem: mem,
+            _register_states: register_states,
+            _program: program,
         }
     }
 
@@ -541,11 +546,8 @@ fn get_ordered_memory_accesses(
 ) -> Vec<Fp, PageAlignedAllocator> {
     // the number of cells allocated for the public memory
     let num_pub_mem_cells = trace_len / PUBLIC_MEMORY_STEP;
-
     let pub_mem = program.get_public_memory();
-    // the actual number of public memory cells
-    let pub_mem_len = pub_mem.len();
-    let pub_mem_accesses = pub_mem.iter().map(|&(a, v)| [(a as u64).into(), v.into()]);
+    let pub_mem_accesses = pub_mem.iter().map(|&(a, v)| [(a as u64).into(), v]);
 
     // order all memory accesses by address
     // memory accesses are of the form [address, value]
@@ -556,8 +558,8 @@ fn get_ordered_memory_accesses(
         .collect::<Vec<[Fp; MEMORY_STEP]>>();
     ordered_accesses.sort();
 
-    // remove the `pub_mem_len` dummy accesses to address `0`. The justification for
-    // this is explained in section 9.8 of the Cairo paper https://eprint.iacr.org/2021/1063.pdf.
+    // remove `num_pub_mem_cells` many dummy accesses to address `0`. The
+    // justification for this is explained in section 9.8 of the Cairo paper https://eprint.iacr.org/2021/1063.pdf.
     // SHARP requires the first address to start at address 1
     let (zeros, ordered_accesses) = ordered_accesses.split_at(num_pub_mem_cells);
     assert!(zeros.iter().all(|[a, v]| a.is_zero() && v.is_zero()));

@@ -1,6 +1,4 @@
 use crate::trace::Flag;
-use ark_serialize::CanonicalDeserialize;
-use ark_serialize::CanonicalSerialize;
 use gpu_poly::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481::Fp;
 use num_bigint::BigUint;
 use ruint::aliases::U256;
@@ -28,12 +26,12 @@ pub const OFF_OP1_BIT_OFFSET: usize = 32;
 pub const FLAGS_BIT_OFFSET: usize = 48;
 
 /// Number of Cairo instruction flags
-pub const NUM_FLAGS: usize = 16;
+pub const _NUM_FLAGS: usize = 16;
 
 // Mask for word offsets (16 bits each)
 pub const OFF_MASK: usize = 0xFFFF;
 
-pub const OFFSET: usize = 2usize.pow(16);
+pub const _OFFSET: usize = 2usize.pow(16);
 pub const HALF_OFFSET: usize = 2usize.pow(15);
 
 /// Holds register values
@@ -299,9 +297,9 @@ impl Word {
     }
 }
 
-impl Into<Fp> for Word {
-    fn into(self) -> Fp {
-        BigUint::from(self.0).into()
+impl From<Word> for Fp {
+    fn from(val: Word) -> Self {
+        BigUint::from(val.0).into()
     }
 }
 
