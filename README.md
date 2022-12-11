@@ -11,7 +11,7 @@
 
 </div>
 
-Sandstorm uses miniSTARK to generate (almost) SHARP compatible proofs for Cairo programs. The prover was built by reverse engineering StarkWare's Open-Source StarkEx Solidity verifier. So far Sandstorm uses exactly the same trace layout as SHARP ✅ but verifier challenges and contraint composition coefficients differ which prevent users from submitting Sandstorm's proofs to StarkWare's L1 smart contract. Fixing this is straighforward 👌.
+Sandstorm uses miniSTARK to generate (almost) SHARP compatible proofs for Cairo programs. The prover was built by reverse engineering StarkWare's Open-Source StarkEx Solidity verifier. So far Sandstorm uses exactly the same trace layout as SHARP ✅ but verifier challenges, proof serialization format and constraint composition coefficients differ which prevent users from submitting Sandstorm's proofs to StarkWare's L1 smart contract. Fixing this is straightforward 👌.
 
 # Decoding constraints
 

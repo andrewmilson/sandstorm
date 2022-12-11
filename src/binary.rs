@@ -1,4 +1,6 @@
 use crate::trace::Flag;
+use ark_serialize::CanonicalDeserialize;
+use ark_serialize::CanonicalSerialize;
 use gpu_poly::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481::Fp;
 use num_bigint::BigUint;
 use ruint::aliases::U256;
@@ -127,11 +129,16 @@ impl CompiledProgram {
         );
     }
 
-    pub fn get_public_memory(&self) -> Vec<(usize, Word)> {
+    pub fn get_public_memory(&self) -> Vec<(usize, Fp)> {
         self.data
             .iter()
-            .map(|value_str| Word::new(U256::from_str(value_str).expect("invalid data item")))
             .enumerate()
+            .map(|(i, value_str)| {
+                (
+                    i + 1, // address 0, 0 is reserved for dummy accesses
+                    Word::new(U256::from_str(value_str).expect("invalid data item")).into(),
+                )
+            })
             .collect()
     }
 }

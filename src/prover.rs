@@ -1,8 +1,6 @@
 use crate::air::CairoAir;
 use crate::air::ExecutionInfo;
-use crate::binary::RegisterState;
 use crate::trace::ExecutionTrace;
-use cairo_rs::vm::trace::trace_entry::RelocatedTraceEntry;
 use gpu_poly::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481::Fp;
 use ministark::ProofOptions;
 use ministark::Prover;
@@ -31,6 +29,9 @@ impl Prover for CairoProver {
             initial_pc: (trace.initial_registers.pc as u64).into(),
             final_ap: (trace.final_registers.ap as u64).into(),
             final_pc: (trace.final_registers.pc as u64).into(),
+            public_memory: trace.public_memory.clone(),
+            range_check_min: trace.range_check_min,
+            range_check_max: trace.range_check_max,
         }
     }
 }

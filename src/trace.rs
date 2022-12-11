@@ -9,24 +9,25 @@ use ministark::StarkExtensionOf;
 use ministark::Trace;
 use ark_ff::Zero;
 use ministark::constraints::AlgebraicExpression;
-use ark_ff::Field;
 use ark_ff::One;
 use ministark::constraints::ExecutionTraceColumn;
 use strum::IntoEnumIterator;
+use crate::air::CYCLE_HEIGHT;
+use crate::air::MEMORY_STEP;
 use crate::air::MemoryPermutation;
+use crate::air::PUBLIC_MEMORY_STEP;
 use crate::binary::CompiledProgram;
 use crate::binary::Memory;
 use crate::binary::RegisterState;
 use crate::binary::RegisterStates;
-use crate::binary::Word;
 use std::fs::File;
 use std::io::BufReader;
 use std::path::PathBuf;
 
-pub const CYCLE_HEIGHT: usize = 16;
-
 pub struct ExecutionTrace {
-    pub public_memory: Vec<(usize, Word)>,
+    pub range_check_min: usize,
+    pub range_check_max: usize,
+    pub public_memory: Vec<(usize, Fp)>,
     pub initial_registers: RegisterState,
     pub final_registers: RegisterState,
     register_states: RegisterStates,
@@ -66,26 +67,30 @@ impl ExecutionTrace {
         let mut npc_column = Vec::new_in(PageAlignedAllocator);
         npc_column.resize(trace_len, Fp::zero());
 
-        let mut memory_column = Vec::new_in(PageAlignedAllocator);
-        memory_column.resize(trace_len, Fp::zero());
-
         let mut range_check_column = Vec::new_in(PageAlignedAllocator);
         range_check_column.resize(trace_len, Fp::zero());
 
         let mut auxiliary_column = Vec::new_in(PageAlignedAllocator);
         auxiliary_column.resize(trace_len, Fp::zero());
 
-        println!("{}", register_states[0].pc);
-        memory_column[0] = (register_states[0].pc as u64).into();
-        memory_column[1] = mem[register_states[0].pc].unwrap().into();
+        let mut range_check_min = 0;
+        let mut range_check_max = 0;
 
         for (i, &RegisterState { pc, ap, fp }) in register_states.iter().enumerate() {
             let trace_offset = i * CYCLE_HEIGHT;
             let word = mem[pc].unwrap();
             assert!(!word.get_flag(Flag::Zero));
-            let off_dst = (word.get_off_dst() as u64).into();
-            let off_op0 = (word.get_off_op0() as u64).into();
-            let off_op1 = (word.get_off_op1() as u64).into();
+
+            // range check all offset values
+            let off_dst = word.get_off_dst();
+            let off_op0 = word.get_off_op0();
+            let off_op1 = word.get_off_op1();
+            range_check_min = range_check_min.min(off_dst).min(off_op0).min(off_op1);
+            range_check_max = range_check_max.max(off_dst).max(off_op0).max(off_op1);
+
+            let off_dst = (off_dst as u64).into();
+            let off_op0 = (off_op0 as u64).into();
+            let off_op1 = (off_op1 as u64).into();
             let dst_addr = (word.get_dst_addr(ap, fp) as u64).into();
             let op0_addr = (word.get_op0_addr(ap, fp) as u64).into();
             let op1_addr = (word.get_op1_addr(pc, ap, fp, &mem) as u64).into();
@@ -136,7 +141,25 @@ impl ExecutionTrace {
             aux_virtual_row[Auxiliary::Tmp1 as usize] = tmp1;
         }
 
-        let mut base_trace = Matrix::new(vec![
+        // pad the execution trace by duplicating
+        // trace cells for the last cycle
+        for column in [
+            &mut flags_column,
+            &mut npc_column,
+            &mut auxiliary_column,
+            &mut range_check_column,
+        ] {
+            let last_cycle_offset = (num_program_cycles - 1) * CYCLE_HEIGHT;
+            let (_, trace_suffix) = column.split_at_mut(last_cycle_offset);
+            let (last_cycle, padding_rows) = trace_suffix.split_at_mut(CYCLE_HEIGHT);
+            let padding_cycles = padding_rows.chunks_mut(CYCLE_HEIGHT);
+            padding_cycles.for_each(|padding_cycle| padding_cycle.copy_from_slice(last_cycle))
+        }
+
+        // generate the memory column by ordering memory accesses
+        let memory_column = get_ordered_memory_accesses(&npc_column, &program);
+
+        let base_trace = Matrix::new(vec![
             flags_column.to_vec_in(PageAlignedAllocator),
             zeros_column.to_vec_in(PageAlignedAllocator),
             zeros_column.to_vec_in(PageAlignedAllocator),
@@ -148,19 +171,12 @@ impl ExecutionTrace {
             auxiliary_column.to_vec_in(PageAlignedAllocator),
         ]);
 
-        // pad the execution trace by duplicating the trace cells for the last cycle
-        for column in base_trace.iter_mut() {
-            let last_cycle_offset = (num_program_cycles - 1) * CYCLE_HEIGHT;
-            let (_, trace_suffix) = column.split_at_mut(last_cycle_offset);
-            let (last_cycle, padding_rows) = trace_suffix.split_at_mut(CYCLE_HEIGHT);
-            let padding_cycles = padding_rows.chunks_mut(CYCLE_HEIGHT);
-            padding_cycles.for_each(|padding_cycle| padding_cycle.copy_from_slice(last_cycle))
-        }
-
         let initial_registers = *register_states.first().unwrap();
         let final_registers = *register_states.last().unwrap();
 
         ExecutionTrace {
+            range_check_min,
+            range_check_max,
             public_memory,
             initial_registers,
             final_registers,
@@ -201,26 +217,24 @@ impl Trace for ExecutionTrace {
     }
 
     fn build_extension_columns(&self, challenges: &Challenges<Fp>) -> Option<Matrix<Fp>> {
-        let trace_len = self.base_trace.num_rows();
+        // see distinction between (a', v') and (a, v) in the Cairo paper.
+        let z = challenges[MemoryPermutation::Z];
+        let alpha = challenges[MemoryPermutation::A];
+        let program_order_accesses = self.npc_column.array_chunks::<MEMORY_STEP>();
+        let address_order_accesses = self.memory_column.array_chunks::<MEMORY_STEP>();
+        let mut running_mem_permutation = Vec::new();
+        let mut accumulator = Fp::one();
+        for (&[a, v], &[a_prime, v_prime]) in program_order_accesses.zip(address_order_accesses) {
+            accumulator *= (z - (a + alpha * v)) / (z - (a_prime + alpha * v_prime));
+            running_mem_permutation.push(accumulator);
+        }
+
+        // TODO: range check
         let mut permutation_column = Vec::new_in(PageAlignedAllocator);
-        permutation_column.resize(trace_len, Fp::zero());
-
-        use MemoryPermutation::*;
-        // permutation_column[0] = -challenges[Z];
-        permutation_column[0] = Fp::one();
-        // self.npc_column[Npc::Pc as usize]
-        // + challenges[A] * self.npc_column[Npc::FirstWord as usize]
-        // - challenges[Z];
-
-        // for i in 0..trace_len / NUM_VIRTUAL_PERMURATION_COLUMNS {
-        //     let trace_offset = i * NUM_VIRTUAL_PERMURATION_COLUMNS;
-        //     let permutation_virtual_row = &mut permutation_column
-        //         [trace_offset..trace_offset + NUM_VIRTUAL_PERMURATION_COLUMNS];
-        //     // TODO:
-        //     use MemoryPermutation::*;
-        //     // permutation_virtual_row[Permutation::Memory as usize] = challenges[Z]
-        // - ;     permutation_virtual_row[Permutation::RangeCheck as usize] =
-        // Fp::zero(); }
+        permutation_column.resize(self.base_columns().num_rows(), Fp::zero());
+        for (i, permutation) in running_mem_permutation.into_iter().enumerate() {
+            permutation_column[i * MEMORY_STEP] = permutation;
+        }
 
         Some(Matrix::new(vec![permutation_column]))
     }
@@ -296,9 +310,8 @@ pub enum Npc {
     // TODO: What kind of memory address? 8 - memory function?
     MemDstAddr = 8,
     MemDst = 9,
-    // TODO: second value also PubMemAddr = 10?
-    // TODO: second value also PubMemVal = 11?
-    // = 11 TODO
+    // NOTE: cycle cells 10 and 11 is occupied by PubMemAddr since the public memory step is 8.
+    // This means it applies twice (2, 3) then (8+2, 8+3) within a single 16 row cycle.
     MemOp1Addr = 12,
     MemOp1 = 13,
 }
@@ -310,10 +323,14 @@ impl ExecutionTraceColumn for Npc {
 
     fn offset<Fp: GpuFftField, Fq: StarkExtensionOf<Fp>>(
         &self,
-        cycle_offset: isize,
+        offset: isize,
     ) -> AlgebraicExpression<Fp, Fq> {
+        let step = match self {
+            Npc::PubMemAddr | Npc::PubMemVal => PUBLIC_MEMORY_STEP,
+            _ => CYCLE_HEIGHT,
+        } as isize;
         let column = self.index();
-        let trace_offset = CYCLE_HEIGHT as isize * cycle_offset + *self as isize;
+        let trace_offset = step * offset + *self as isize;
         AlgebraicExpression::Trace(column, trace_offset)
     }
 }
@@ -336,7 +353,7 @@ impl ExecutionTraceColumn for Mem {
         mem_offset: isize,
     ) -> AlgebraicExpression<Fp, Fq> {
         let column = self.index();
-        let trace_offset = 2 as isize * mem_offset + *self as isize;
+        let trace_offset = MEMORY_STEP as isize * mem_offset + *self as isize;
         AlgebraicExpression::Trace(column, trace_offset)
     }
 }
@@ -406,33 +423,50 @@ impl ExecutionTraceColumn for Permutation {
 
     fn offset<Fp: GpuFftField, Fq: StarkExtensionOf<Fp>>(
         &self,
-        permutation_offset: isize,
+        offset: isize,
     ) -> AlgebraicExpression<Fp, Fq> {
         let column = self.index();
         let trace_offset = match self {
-            Permutation::Memory => 2 * permutation_offset + *self as isize,
-            Permutation::RangeCheck => 4 * permutation_offset + *self as isize,
+            Permutation::Memory => MEMORY_STEP as isize * offset + *self as isize,
+            Permutation::RangeCheck => 4 * offset + *self as isize,
         };
         AlgebraicExpression::Trace(column, trace_offset)
     }
 }
 
-/// Computes the value of the public memory quotient:
-///     numerator / (denominator * padding)
-/// where:
-///     numerator = (z - (0 + alpha * 0))^S,
-///     denominator = \prod_i( z - (addr_i + alpha * value_i) ),
-///     padding = (z - (padding_addr + alpha * padding_value))^(S - N),
-///     N is the actual number of public memory cells,
-///     and S is the num of cells allocated for the pub mem (include padding).
-/// Sourced from https://github.com/starkware-libs/starkex-contracts
-fn compute_public_memory_quotient(
-    challenges: &Challenges<Fp>,
-    trace_len: usize,
-    num_padded_rows: usize,
-    public_memory: &[(usize, Word)],
-) -> Fp {
-    use MemoryPermutation::*;
-    // let numerator = challenges[Z].pow([trace_len as u64]);
-    todo!()
+// TODO: support input, output and builtins
+fn get_ordered_memory_accesses(
+    npc_column: &[Fp],
+    program: &CompiledProgram,
+) -> Vec<Fp, PageAlignedAllocator> {
+    let pub_mem = program.get_public_memory();
+    let pub_mem_len = pub_mem.len();
+    let pub_mem_accesses = pub_mem.iter().map(|&(a, v)| [(a as u64).into(), v.into()]);
+
+    // order all memory accesses by address
+    // memory accesses are of the form [address, value]
+    let mut ordered_accesses = npc_column
+        .array_chunks()
+        .copied()
+        .chain(pub_mem_accesses)
+        .collect::<Vec<[Fp; MEMORY_STEP]>>();
+    ordered_accesses.sort();
+
+    // remove the `pub_mem_len` dummy accesses to address `0`. The justification for
+    // this is explained in section 9.8 of the Cairo paper https://eprint.iacr.org/2021/1063.pdf.
+    let (zeros, ordered_accesses) = ordered_accesses.split_at(pub_mem_len);
+    assert!(zeros.iter().all(|[a, v]| a.is_zero() && v.is_zero()));
+
+    // check memory is "continuous" and "single valued"
+    ordered_accesses
+        .array_windows()
+        .enumerate()
+        .for_each(|(i, &[[a, v], [a_next, v_next]])| {
+            assert!(
+                (a == a_next && v == v_next) || a == a_next - Fp::one(),
+                "mismatch at {i}: a={a}, v={v}, a_next={a_next}, v_next={v_next}"
+            );
+        });
+
+    ordered_accesses.flatten().to_vec_in(PageAlignedAllocator)
 }

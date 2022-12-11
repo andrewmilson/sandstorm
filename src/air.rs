@@ -5,6 +5,9 @@ use ministark::TraceInfo;
 use ark_ff::One;
 use ark_ff::Field;
 use ark_ff::Zero;
+use ministark::challenges;
+use crate::binary::Word;
+use crate::utils;
 use ministark::challenges::Challenges;
 use ministark::constraints::AlgebraicExpression;
 use ark_poly::domain::EvaluationDomain;
@@ -17,11 +20,14 @@ use ministark::constraints::VerifierChallenge as _;
 use ministark::hints::Hints;
 use crate::trace::Auxiliary;
 use crate::trace::Flag;
-use crate::trace::CYCLE_HEIGHT;
 use crate::trace::Mem;
 use crate::trace::Npc;
 use crate::trace::Permutation;
 use crate::trace::RangeCheck;
+
+pub const CYCLE_HEIGHT: usize = 16;
+pub const PUBLIC_MEMORY_STEP: usize = 8;
+pub const MEMORY_STEP: usize = 2;
 
 pub struct CairoAir {
     info: TraceInfo,
@@ -36,6 +42,9 @@ pub struct ExecutionInfo {
     pub initial_pc: Fp,
     pub final_ap: Fp,
     pub final_pc: Fp,
+    pub range_check_min: usize,
+    pub range_check_max: usize,
+    pub public_memory: Vec<(usize, Fp)>,
 }
 // pub struct ExecutionInfo {
 //     pub partial_mem: Vec<Fp>,
@@ -67,18 +76,31 @@ impl Air for CairoAir {
         &self.options
     }
 
-    fn get_hints(&self, _: &Challenges<Self::Fq>) -> Hints<Self::Fq> {
+    fn get_hints(&self, challenges: &Challenges<Self::Fq>) -> Hints<Self::Fq> {
         use PublicInputHint::*;
+
+        let memory_product = utils::compute_public_memory_quotient(
+            challenges[MemoryPermutation::Z],
+            challenges[MemoryPermutation::A],
+            self.trace_len(),
+            &self.inputs.public_memory,
+        );
+
+        let rc_min = self.inputs.range_check_min;
+        let rc_max = self.inputs.range_check_max;
+        assert!(rc_min <= rc_max);
+        assert!(rc_max < 2usize.pow(16));
+
         Hints::new(vec![
             (InitialAp.index(), self.inputs.initial_ap),
             (InitialPc.index(), self.inputs.initial_pc),
             (FinalAp.index(), self.inputs.final_ap),
             (FinalPc.index(), self.inputs.final_pc),
             // TODO: this is a wrong value. Must fix
-            (MemoryProduct.index(), Fp::one() + Fp::one()),
+            (MemoryProduct.index(), memory_product),
             (RangeCheckProduct.index(), Fp::one()),
-            (RangeCheckMin.index(), Fp::zero()),
-            (RangeCheckMax.index(), Fp::from(2u32.pow(16) - 1)),
+            (RangeCheckMin.index(), (rc_min as u64).into()),
+            (RangeCheckMax.index(), (rc_max as u64).into()),
         ])
     }
 
@@ -467,12 +489,15 @@ impl Air for CairoAir {
         let every_second_row_zerofier = X.pow(n / 2) - &one;
         let second_last_row_zerofier = X - FieldConstant::Fp(g.pow([2 * (n as u64 / 2 - 1)]));
         let every_second_row_except_last_zerofier =
-            second_last_row_zerofier / every_second_row_zerofier;
+            &second_last_row_zerofier / &every_second_row_zerofier;
 
-        // memory/multi_column_perm/perm/init0
-        // TODO: permutation argument for memory column?
-        // TODO: requires investigation
-        // boundary constraint for first cycle
+        // Memory access constraints
+        // =========================
+        // All these constraints make more sense once you understand how the permutation
+        // column is calculated (look at get_ordered_memory_accesses()). Sections 9.8
+        // and 9.7 of the Cairo paper justify these constraints.
+
+        // memory permutation boundary constraint
         let memory_multi_column_perm_perm_init0 = ((MemoryPermutation::Z.challenge()
             - (Mem::Address.curr() + MemoryPermutation::A.challenge() * Mem::Value.curr()))
             * Permutation::Memory.curr()
@@ -481,7 +506,21 @@ impl Air for CairoAir {
             - MemoryPermutation::Z.challenge())
             / &first_row_zerofier;
 
-        // TODO:
+        // memory permutation transition constraint
+        // NOTE: memory entries are stacked in the trace like so:
+        // ┌─────┬───────────┬─────┐
+        // │ ... │    ...    │ ... │
+        // ├─────┼───────────┼─────┤
+        // │ ... │ address 0 │ ... │
+        // ├─────┼───────────┼─────┤
+        // │ ... │  value 0  │ ... │
+        // ├─────┼───────────┼─────┤
+        // │ ... │ address 1 │ ... │
+        // ├─────┼───────────┼─────┤
+        // │ ... │  value 1  │ ... │
+        // ├─────┼───────────┼─────┤
+        // │ ... │    ...    │ ... │
+        // └─────┴───────────┴─────┘
         let memory_multi_column_perm_perm_step0 = ((MemoryPermutation::Z.challenge()
             - (Mem::Address.next() + MemoryPermutation::A.challenge() * Mem::Value.next()))
             * Permutation::Memory.next()
@@ -491,49 +530,45 @@ impl Air for CairoAir {
                 * Permutation::Memory.curr())
             * &every_second_row_except_last_zerofier;
 
-        let memory_multi_column_perm_perm_last = &one;
+        let memory_multi_column_perm_perm_last =
+            (Permutation::Memory.curr() - MemoryProduct.hint()) / &second_last_row_zerofier;
 
         // Constraint expression for memory/diff_is_bit
         // checks the address doesn't change or increases by 1
         // "Continuity" constraint in cairo whitepaper 9.7.2
         let memory_diff_is_bit = (&memory_address_diff_0 * &memory_address_diff_0
-            + &memory_address_diff_0)
+            - &memory_address_diff_0)
             * &every_second_row_except_last_zerofier;
 
         // if the address stays the same then the value stays the same
-        // "Single-valued" constraint in cairo whitepaper 9.7.2
+        // "Single-valued" constraint in cairo whitepaper 9.7.2.
+        // cairo uses nondeterministic read-only memory so if the address is the same
+        // the value should also stay the same.
         let memory_is_func = ((&memory_address_diff_0 - &one)
             * (Mem::Value.curr() - Mem::Value.next()))
             * &every_second_row_except_last_zerofier;
 
         // boundary condition stating the first memory address == 1
+        // TODO: add back once pedersen is complete
         let memory_initial_addr = (Mem::Address.curr() - &one) / &first_row_zerofier;
 
-        // applies to first half and second half of trace
-        let every_eighth_rows_zerofier = X.pow(n / 8) - &one;
+        // applies every 8 rows
+        let every_eighth_row_zerofier = X.pow(n / 8) - &one;
 
-        // Constraint expression for public_memory_addr_zero: column5_row2.
-        // TODO: why is public memory address always zero?
-        // cairo whitepaper "Another pair of subcolumns is dedicated to the public
-        // memory mechanism (Section 9.8); for those cells, we add constraints that both
-        // the addresses and the values are zeros." - 9.8 and 9.7.2 give more clarity!
-        // TODO: why do these apply every 8 rows? (2 public memory entries per cycle?)
-        let public_memory_addr_zero = Npc::PubMemAddr.curr() / &every_eighth_rows_zerofier;
-        let public_memory_value_zero = Npc::PubMemVal.curr() / &every_eighth_rows_zerofier;
+        // Read cairo whitepaper section 9.8 as to why the public memory cells are 0.
+        // The high level is that the way public memory works is that the prover is
+        // forced (with these constraints) to exclude the public memory from one of
+        // the permuration products. This means the running permuration column
+        // terminates with more-or-less the permutation of just the public input. The
+        // verifier can relatively cheaply calculate this terminal. The constraint for
+        // this terminal is `memory_multi_column_perm_perm_last`.
+        let public_memory_addr_zero = Npc::PubMemAddr.curr() / &every_eighth_row_zerofier;
+        let public_memory_value_zero = Npc::PubMemVal.curr() / &every_eighth_row_zerofier;
 
         // Range check constraints
         // =======================
-
-        // (memory/multi_column_perm/perm/interaction_elm - (column6_row0 +
-        // memory/multi_column_perm/hash_interaction_elm0 * column6_row1)) *
-        // column9_inter1_row0 + column5_row0 +
-        // memory/multi_column_perm/hash_interaction_elm0 * column5_row1 -
-        // memory/multi_column_perm/perm/interaction_elm
-
-        // (z - column7_row2) * column9_inter1_row1 + column7_row0 - z
-
-        // => (z - column7_row2) * column9_inter1_row1 + column7_row0 - z
-        // => (z - column7_row2) * column9_inter1_row1 - (z - column7_row0)
+        // Look at memory to understand the general approach to permutation.
+        // More info in section 9.9 of the Cairo paper.
 
         // RIIIIIGHT: stores the difference between the permutation products
         // Then at the end checks that the difference is 0
@@ -600,14 +635,16 @@ impl Air for CairoAir {
             final_pc,
             // TODO: memory constraints
             memory_multi_column_perm_perm_init0,
-            // memory_multi_column_perm_perm_step0,
-            // memory_multi_column_perm_perm_last,
-            // memory_diff_is_bit,
-            // memory_is_func,
+            memory_multi_column_perm_perm_step0,
+            // TODO: the calculation of the terminal could cause issue
+            memory_multi_column_perm_perm_last,
+            memory_diff_is_bit,
+            memory_is_func,
+            // TODO: add back in once more clarity on memory stuff
             // memory_initial_addr,
-            // public_memory_addr_zero,
-            // public_memory_value_zero,
-            rc16_perm_init0,
+            public_memory_addr_zero,
+            public_memory_value_zero,
+            // rc16_perm_init0,
         ]
     }
 }
