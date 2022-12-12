@@ -20,7 +20,7 @@ Sandstorm uses [miniSTARK](https://github.com/andrewmilson/ministark/) to genera
 |:--:|:--:|
 | *Generating the proof* | *Verifying the proof* 
 
-In this example the prover generates a proof that proves they know three values of an array that sum to 25. The verifier uses the proof, Cairo source code and output to verify execution integrity without executing the program at all. To run this demo locally:
+In this example the prover generates a proof that proves they know the values of an array sum to 25. The verifier uses the proof and Cairo source code to verify this fact without executing the Cairo program at all. To run this demo locally:
 
 ```bash
 # 1. (optional) Install Cairo and activate the venv

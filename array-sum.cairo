@@ -4,7 +4,8 @@ func array_sum(arr: felt*, n) -> felt {
     if (n == 0) { 
         return 0;
     }
-    return arr[0] + array_sum(arr=arr + 1, n=n - 1);
+    let remainder = array_sum(arr=arr + 1, n=n - 1);
+    return arr[0] + remainder;
 }
 
 func main() {
