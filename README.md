@@ -19,7 +19,10 @@ Sandstorm uses [miniSTARK](https://github.com/andrewmilson/ministark/) to genera
 |:--:|:--:|
 | *Generating the proof* | *Verifying the proof* 
 
-In this example the prover generates a proof that they know the values of an array sum to 25. The verifier uses the proof and Cairo source code to verify this without executing the Cairo program at all. To run this demo locally:
+In this demo, the prover has a cairo program that appears to sum the values of an array. The prover runs the program with `cairo-run` to generate `trace.bin` (stores register values at each VM cycle) and `memory.bin` (stores memory address value pairs). The prover then runs `sandstorm prove` which builds a STARK execution trace and proof from the `trace.bin`, `memory.bin` and the compiled program.
+
+
+The verifier, supplied with this proof and the original code, can run `sandstorm verify` to be assert the program was executed accurately without having to run the program themselves. This is small program for demonstration purposes and it'd probably be faster for the verifier to run the program themselves. Sandstorm is capable of generating proofs for much larger programs, where verification would run orders of magnitude faster than running the program. To run this demo locally:
 
 ```bash
 # 1. (optional) Install Cairo and activate the venv
@@ -34,7 +37,8 @@ cairo-run --program array-sum.json \
 
 # 3. generate the proof
 # use `-F parallel,asm` if not using an M1 Mac
-cargo +nightly run -r -F parallel,asm -- \
+# make sure latest macOS is installed
+cargo +nightly run -r -F gpu,parallel,asm -- \
     prove --program array-sum.json \
           --trace trace.bin \
           --memory memory.bin \
@@ -44,18 +48,11 @@ cargo +nightly run -r -F parallel,asm -- \
 cargo +nightly run -r -F parallel,asm -- \
     verify --program array-sum.json \
            --proof array-sum.proof
-
-# 5. (optional) GPU proof generation on M1 Mac 
-# M1 Mac users can install miniSTARK locally
-# and generate Cairo proofs on the GPU. This
-# requires Xcode but is much faster
-# https://github.com/andrewmilson/ministark
-# `cargo +nightly run -r -F gpu,parallel,asm ...`
 ```
 
 <h2 id="sandstorm-sharp-differences">Differences between Sandstorm and SHARP</h2>
 
-Sandstorm implements an exact subset of the constraints and trace layout that's used by [StarkWare's STARK prover (SHARP)](https://starknet.io/docs/sharp.html). This subset is the set of all constraints outlined in the Cairo whitepaper (section 9.10) and is the set of constraints required to prove correct execution of Cairo programs (no builtins... yet). There are some other differences between Sandstorm and SHARP. Sandstorm has a different proof serialization format and calculates verifier randomness differently. These need to be the same to allow users to submit a Sandstorm generated proof to StarkWare's Ethereum STARK verifier. 
+Sandstorm implements a subset of the constraints and trace layout that's used by [StarkWare's STARK prover (SHARP)](https://starknet.io/docs/sharp.html). This subset is the set of all constraints outlined in the Cairo whitepaper (section 9.10) and is the set of constraints required to prove correct execution of Cairo programs (no builtins... yet). There are some other differences between Sandstorm and SHARP. Sandstorm has a different proof serialization format and calculates verifier randomness differently. These need to be the same to allow users to submit a Sandstorm generated proof to StarkWare's Ethereum STARK verifier. 
 
 ## How Sandstorm works
 
