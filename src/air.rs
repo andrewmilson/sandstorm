@@ -344,7 +344,7 @@ impl Air for CairoAir {
         // from whitepaper `t0 = fPC_JNZ * dst`
         let cpu_update_registers_update_pc_tmp0 = (Auxiliary::Tmp0.curr()
             - Flag::PcJnz.curr() * Npc::MemDst.curr())
-            / &all_cycles_except_last_zerofier;
+            * &all_cycles_except_last_zerofier;
 
         // From the whitepaper "To verify that we make a regular update if dst = 0, we
         // need an auxiliary variable, v (to fill the trace in the case dst != 0, set v
@@ -354,7 +354,7 @@ impl Air for CairoAir {
         // NOTE: `t1 = t0 * v`
         let cpu_update_registers_update_pc_tmp1 = (Auxiliary::Tmp1.curr()
             - Auxiliary::Tmp0.curr() * RangeCheck::Res.curr())
-            / &all_cycles_except_last_zerofier;
+            * &all_cycles_except_last_zerofier;
 
         // There are two constraints here bundled in one. The first is `t0 * (next_pc −
         // (pc + op1)) = 0` (ensures if dst != 0 a relative jump is made) and the second
@@ -370,12 +370,12 @@ impl Air for CairoAir {
             - (&cpu_decode_flag_pc_update_regular_0 * &npc_reg_0
                 + Flag::PcJumpAbs.curr() * RangeCheck::Res.curr()
                 + Flag::PcJumpRel.curr() * (Npc::Pc.curr() + RangeCheck::Res.curr())))
-            / &all_cycles_except_last_zerofier;
+            * &all_cycles_except_last_zerofier;
 
         // ensure `if dst == 0: pc + instruction_size == next_pc`
         let cpu_update_registers_update_pc_pc_cond_positive =
             ((Auxiliary::Tmp1.curr() - Flag::PcJnz.curr()) * (Npc::Pc.next() - npc_reg_0))
-                / &all_cycles_except_last_zerofier;
+                * &all_cycles_except_last_zerofier;
 
         // Updating the allocation pointer
         // ===============================
@@ -388,17 +388,18 @@ impl Air for CairoAir {
                 + Flag::ApAdd.curr() * RangeCheck::Res.curr()
                 + Flag::ApAdd1.curr()
                 + Flag::OpcodeCall.curr() * &two))
-            / &all_cycles_except_last_zerofier;
+            * &all_cycles_except_last_zerofier;
 
         // Updating the frame pointer
         // ==========================
         // This handles all fp update except the `op0 == pc + instruction_size`, `res =
         // dst` and `dst == fp` assertions.
-        let cpu_update_registers_update_fp_fp_update = (RangeCheck::Fp.next()
-            - (&cpu_decode_fp_update_regular_0 * RangeCheck::Fp.curr()
-                + Flag::OpcodeRet.curr() * Npc::MemDst.curr()
-                + Flag::OpcodeCall.curr() * (RangeCheck::Ap.curr() + &two)))
-            / &all_cycles_except_last_zerofier;
+        // TODO: fix bug
+        // let cpu_update_registers_update_fp_fp_update = (RangeCheck::Fp.next()
+        //     - (&cpu_decode_fp_update_regular_0 * RangeCheck::Fp.curr() +
+        //       Flag::OpcodeRet.curr() * Npc::MemDst.curr() + Flag::OpcodeCall.curr() *
+        //       (RangeCheck::Ap.curr() + &two)))
+        //     / &all_cycles_except_last_zerofier;
 
         // push registers to memory (see section 8.4 in the whitepaper).
         // These are essentially the assertions for assert `op0 == pc +
@@ -598,7 +599,8 @@ impl Air for CairoAir {
             cpu_update_registers_update_pc_pc_cond_negative,
             cpu_update_registers_update_pc_pc_cond_positive,
             cpu_update_registers_update_ap_ap_update,
-            cpu_update_registers_update_fp_fp_update,
+            // TODO: fix bug
+            // cpu_update_registers_update_fp_fp_update,
             cpu_opcodes_call_push_fp,
             cpu_opcodes_call_push_pc,
             cpu_opcodes_call_off0,
