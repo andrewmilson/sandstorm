@@ -11,7 +11,7 @@
 
 </div>
 
-Sandstorm uses [miniSTARK](https://github.com/andrewmilson/ministark/) to generate, almost 😉, [SHARP](https://starknet.io/docs/sharp.html) compatible proofs for Cairo programs. The prover was built by reverse engineering [StarkWare's Open-Source StarkEx verifier](https://github.com/starkware-libs/starkex-contracts). Please get in touch with me at [andrew.j.milson@gmail.com](mailto:andrew.j.milson@gmail.com) if you want to fund the development of Cairo builtins, performance optimizations, full SHARP compatibility or proof recursion.
+Sandstorm uses [miniSTARK](https://github.com/andrewmilson/ministark/) to generate [SHARP](https://starknet.io/docs/sharp.html) compatible proofs for Cairo programs ([almost](#sandstorm-sharp-differences) 😉). The prover was built by reverse engineering [StarkWare's Open-Source verifier](https://github.com/starkware-libs/starkex-contracts). Please get in touch with me at [andrew.j.milson@gmail.com](mailto:andrew.j.milson@gmail.com) if you want to fund the development of Cairo builtins, performance optimizations, full SHARP compatibility or proof recursion.
 
 ## Demo - proving Cairo programs
 
@@ -19,7 +19,7 @@ Sandstorm uses [miniSTARK](https://github.com/andrewmilson/ministark/) to genera
 |:--:|:--:|
 | *Generating the proof* | *Verifying the proof* 
 
-In this example the prover generates a proof that proves they know the values of an array sum to 25. The verifier uses the proof and Cairo source code to verify this fact without executing the Cairo program at all. To run this demo locally:
+In this example the prover generates a proof that they know the values of an array sum to 25. The verifier uses the proof and Cairo source code to verify this without executing the Cairo program at all. To run this demo locally:
 
 ```bash
 # 1. (optional) Install Cairo and activate the venv
@@ -53,7 +53,7 @@ cargo +nightly run -r -F parallel,asm -- \
 # `cargo +nightly run -r -F gpu,parallel,asm ...`
 ```
 
-## Differences between Sandstorm and SHARP
+<h2 id="sandstorm-sharp-differences">Differences between Sandstorm and SHARP</h2>
 
 Sandstorm implements an exact subset of the constraints and trace layout that's used by [StarkWare's STARK prover (SHARP)](https://starknet.io/docs/sharp.html). This subset is the set of all constraints outlined in the Cairo whitepaper (section 9.10) and is the set of constraints required to prove correct execution of Cairo programs (no builtins... yet). There are some other differences between Sandstorm and SHARP. Sandstorm has a different proof serialization format and calculates verifier randomness differently. These need to be the same to allow users to submit a Sandstorm generated proof to StarkWare's Ethereum STARK verifier. 
 
