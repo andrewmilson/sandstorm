@@ -1,9 +1,14 @@
+use ark_serialize::CanonicalDeserialize;
 use ark_serialize::CanonicalSerialize;
+use ministark::Proof;
 use ministark::ProofOptions;
 use ministark::Prover;
 use ministark::Trace;
+use sandstorm::air::CairoAir;
+use sandstorm::binary::CompiledProgram;
 use sandstorm::prover::CairoProver;
 use sandstorm::trace::ExecutionTrace;
+use std::fs;
 use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
@@ -23,27 +28,17 @@ enum SandstormOptions {
         #[structopt(long, parse(from_os_str))]
         output: PathBuf,
     },
+    Verify {
+        #[structopt(long, parse(from_os_str))]
+        program: PathBuf,
+        #[structopt(long, parse(from_os_str))]
+        proof: PathBuf,
+    },
 }
 
 fn main() {
-    // read command-line args
-    match SandstormOptions::from_args() {
-        SandstormOptions::Prove {
-            program,
-            trace,
-            memory,
-            output,
-        } => prove(&program, &trace, &memory, &output),
-    }
-}
-
-fn prove(
-    program_path: &PathBuf,
-    trace_path: &PathBuf,
-    memory_path: &PathBuf,
-    output_path: &PathBuf,
-) {
     // TODO:
+    // proof options for 95 bit security level
     let num_queries = 40;
     let lde_blowup_factor = 4;
     let grinding_factor = 16;
@@ -57,6 +52,38 @@ fn prove(
         fri_max_remainder_size,
     );
 
+    // read command-line args
+    match SandstormOptions::from_args() {
+        SandstormOptions::Prove {
+            program,
+            trace,
+            memory,
+            output,
+        } => prove(options, &program, &trace, &memory, &output),
+        SandstormOptions::Verify { program, proof } => verify(options, &program, &proof),
+    }
+}
+
+fn verify(options: ProofOptions, program_path: &PathBuf, proof_path: &PathBuf) {
+    let program = CompiledProgram::from_file(program_path);
+    let proof_bytes = fs::read(proof_path).unwrap();
+    let proof: Proof<CairoAir> = Proof::deserialize_compressed(proof_bytes.as_slice()).unwrap();
+    let public_inputs = &proof.public_inputs;
+    assert_eq!(program.get_public_memory(), public_inputs.public_memory);
+    assert_eq!(options, proof.options);
+
+    let now = Instant::now();
+    proof.verify().unwrap();
+    println!("Proof verified in: {:?}", now.elapsed());
+}
+
+fn prove(
+    options: ProofOptions,
+    program_path: &PathBuf,
+    trace_path: &PathBuf,
+    memory_path: &PathBuf,
+    output_path: &PathBuf,
+) {
     let now = Instant::now();
     let execution_trace = ExecutionTrace::from_file(program_path, trace_path, memory_path);
     println!(

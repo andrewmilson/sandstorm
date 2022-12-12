@@ -119,6 +119,13 @@ pub struct CompiledProgram {
 }
 
 impl CompiledProgram {
+    /// Parses the compiled .json program file outputted by a Cairo runner.
+    pub fn from_file(program_path: &PathBuf) -> Self {
+        let program_file = File::open(program_path).expect("could not open program file");
+        let reader = BufReader::new(program_file);
+        serde_json::from_reader(reader).unwrap()
+    }
+
     pub fn validate(&self) {
         // Make sure the field modulus matches the expected
         assert_eq!(

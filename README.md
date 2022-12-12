@@ -15,7 +15,7 @@ Sandstorm uses [miniSTARK](https://github.com/andrewmilson/ministark/) to genera
 
 ## Demo - proving Cairo programs
 
-| ![Generating a proof](https://raw.githubusercontent.com/andrewmilson/ministark/main/prover.gif) | ![Verifying a proof](https://raw.githubusercontent.com/andrewmilson/ministark/main/verifier.gif) |
+| ![Generating a proof](prover.gif) | ![Verifying a proof](verifier.gif) |
 |:--:|:--:|
 | *Generating the proof* | *Verifying the proof* 
 
@@ -27,21 +27,22 @@ In this example the prover generates a proof that proves they know the values of
 source ~/cairo_venv/bin/activate
 
 # 2. (optional) Compile and run the Cairo program
-cairo-compile array-sum.cairo --output program.json
-cairo-run --program program.json \
+cairo-compile array-sum.cairo --output array-sum.json
+cairo-run --program array-sum.json \
           --trace_file trace.bin \
           --memory_file memory.bin
 
 # 3. generate the proof
+# use `-F parallel,asm` if not using an M1 Mac
 cargo +nightly run -r -F parallel,asm -- \
-    prove --program program.json \
+    prove --program array-sum.json \
           --trace trace.bin \
           --memory memory.bin \
           --output array-sum.proof
 
 # 4. verify the proof
 cargo +nightly run -r -F parallel,asm -- \
-    verify --program program.json \
+    verify --program array-sum.json \
            --proof array-sum.proof
 
 # 5. (optional) GPU proof generation on M1 Mac 
@@ -58,4 +59,4 @@ Sandstorm implements an exact subset of the constraints and trace layout that's 
 
 ## How Sandstorm works
 
-Those curious about how Sandstorm works can read the comments in [air.rs](src/air.rs#L115). The comments expect some understanding of how STARK proofs work - [Anatomy of a STARK](https://aszepieniec.github.io/stark-anatomy/) by [Alan Szepieniec](https://twitter.com/aszepieniec) is a great resource for this. Also the pseudo code in section 4.5 of the [Cairo whitepaper](https://eprint.iacr.org/2021/1063.pdf) provides a nice high level overview of how some pieces fit together.
+Those curious about how Sandstorm works can read the comments in [air.rs](src/air.rs#L115). The comments expect some understanding of how STARK proofs are generated - [Anatomy of a STARK](https://aszepieniec.github.io/stark-anatomy/) by [Alan Szepieniec](https://twitter.com/aszepieniec) is a great resource for this. Also the pseudo code in section 4.5 of the [Cairo whitepaper](https://eprint.iacr.org/2021/1063.pdf) provides a nice high level overview of how some pieces fit together.

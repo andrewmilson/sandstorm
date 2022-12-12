@@ -23,8 +23,6 @@ use crate::binary::CompiledProgram;
 use crate::binary::Memory;
 use crate::binary::RegisterState;
 use crate::binary::RegisterStates;
-use std::fs::File;
-use std::io::BufReader;
 use std::path::PathBuf;
 
 pub struct ExecutionTrace {
@@ -224,9 +222,11 @@ impl ExecutionTrace {
     }
 
     pub fn from_file(program_path: &PathBuf, trace_path: &PathBuf, memory_path: &PathBuf) -> Self {
-        let file = File::open(program_path).expect("program file not found");
-        let reader = BufReader::new(file);
-        let compiled_program: CompiledProgram = serde_json::from_reader(reader).unwrap();
+        // let file = File::open(program_path).expect("program file not found");
+        // let reader = BufReader::new(file);
+        // let compiled_program: CompiledProgram =
+        // serde_json::from_reader(reader).unwrap();
+        let compiled_program = CompiledProgram::from_file(program_path);
         #[cfg(debug_assertions)]
         compiled_program.validate();
 

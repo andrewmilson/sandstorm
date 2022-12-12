@@ -5,8 +5,8 @@
     slice_flatten,
     array_windows
 )]
-mod air;
-mod binary;
+pub mod air;
+pub mod binary;
 pub mod prover;
 pub mod trace;
 mod utils;
