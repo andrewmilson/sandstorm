@@ -11,7 +11,7 @@
 
 </div>
 
-Sandstorm uses [miniSTARK](https://github.com/andrewmilson/ministark/) to generate [SHARP](https://starknet.io/docs/sharp.html) compatible proofs for Cairo programs ([almost](#sandstorm-sharp-differences) 😉). The prover was built by reverse engineering [StarkWare's Open-Source verifier](https://github.com/starkware-libs/starkex-contracts). Please get in touch with me at [andrew.j.milson@gmail.com](mailto:andrew.j.milson@gmail.com) if you want to fund the development of Cairo builtins, performance optimizations, full SHARP compatibility or proof recursion.
+Sandstorm uses [miniSTARK](https://github.com/andrewmilson/ministark/) to generate [SHARP](https://starknet.io/docs/sharp.html) compatible proofs for [Cairo](https://www.cairo-lang.org/) programs ([almost](#sandstorm-sharp-differences) 😉). The prover was built by reverse engineering [StarkWare's Open-Source verifier](https://github.com/starkware-libs/starkex-contracts). Please get in touch with me at [andrew.j.milson@gmail.com](mailto:andrew.j.milson@gmail.com) if you want to fund the development of Cairo builtins, performance optimizations, full SHARP compatibility or proof recursion.
 
 ## Demo - proving Cairo programs
 
@@ -19,10 +19,10 @@ Sandstorm uses [miniSTARK](https://github.com/andrewmilson/ministark/) to genera
 |:--:|:--:|
 | *Generating the proof* | *Verifying the proof* 
 
-In this demo, the prover has a cairo program that appears to sum the values of an array. The prover runs the program with `cairo-run` to generate `trace.bin` (stores register values at each VM cycle) and `memory.bin` (stores memory address value pairs). The prover then runs `sandstorm prove` which builds a STARK execution trace and proof from the `trace.bin`, `memory.bin` and the compiled program.
+In this demo, the prover has a cairo program that appears to sum the values of an array. The prover runs the program with `cairo-run` to generate `trace.bin` (stores register values at each VM cycle) and `memory.bin` (stores memory address value pairs). The prover then runs `sandstorm prove` which builds a STARK execution trace and proof from `trace.bin`, `memory.bin` and the compiled program.
 
 
-The verifier, supplied with this proof and the original code, can run `sandstorm verify` to be assert the program was executed accurately without having to run the program themselves. This is small program for demonstration purposes and it'd probably be faster for the verifier to run the program themselves. Sandstorm is capable of generating proofs for much larger programs, where verification would run orders of magnitude faster than running the program. To run this demo locally:
+The verifier, supplied with this proof and the original code, can run `sandstorm verify` to be assert the program was executed accurately without having to run the program themselves. This is a small program for demonstration purposes and it'd probably be faster for the verifier to run the program themselves. Sandstorm is capable of generating proofs for much larger programs, where proof verification would run orders of magnitude faster than running the program. To run this demo locally:
 
 ```bash
 # 1. (optional) Install Cairo and activate the venv
@@ -54,7 +54,7 @@ cargo +nightly run -r -F parallel,asm -- \
 
 
 
-Sandstorm implements a subset of the constraints and trace layout that's used by [StarkWare's STARK prover (SHARP)](https://starknet.io/docs/sharp.html). This subset contains all of all constraints outlined in the Cairo whitepaper (section 9.10) and charachterises the constraints required to prove correct execution of Cairo programs (no builtins... yet). Sandstorm has a different proof serialization format and calculates verifier randomness differently. These need to be the same to allow users to submit a Sandstorm generated proof to StarkWare's Ethereum STARK verifier (coming soon). 
+Sandstorm implements a subset of the constraints and trace layout that's used by [StarkWare's STARK prover (SHARP)](https://starknet.io/docs/sharp.html). This subset contains all of all constraints outlined in the Cairo whitepaper (section 9.10) and characterizes the constraints required to prove correct execution of Cairo programs (no builtins... yet). Sandstorm has a different proof serialization format and calculates verifier randomness differently. These need to be the same to allow users to submit a Sandstorm generated proof to StarkWare's Ethereum STARK verifier (coming soon). 
 
 ## How Sandstorm works
 
