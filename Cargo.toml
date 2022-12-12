@@ -12,8 +12,8 @@ gpu = [ "ministark/gpu" ]
 parallel = [ "ministark/parallel" ]
 
 [dependencies]
-ministark = { path = "../ministark-mirror" }
-gpu-poly = { path = "../ministark-mirror/gpu-poly" }
+ministark = { git = "https://github.com/andrewmilson/ministark" }
+gpu-poly = { git = "https://github.com/andrewmilson/ministark" }
 ark-std = { git = "https://github.com/arkworks-rs/std" }
 ark-ff = { git = "https://github.com/arkworks-rs/algebra" }
 ark-poly = { git = "https://github.com/andrewmilson/algebra", branch = "vec-allocator" }

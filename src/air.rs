@@ -46,10 +46,6 @@ pub struct ExecutionInfo {
     pub public_memory_padding_address: usize,
     pub public_memory_padding_value: Fp,
 }
-// pub struct ExecutionInfo {
-//     pub partial_mem: Vec<Fp>,
-//     // TODO
-// }
 
 impl Air for CairoAir {
     type Fp = Fp;
@@ -115,15 +111,6 @@ impl Air for CairoAir {
             (RangeCheckMax.index(), (*range_check_max as u64).into()),
         ])
     }
-
-    // column ideas:
-    // =============
-    // col0 - flags
-    // col3 - pedersen
-    // col5 - npc? next program counter?
-    // col6 - memory
-    // col7 - rc16 (range check 16 bit?)
-    // col8 - auxiliary fields?
 
     fn constraints(&self) -> Vec<AlgebraicExpression<Fp>> {
         use AlgebraicExpression::*;
@@ -680,7 +667,7 @@ impl ministark::constraints::VerifierChallenge for MemoryPermutation {
 
 /// Symbolic range check permutation challenges
 /// Note section 9.7.2 from Cairo whitepaper
-/// (z − (address + α * value))
+/// (z − value)
 #[derive(Clone, Copy)]
 pub enum RangeCheckPermutation {
     Z = 2, // =z

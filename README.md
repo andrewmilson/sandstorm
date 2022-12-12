@@ -50,6 +50,7 @@ cargo +nightly run -r -F parallel,asm -- \
 # and generate Cairo proofs on the GPU. This
 # requires Xcode but is much faster
 # https://github.com/andrewmilson/ministark
+# `cargo +nightly run -r -F gpu,parallel,asm ...`
 ```
 
 ## Differences between Sandstorm and SHARP
@@ -58,4 +59,4 @@ Sandstorm implements an exact subset of the constraints and trace layout that's 
 
 ## How Sandstorm works
 
-Those curious about how Sandstorm works can read the comments in [air.rs](src/air.rs). The comments expect some understanding of how STARK proofs work - [Anatomy of a STARK](https://aszepieniec.github.io/stark-anatomy/) by [Alan Szepieniec](https://twitter.com/aszepieniec) is a great resource for this. Also the pseudo code in section 4.5 of the [Cairo whitepaper](https://eprint.iacr.org/2021/1063.pdf) provides a nice high level overview of how some pieces fit together.
+Those curious about how Sandstorm works can read the comments in [air.rs](src/air.rs#L128). The comments expect some understanding of how STARK proofs work - [Anatomy of a STARK](https://aszepieniec.github.io/stark-anatomy/) by [Alan Szepieniec](https://twitter.com/aszepieniec) is a great resource for this. Also the pseudo code in section 4.5 of the [Cairo whitepaper](https://eprint.iacr.org/2021/1063.pdf) provides a nice high level overview of how some pieces fit together.
