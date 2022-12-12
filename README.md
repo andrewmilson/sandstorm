@@ -20,14 +20,14 @@ Sandstorm uses [miniSTARK](https://github.com/andrewmilson/ministark/) to genera
 |:--:|:--:|
 | *Generating the proof* | *Verifying the proof* 
 
-In this example the prover generates a proof that proves integrity of a Cairo program that outputs "hello world". The verifier uses the proof, Cairo source code and output to verify execution integrity without executing the program at all. To run this demo locally:
+In this example the prover generates a proof that proves they know three values of an array that sum to 25. The verifier uses the proof, Cairo source code and output to verify execution integrity without executing the program at all. To run this demo locally:
 
 ```bash
-# 1. Install Cairo and activate the venv
+# 1. (optional) Install Cairo and activate the venv
 # https://www.cairo-lang.org/docs/quickstart.html
 source ~/cairo_venv/bin/activate
 
-# 2. Compile and run the Cairo program
+# 2. (optional) Compile and run the Cairo program
 cairo-compile array-sum.cairo --output program.json
 cairo-run --program program.json \
           --trace_file trace.bin \
@@ -45,7 +45,7 @@ cargo +nightly run -r -F parallel,asm -- \
     verify --program program.json \
            --proof array-sum.proof
 
-# 5. GPU proof generation on M1 Mac (optional)
+# 5. (optional) GPU proof generation on M1 Mac 
 # M1 Mac users can install miniSTARK locally
 # and generate Cairo proofs on the GPU. This
 # requires Xcode but is much faster

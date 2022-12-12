@@ -70,7 +70,7 @@ impl ExecutionTrace {
         npc_column.resize(trace_len, public_memory_padding_value);
 
         let (ordered_rc_vals, ordered_rc_padding_vals) =
-            ordered_range_check_values(&mem, &register_states);
+            ordered_range_check_values(num_trace_cycles, &mem, &register_states);
         let range_check_min = *ordered_rc_vals.first().unwrap();
         let range_check_max = *ordered_rc_vals.last().unwrap();
         let range_check_padding_value = Fp::from(range_check_max as u64);
@@ -122,7 +122,8 @@ impl ExecutionTrace {
                 npc_virtual_row[offset + Npc::PubMemVal as usize] = Fp::zero();
             }
 
-            // MEMORY - handled after this loop
+            // MEMORY
+            // handled after this loop
 
             // RANGE CHECK
             let rc_virtual_row = &mut range_check_column[trace_offset..trace_offset + CYCLE_HEIGHT];
@@ -133,24 +134,13 @@ impl ExecutionTrace {
             rc_virtual_row[RangeCheck::OffOp0 as usize] = off_op0;
             rc_virtual_row[RangeCheck::Fp as usize] = (fp as u64).into();
             rc_virtual_row[RangeCheck::Res as usize] = res;
-            for offset in (0..CYCLE_HEIGHT).step_by(RANGE_CHECK_STEP) {
-                if let Some(val) = ordered_rc_vals.next() {
-                    rc_virtual_row[offset + RangeCheck::Ordered as usize] = (val as u64).into();
-                }
-            }
-            if let Some(val) = ordered_rc_padding_vals.next() {
-                // Last range check is currently unused so stuff in the padding values there
-                rc_virtual_row[RangeCheck::Unused as usize] = (val as u64).into();
-            }
+            // RangeCheck::Ordered and RangeCheck::Unused are handled after cycle padding
 
             // COL8 - TODO: better name
             let aux_virtual_row = &mut auxiliary_column[trace_offset..trace_offset + CYCLE_HEIGHT];
             aux_virtual_row[Auxiliary::Tmp0 as usize] = tmp0;
             aux_virtual_row[Auxiliary::Tmp1 as usize] = tmp1;
         }
-
-        assert!(ordered_rc_vals.next().is_none());
-        assert!(ordered_rc_padding_vals.next().is_none());
 
         // pad the execution trace by duplicating
         // trace cells for the last cycle
@@ -166,6 +156,34 @@ impl ExecutionTrace {
             let padding_cycles = padding_rows.chunks_mut(CYCLE_HEIGHT);
             padding_cycles.for_each(|padding_cycle| padding_cycle.copy_from_slice(last_cycle))
         }
+
+        for cycle_offset in (0..trace_len).step_by(CYCLE_HEIGHT) {
+            let rc_virtual_row = &mut range_check_column[cycle_offset..cycle_offset + CYCLE_HEIGHT];
+
+            // overwrite the range check padding cell with remaining padding values
+            // TODO: this might not be enough
+            rc_virtual_row[RangeCheck::Unused as usize] =
+                if let Some(val) = ordered_rc_padding_vals.next() {
+                    // Last range check is currently unused so stuff in the padding values there
+                    (val as u64).into()
+                } else {
+                    range_check_padding_value
+                };
+
+            // add remaining ordered range check values
+            for offset in (0..CYCLE_HEIGHT).step_by(RANGE_CHECK_STEP) {
+                rc_virtual_row[offset + RangeCheck::Ordered as usize] =
+                    if let Some(val) = ordered_rc_vals.next() {
+                        (val as u64).into()
+                    } else {
+                        range_check_padding_value
+                    };
+            }
+        }
+
+        // ensure range check values have been fully consumed
+        assert!(ordered_rc_padding_vals.next().is_none());
+        assert!(ordered_rc_vals.next().is_none());
 
         // generate the memory column by ordering memory accesses
         let memory_column = get_ordered_memory_accesses(trace_len, &npc_column, &program);
@@ -497,6 +515,7 @@ fn public_memory_padding_address(mem: &Memory, register_states: &RegisterStates)
 /// Currently only offset (off_dst, off_op0, off_op1) are used
 /// Output is of the form `(ordered_vals, padding_vals)`
 fn ordered_range_check_values(
+    num_trace_cycles: usize,
     mem: &Memory,
     register_states: &RegisterStates,
 ) -> (Vec<usize>, Vec<usize>) {
@@ -510,7 +529,6 @@ fn ordered_range_check_values(
 
     // The trace is padded to a power-of-two by copying the trace rows of the last
     // cycle. These copied values need to be accounted for in the range check.
-    let num_trace_cycles = res.len().next_power_of_two();
     res.resize(num_trace_cycles, *res.last().unwrap());
 
     // Get the individual range check values in order

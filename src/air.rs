@@ -228,9 +228,6 @@ impl Air for CairoAir {
         let whole_flag_prefix = Trace(0, 0);
         // NOTE: Forces the `0` flag prefix to =0 in every cycle.
         let cpu_decode_opcode_rc_zero = &whole_flag_prefix / flag0_zerofier;
-        // TODO: let off_op1 = RangeCheck::OffOp1.curr();
-        // TODO: let off_op0 = RangeCheck::OffOp0.curr();
-        // TODO: let off_dst = RangeCheck::OffDst.curr();
 
         // force constraint to apply every 16 trace rows (every cairo cycle)
         // e.g. (x - ω_0)(x - ω_16)(x - ω_32)(x - ω_48) for n=64
@@ -242,26 +239,26 @@ impl Air for CairoAir {
                 + RangeCheck::OffDst.curr()))
             / &all_cycles_zerofier;
 
-        // TODO: constraint for the Op1Src flag group? forces vals 000, 100, 010 or 001
+        // constraint for the Op1Src flag group - forces vals 000, 100, 010 or 001
         let cpu_decode_flag_op1_base_op0_bit = (&cpu_decode_flag_op1_base_op0_0
             * &cpu_decode_flag_op1_base_op0_0
             - &cpu_decode_flag_op1_base_op0_0)
             / &all_cycles_zerofier;
 
-        // TODO: forces only one or none of ResAdd, ResMul or PcJnz to be 1
+        // forces only one or none of ResAdd, ResMul or PcJnz to be 1
         // TODO: Why the F is PcJnz in here? Res flag group is only bit 5 and 6
+        // NOTE: looks like it's a handy optimization to calculate next_fp and next_ap
         let cpu_decode_flag_res_op1_bit = (&cpu_decode_flag_res_op1_0 * &cpu_decode_flag_res_op1_0
             - &cpu_decode_flag_res_op1_0)
             / &all_cycles_zerofier;
 
-        // TODO: constraint forces PcUpdate flag to be 000, 100, 010 or 001
+        // constraint forces PcUpdate flag to be 000, 100, 010 or 001
         let cpu_decode_flag_pc_update_regular_bit = (&cpu_decode_flag_pc_update_regular_0
             * &cpu_decode_flag_pc_update_regular_0
             - &cpu_decode_flag_pc_update_regular_0)
             / &all_cycles_zerofier;
 
-        // TODO: forces max only OpcodeRet or OpcodeAssertEq to be 1
-        // TODO: I guess returning and asserting are related to fp?
+        // forces max only OpcodeRet or OpcodeAssertEq to be 1
         // TODO: why OpcodeCall not included? that would make whole flag group
         let cpu_decode_fp_update_regular_bit = (&cpu_decode_fp_update_regular_0
             * &cpu_decode_fp_update_regular_0
@@ -287,9 +284,9 @@ impl Air for CairoAir {
         // ```
         // # Compute op0.
         // if op0_reg == 0:
-        //     op0 = m(ap + offop0)
+        //     op0 = m(-->>ap + offop0<<--)
         // else:
-        //     op0 = m(fp + offop0)
+        //     op0 = m(-->>fp + offop0<<--)
         // ```
         // NOTE: StarkEx contracts as: cpu_operands_mem0_addr
         let cpu_operands_mem_op0_addr = (Npc::MemOp0Addr.curr() + &half_offset_size
@@ -440,15 +437,15 @@ impl Air for CairoAir {
         let cpu_opcodes_call_off1 = (Flag::OpcodeCall.curr()
             * (RangeCheck::OffOp0.curr() - (&half_offset_size + &one)))
             / &all_cycles_zerofier;
-        // TODO: I don't understand this one
-        // TODO: Flag::OpcodeCall.curr() is 0 or 1. Why not just replace
-        // `Flag::OpcodeCall.curr() + Flag::OpcodeCall.curr() + &one + &one` with `4`
+        // TODO: I don't understand this one - Flag::OpcodeCall.curr() is 0 or 1. Why
+        // not just replace `Flag::OpcodeCall.curr() + Flag::OpcodeCall.curr() +
+        // &one + &one` with `4`
         let cpu_opcodes_call_flags = (Flag::OpcodeCall.curr()
             * (Flag::OpcodeCall.curr() + Flag::OpcodeCall.curr() + &one + &one
                 - (Flag::DstReg.curr() + Flag::Op0Reg.curr() + &four)))
             / &all_cycles_zerofier;
         // checks `if opcode == OpcodeRet: assert off_dst = 2^15 - 2`
-        // TODO: why -2?
+        // TODO: why -2 🤯? Instruction size?
         let cpu_opcodes_ret_off0 = (Flag::OpcodeRet.curr()
             * (RangeCheck::OffDst.curr() + &two - &half_offset_size))
             / &all_cycles_zerofier;

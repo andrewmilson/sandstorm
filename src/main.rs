@@ -1,7 +1,11 @@
+use ark_serialize::CanonicalSerialize;
 use ministark::ProofOptions;
 use ministark::Prover;
+use ministark::Trace;
 use sandstorm::prover::CairoProver;
 use sandstorm::trace::ExecutionTrace;
+use std::fs::File;
+use std::io::Write;
 use std::path::PathBuf;
 use std::time::Instant;
 use structopt::StructOpt;
@@ -16,7 +20,8 @@ enum SandstormOptions {
         trace: PathBuf,
         #[structopt(long, parse(from_os_str))]
         memory: PathBuf,
-        // TODO: proof options
+        #[structopt(long, parse(from_os_str))]
+        output: PathBuf,
     },
 }
 
@@ -27,13 +32,19 @@ fn main() {
             program,
             trace,
             memory,
-        } => prove(&program, &trace, &memory),
+            output,
+        } => prove(&program, &trace, &memory, &output),
     }
 }
 
-fn prove(program_path: &PathBuf, trace_path: &PathBuf, memory_path: &PathBuf) {
-    // TODO: unmodified from miniSTARK brainfuck example
-    let num_queries = 10;
+fn prove(
+    program_path: &PathBuf,
+    trace_path: &PathBuf,
+    memory_path: &PathBuf,
+    output_path: &PathBuf,
+) {
+    // TODO:
+    let num_queries = 40;
     let lde_blowup_factor = 4;
     let grinding_factor = 16;
     let fri_folding_factor = 8;
@@ -46,10 +57,29 @@ fn prove(program_path: &PathBuf, trace_path: &PathBuf, memory_path: &PathBuf) {
         fri_max_remainder_size,
     );
 
+    let now = Instant::now();
     let execution_trace = ExecutionTrace::from_file(program_path, trace_path, memory_path);
+    println!(
+        "Generated execution trace (cols={}, rows={}) in {:.0?}",
+        execution_trace.base_columns().num_cols(),
+        execution_trace.base_columns().num_rows(),
+        now.elapsed(),
+    );
+
     let prover = CairoProver::new(options);
     let now = Instant::now();
     let proof = prover.generate_proof(execution_trace).unwrap();
-    println!("Proof generated in: {:?}", now.elapsed());
-    proof.verify().unwrap();
+    println!("Proof generated in: {:.0?}", now.elapsed());
+    println!(
+        "Proof security (conjectured): {}bit",
+        proof.conjectured_security_level()
+    );
+
+    let mut proof_bytes = Vec::new();
+    proof.serialize_compressed(&mut proof_bytes).unwrap();
+    println!("Proof size: {:?}KB", proof_bytes.len() / 1024);
+    let mut f = File::create(output_path).unwrap();
+    f.write_all(proof_bytes.as_slice()).unwrap();
+    f.flush().unwrap();
+    println!("Proof written to {}", output_path.as_path().display());
 }
