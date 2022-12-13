@@ -48,7 +48,6 @@ impl ExecutionTrace {
     fn new(mem: Memory, register_states: RegisterStates, program: CompiledProgram) -> Self {
         let num_cycles = register_states.len();
         assert!(num_cycles.is_power_of_two());
-        println!("{num_cycles}");
         let trace_len = num_cycles * CYCLE_HEIGHT;
         assert!(trace_len >= TraceInfo::MIN_TRACE_LENGTH);
         let public_memory = program.get_public_memory();
@@ -563,6 +562,5 @@ fn get_ordered_memory_accesses(
             );
         });
 
-    println!("gkk: {}", ordered_accesses.len());
     ordered_accesses.flatten().to_vec_in(PageAlignedAllocator)
 }
