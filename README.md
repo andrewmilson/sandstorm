@@ -30,10 +30,12 @@ The verifier, supplied with this proof and the original code, can run `sandstorm
 source ~/cairo_venv/bin/activate
 
 # 2. (optional) Compile and run the Cairo program
-cairo-compile array-sum.cairo --output array-sum.json
+cairo-compile array-sum.cairo --proof_mode --output array-sum.json
 cairo-run --program array-sum.json \
           --trace_file trace.bin \
-          --memory_file memory.bin
+          --memory_file memory.bin \
+          --min_steps 128 \
+          --proof_mode
 
 # 3. generate the proof
 # use `-F parallel,asm` if not using an M1 Mac

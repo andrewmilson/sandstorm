@@ -66,6 +66,7 @@ impl Deref for RegisterStates {
     }
 }
 
+#[derive(Debug)]
 pub struct Memory(Vec<Option<Word>>);
 
 impl Memory {
@@ -145,6 +146,12 @@ impl CompiledProgram {
                 )
             })
             .collect()
+    }
+
+    pub fn get_padding_address_and_value(&self) -> (usize, Fp) {
+        // TODO: make more concrete. By convention seems to be next after public memory
+        let address = self.data.len() + 1;
+        (address, (address as u64).into())
     }
 }
 

@@ -35,7 +35,7 @@ strum_macros = "0.24"
 opt-level = 3
 
 [profile.release]
-codegen-units = 1
+codegen-units = 16
 lto = true
 
 [profile.bench]

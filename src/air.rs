@@ -22,6 +22,7 @@ use crate::trace::Npc;
 use crate::trace::Permutation;
 use crate::trace::RangeCheck;
 
+// must be a power-of-two
 pub const CYCLE_HEIGHT: usize = 16;
 pub const PUBLIC_MEMORY_STEP: usize = 8;
 pub const MEMORY_STEP: usize = 2;
@@ -365,7 +366,7 @@ impl Air for CairoAir {
         // constraint is trivially 0=0. For this reason we can bundle these constraints
         // into one.
         // TODO: fix padding bug
-        let _cpu_update_registers_update_pc_pc_cond_negative = ((&one - Flag::PcJnz.curr())
+        let cpu_update_registers_update_pc_pc_cond_negative = ((&one - Flag::PcJnz.curr())
             * Npc::Pc.next()
             + Auxiliary::Tmp0.curr() * (Npc::Pc.next() - (Npc::Pc.curr() + Npc::MemOp1.curr()))
             - (&cpu_decode_flag_pc_update_regular_0 * &npc_reg_0
@@ -396,7 +397,7 @@ impl Air for CairoAir {
         // This handles all fp update except the `op0 == pc + instruction_size`, `res =
         // dst` and `dst == fp` assertions.
         // TODO: fix padding bug
-        let _cpu_update_registers_update_fp_fp_update = (RangeCheck::Fp.next()
+        let cpu_update_registers_update_fp_fp_update = (RangeCheck::Fp.next()
             - (&cpu_decode_fp_update_regular_0 * RangeCheck::Fp.curr()
                 + Flag::OpcodeRet.curr() * Npc::MemDst.curr()
                 + Flag::OpcodeCall.curr() * (RangeCheck::Ap.curr() + &two)))
@@ -597,12 +598,10 @@ impl Air for CairoAir {
             cpu_operands_res,
             cpu_update_registers_update_pc_tmp0,
             cpu_update_registers_update_pc_tmp1,
-            // TODO: fix padding bug
-            // _cpu_update_registers_update_pc_pc_cond_negative,
+            cpu_update_registers_update_pc_pc_cond_negative,
             cpu_update_registers_update_pc_pc_cond_positive,
             cpu_update_registers_update_ap_ap_update,
-            // TODO: fix padding bug
-            // _cpu_update_registers_update_fp_fp_update,
+            cpu_update_registers_update_fp_fp_update,
             cpu_opcodes_call_push_fp,
             cpu_opcodes_call_push_pc,
             cpu_opcodes_call_off0,
