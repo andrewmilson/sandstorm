@@ -377,7 +377,7 @@ dependencies = [
 [[package]]
 name = "gpu-poly"
 version = "0.1.0"
-source = "git+https://github.com/andrewmilson/ministark#3ae91f43d82a6aa0f5acb39aa31815c1c85d243c"
+source = "git+https://github.com/andrewmilson/ministark#db9f75f18f8a73e5146768fe9a079053665f4535"
 dependencies = [
  "ark-ff",
  "ark-ff-optimized",
@@ -497,7 +497,7 @@ dependencies = [
 [[package]]
 name = "ministark"
 version = "0.1.0"
-source = "git+https://github.com/andrewmilson/ministark#3ae91f43d82a6aa0f5acb39aa31815c1c85d243c"
+source = "git+https://github.com/andrewmilson/ministark#db9f75f18f8a73e5146768fe9a079053665f4535"
 dependencies = [
  "anyhow",
  "ark-ff",
@@ -739,6 +739,7 @@ dependencies = [
  "gpu-poly",
  "ministark",
  "num-bigint",
+ "rayon",
  "ruint",
  "serde",
  "serde_json",

@@ -1,3 +1,4 @@
+use ark_ff::batch_inversion;
 use gpu_poly::GpuFftField;
 use ministark::TraceInfo;
 use ministark::challenges::Challenges;
@@ -23,6 +24,10 @@ use crate::binary::CompiledProgram;
 use crate::binary::Memory;
 use crate::binary::RegisterState;
 use crate::binary::RegisterStates;
+#[cfg(feature = "parallel")]
+use rayon::prelude::*;
+use std::iter::zip;
+use std::ops::Deref;
 use std::path::PathBuf;
 
 pub struct ExecutionTrace {
@@ -79,65 +84,73 @@ impl ExecutionTrace {
         let mut auxiliary_column = Vec::new_in(PageAlignedAllocator);
         auxiliary_column.resize(trace_len, Fp::zero());
 
-        for (i, &RegisterState { pc, ap, fp }) in register_states.iter().enumerate() {
-            let trace_offset = i * CYCLE_HEIGHT;
-            let word = mem[pc].unwrap();
-            assert!(!word.get_flag(Flag::Zero));
+        let (range_check_cycles, _) = range_check_column.as_chunks_mut::<CYCLE_HEIGHT>();
+        let (auxiliary_cycles, _) = auxiliary_column.as_chunks_mut::<CYCLE_HEIGHT>();
+        let (npc_cycles, _) = npc_column.as_chunks_mut::<CYCLE_HEIGHT>();
+        let (flag_cycles, _) = flags_column.as_chunks_mut::<CYCLE_HEIGHT>();
 
-            // range check all offset values
-            let off_dst = (word.get_off_dst() as u64).into();
-            let off_op0 = (word.get_off_op0() as u64).into();
-            let off_op1 = (word.get_off_op1() as u64).into();
-            let dst_addr = (word.get_dst_addr(ap, fp) as u64).into();
-            let op0_addr = (word.get_op0_addr(ap, fp) as u64).into();
-            let op1_addr = (word.get_op1_addr(pc, ap, fp, &mem) as u64).into();
-            let dst = word.get_dst(ap, fp, &mem);
-            let op0 = word.get_op0(ap, fp, &mem);
-            let op1 = word.get_op1(pc, ap, fp, &mem);
-            let res = word.get_res(pc, ap, fp, &mem);
-            let tmp0 = word.get_tmp0(ap, fp, &mem);
-            let tmp1 = word.get_tmp1(pc, ap, fp, &mem);
+        ark_std::cfg_iter_mut!(range_check_cycles)
+            .zip(auxiliary_cycles)
+            .zip(npc_cycles)
+            .zip(flag_cycles)
+            .zip(register_states.deref())
+            .for_each(
+                |((((rc_cycle, aux_cycle), npc_cycle), flag_cycle), registers)| {
+                    let &RegisterState { pc, ap, fp } = registers;
+                    let word = mem[pc].unwrap();
+                    debug_assert!(!word.get_flag(Flag::Zero));
 
-            // FLAGS
-            let flags_virtual_row = &mut flags_column[trace_offset..trace_offset + CYCLE_HEIGHT];
-            for flag in Flag::iter() {
-                flags_virtual_row[flag as usize] = word.get_flag_prefix(flag).into();
-            }
+                    // range check all offset values
+                    let off_dst = (word.get_off_dst() as u64).into();
+                    let off_op0 = (word.get_off_op0() as u64).into();
+                    let off_op1 = (word.get_off_op1() as u64).into();
+                    let dst_addr = (word.get_dst_addr(ap, fp) as u64).into();
+                    let op0_addr = (word.get_op0_addr(ap, fp) as u64).into();
+                    let op1_addr = (word.get_op1_addr(pc, ap, fp, &mem) as u64).into();
+                    let dst = word.get_dst(ap, fp, &mem);
+                    let op0 = word.get_op0(ap, fp, &mem);
+                    let op1 = word.get_op1(pc, ap, fp, &mem);
+                    let res = word.get_res(pc, ap, fp, &mem);
+                    let tmp0 = word.get_tmp0(ap, fp, &mem);
+                    let tmp1 = word.get_tmp1(pc, ap, fp, &mem);
 
-            // NPC
-            let npc_virtual_row = &mut npc_column[trace_offset..trace_offset + CYCLE_HEIGHT];
-            npc_virtual_row[Npc::Pc as usize] = (pc as u64).into();
-            npc_virtual_row[Npc::Instruction as usize] = word.into();
-            npc_virtual_row[Npc::MemOp0Addr as usize] = op0_addr;
-            npc_virtual_row[Npc::MemOp0 as usize] = op0;
-            npc_virtual_row[Npc::MemDstAddr as usize] = dst_addr;
-            npc_virtual_row[Npc::MemDst as usize] = dst;
-            npc_virtual_row[Npc::MemOp1Addr as usize] = op1_addr;
-            npc_virtual_row[Npc::MemOp1 as usize] = op1;
-            for offset in (0..CYCLE_HEIGHT).step_by(PUBLIC_MEMORY_STEP) {
-                npc_virtual_row[offset + Npc::PubMemAddr as usize] = Fp::zero();
-                npc_virtual_row[offset + Npc::PubMemVal as usize] = Fp::zero();
-            }
+                    // FLAGS
+                    for flag in Flag::iter() {
+                        flag_cycle[flag as usize] = word.get_flag_prefix(flag).into();
+                    }
 
-            // MEMORY
-            // handled after this loop
+                    // NPC
+                    npc_cycle[Npc::Pc as usize] = (pc as u64).into();
+                    npc_cycle[Npc::Instruction as usize] = word.into();
+                    npc_cycle[Npc::MemOp0Addr as usize] = op0_addr;
+                    npc_cycle[Npc::MemOp0 as usize] = op0;
+                    npc_cycle[Npc::MemDstAddr as usize] = dst_addr;
+                    npc_cycle[Npc::MemDst as usize] = dst;
+                    npc_cycle[Npc::MemOp1Addr as usize] = op1_addr;
+                    npc_cycle[Npc::MemOp1 as usize] = op1;
+                    for offset in (0..CYCLE_HEIGHT).step_by(PUBLIC_MEMORY_STEP) {
+                        npc_cycle[offset + Npc::PubMemAddr as usize] = Fp::zero();
+                        npc_cycle[offset + Npc::PubMemVal as usize] = Fp::zero();
+                    }
 
-            // RANGE CHECK
-            let rc_virtual_row = &mut range_check_column[trace_offset..trace_offset + CYCLE_HEIGHT];
-            rc_virtual_row[RangeCheck::OffDst as usize] = off_dst;
-            rc_virtual_row[RangeCheck::Ap as usize] = (ap as u64).into();
-            rc_virtual_row[RangeCheck::OffOp1 as usize] = off_op1;
-            rc_virtual_row[RangeCheck::Op0MulOp1 as usize] = op0 * op1;
-            rc_virtual_row[RangeCheck::OffOp0 as usize] = off_op0;
-            rc_virtual_row[RangeCheck::Fp as usize] = (fp as u64).into();
-            rc_virtual_row[RangeCheck::Res as usize] = res;
-            // RangeCheck::Ordered and RangeCheck::Unused are handled after cycle padding
+                    // MEMORY
+                    // handled after this loop
 
-            // COL8 - TODO: better name
-            let aux_virtual_row = &mut auxiliary_column[trace_offset..trace_offset + CYCLE_HEIGHT];
-            aux_virtual_row[Auxiliary::Tmp0 as usize] = tmp0;
-            aux_virtual_row[Auxiliary::Tmp1 as usize] = tmp1;
-        }
+                    // RANGE CHECK
+                    rc_cycle[RangeCheck::OffDst as usize] = off_dst;
+                    rc_cycle[RangeCheck::Ap as usize] = (ap as u64).into();
+                    rc_cycle[RangeCheck::OffOp1 as usize] = off_op1;
+                    rc_cycle[RangeCheck::Op0MulOp1 as usize] = op0 * op1;
+                    rc_cycle[RangeCheck::OffOp0 as usize] = off_op0;
+                    rc_cycle[RangeCheck::Fp as usize] = (fp as u64).into();
+                    rc_cycle[RangeCheck::Res as usize] = res;
+                    // RangeCheck::Ordered and RangeCheck::Unused are handled after cycle padding
+
+                    // COL8 - TODO: better name
+                    aux_cycle[Auxiliary::Tmp0 as usize] = tmp0;
+                    aux_cycle[Auxiliary::Tmp1 as usize] = tmp1;
+                },
+            );
 
         for cycle_offset in (0..trace_len).step_by(CYCLE_HEIGHT) {
             let rc_virtual_row = &mut range_check_column[cycle_offset..cycle_offset + CYCLE_HEIGHT];
@@ -232,6 +245,7 @@ impl Trace for ExecutionTrace {
     }
 
     fn build_extension_columns(&self, challenges: &Challenges<Fp>) -> Option<Matrix<Fp>> {
+        // TODO: multithread
         // Generate memory permutation product
         // ===================================
         // see distinction between (a', v') and (a, v) in the Cairo paper.
@@ -239,37 +253,46 @@ impl Trace for ExecutionTrace {
         let alpha = challenges[MemoryPermutation::A];
         let program_order_accesses = self.npc_column.array_chunks::<MEMORY_STEP>();
         let address_order_accesses = self.memory_column.array_chunks::<MEMORY_STEP>();
-        let mut running_mem_permutation = Vec::new();
-        let mut accumulator = Fp::one();
+        let mut mem_perm_numerators = Vec::new();
+        let mut mem_perm_denominators = Vec::new();
+        let mut numerator_acc = Fp::one();
+        let mut denominator_acc = Fp::one();
         for (&[a, v], &[a_prime, v_prime]) in program_order_accesses.zip(address_order_accesses) {
-            accumulator *= (z - (a + alpha * v)) / (z - (a_prime + alpha * v_prime));
-            running_mem_permutation.push(accumulator);
+            numerator_acc *= z - (a + alpha * v);
+            denominator_acc *= z - (a_prime + alpha * v_prime);
+            mem_perm_numerators.push(numerator_acc);
+            mem_perm_denominators.push(denominator_acc);
         }
+        batch_inversion(&mut mem_perm_denominators);
 
         // Generate range check permutation product
         // ========================================
         let z = challenges[RangeCheckPermutation::Z];
         let range_check_chunks = self.range_check_column.array_chunks::<RANGE_CHECK_STEP>();
-        let mut running_rc_permutation = Vec::new();
-        let mut accumulator = Fp::one();
+        let mut rc_perm_numerators = Vec::new();
+        let mut rc_perm_denominators = Vec::new();
+        let mut numerator_acc = Fp::one();
+        let mut denominator_acc = Fp::one();
         for chunk in range_check_chunks {
-            accumulator *= (z - chunk[RangeCheck::OffDst as usize])
-                / (z - chunk[RangeCheck::Ordered as usize]);
-            running_rc_permutation.push(accumulator);
+            numerator_acc *= z - chunk[RangeCheck::OffDst as usize];
+            denominator_acc *= z - chunk[RangeCheck::Ordered as usize];
+            rc_perm_numerators.push(numerator_acc);
+            rc_perm_denominators.push(denominator_acc);
         }
-        assert!(accumulator.is_one());
+        batch_inversion(&mut mem_perm_denominators);
+        debug_assert!((numerator_acc / denominator_acc).is_one());
 
         let mut permutation_column = Vec::new_in(PageAlignedAllocator);
         permutation_column.resize(self.base_columns().num_rows(), Fp::zero());
 
         // Insert intermediate memory permutation results
-        for (i, p) in running_mem_permutation.into_iter().enumerate() {
-            permutation_column[i * MEMORY_STEP + Permutation::Memory as usize] = p;
+        for (i, (n, d)) in zip(mem_perm_numerators, mem_perm_denominators).enumerate() {
+            permutation_column[i * MEMORY_STEP + Permutation::Memory as usize] = n * d;
         }
 
         // Insert intermediate range check results
-        for (i, p) in running_rc_permutation.into_iter().enumerate() {
-            permutation_column[i * RANGE_CHECK_STEP + Permutation::RangeCheck as usize] = p;
+        for (i, (n, d)) in zip(rc_perm_numerators, rc_perm_denominators).enumerate() {
+            permutation_column[i * RANGE_CHECK_STEP + Permutation::RangeCheck as usize] = n * d;
         }
 
         Some(Matrix::new(vec![permutation_column]))
@@ -343,7 +366,6 @@ pub enum Npc {
     PubMemVal = 3,
     MemOp0Addr = 4,
     MemOp0 = 5,
-    // TODO: What kind of memory address? 8 - memory function?
     MemDstAddr = 8,
     MemDst = 9,
     // NOTE: cycle cells 10 and 11 is occupied by PubMemAddr since the public memory step is 8.

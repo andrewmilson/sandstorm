@@ -9,7 +9,7 @@ edition = "2021"
 default = [ ]
 asm = [ "ministark/asm" ]
 gpu = [ "ministark/gpu" ]
-parallel = [ "ministark/parallel" ]
+parallel = [ "dep:rayon", "ministark/parallel" ]
 
 [dependencies]
 ministark = { git = "https://github.com/andrewmilson/ministark" }
@@ -26,6 +26,7 @@ serde = "1.0.147"
 serde_json = "1.0.89"
 strum = "0.24.1"
 strum_macros = "0.24"
+rayon = { version = "1.5.3", optional = true }
 
 # taken from https://github.com/recmo/uint
 # Compilation profile for any non-workspace member.

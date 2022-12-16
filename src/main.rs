@@ -39,7 +39,7 @@ enum SandstormOptions {
 fn main() {
     // TODO:
     // proof options for 95 bit security level
-    let num_queries = 40;
+    let num_queries = 20;
     let lde_blowup_factor = 4;
     let grinding_factor = 16;
     let fri_folding_factor = 8;
@@ -96,7 +96,7 @@ fn prove(
     let prover = CairoProver::new(options);
     let now = Instant::now();
     let proof = prover.generate_proof(execution_trace).unwrap();
-    println!("Proof generated in: {:.0?}", now.elapsed());
+    println!("Proof generated in: {:?}", now.elapsed());
     println!(
         "Proof security (conjectured): {}bit",
         proof.conjectured_security_level()

@@ -3,7 +3,8 @@
     allocator_api,
     array_chunks,
     slice_flatten,
-    array_windows
+    array_windows,
+    slice_as_chunks
 )]
 pub mod air;
 pub mod binary;
