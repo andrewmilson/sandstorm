@@ -443,8 +443,12 @@ impl ExecutionTraceColumn for RangeCheck {
         &self,
         cycle_offset: isize,
     ) -> AlgebraicExpression<Fp, Fq> {
+        let step = match self {
+            RangeCheck::Ordered => RANGE_CHECK_STEP,
+            _ => CYCLE_HEIGHT,
+        } as isize;
         let column = self.index();
-        let trace_offset = CYCLE_HEIGHT as isize * cycle_offset + *self as isize;
+        let trace_offset = step * cycle_offset + *self as isize;
         AlgebraicExpression::Trace(column, trace_offset)
     }
 }

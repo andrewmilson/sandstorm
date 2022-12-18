@@ -146,7 +146,8 @@ impl Air for CairoAir {
         let memory_address_diff_0: AlgebraicExpression<Fp> =
             Mem::Address.next() - Mem::Address.curr();
 
-        let rc16_diff_0: AlgebraicExpression<Fp> = Trace(7, 6) - Trace(7, 2);
+        let rc16_diff_0: AlgebraicExpression<Fp> =
+            RangeCheck::Ordered.next() - RangeCheck::Ordered.curr();
 
         // TODO: builtins
         let pedersen_hash0_ec_subset_sub_b0 = Trace(3, 0) - (Trace(3, 1) + Trace(3, 1));
@@ -560,12 +561,12 @@ impl Air for CairoAir {
         // =======================
         // Look at memory to understand the general approach to permutation.
         // More info in section 9.9 of the Cairo paper.
-        let rc16_perm_init0 = ((RangeCheckPermutation::Z.challenge() - Trace(7, 2))
+        let rc16_perm_init0 = ((RangeCheckPermutation::Z.challenge() - RangeCheck::Ordered.curr())
             * Permutation::RangeCheck.curr()
             + RangeCheck::OffDst.curr()
             - RangeCheckPermutation::Z.challenge())
             / &first_row_zerofier;
-        let rc16_perm_step0 = ((RangeCheckPermutation::Z.challenge() - Trace(7, 6))
+        let rc16_perm_step0 = ((RangeCheckPermutation::Z.challenge() - RangeCheck::Ordered.next())
             * Permutation::RangeCheck.next()
             - (RangeCheckPermutation::Z.challenge() - RangeCheck::OffOp1.curr())
                 * Permutation::RangeCheck.curr())
@@ -577,8 +578,10 @@ impl Air for CairoAir {
             (&rc16_diff_0 * &rc16_diff_0 - &rc16_diff_0) * &every_fourth_row_except_last_zerofier;
         // Prover sends the minimim and maximum as a public input.
         // Verifier checks the RC min and max fall within [0, 2^16).
-        let rc16_minimum = (Trace(7, 2) - RangeCheckMin.hint()) / &first_row_zerofier;
-        let rc16_maximum = (Trace(7, 2) - RangeCheckMax.hint()) / &fourth_last_row_zerofier;
+        let rc16_minimum =
+            (RangeCheck::Ordered.curr() - RangeCheckMin.hint()) / &first_row_zerofier;
+        let rc16_maximum =
+            (RangeCheck::Ordered.curr() - RangeCheckMax.hint()) / &fourth_last_row_zerofier;
 
         // TODO: find out what diluted constraints are for. Might be starkex specific
 
