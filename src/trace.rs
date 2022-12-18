@@ -279,7 +279,7 @@ impl Trace for ExecutionTrace {
             rc_perm_numerators.push(numerator_acc);
             rc_perm_denominators.push(denominator_acc);
         }
-        batch_inversion(&mut mem_perm_denominators);
+        batch_inversion(&mut rc_perm_denominators);
         debug_assert!((numerator_acc / denominator_acc).is_one());
 
         let mut permutation_column = Vec::new_in(PageAlignedAllocator);

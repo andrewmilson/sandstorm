@@ -548,8 +548,8 @@ impl Air for CairoAir {
 
         // examples for trace length n=16
         // =====================================
-        // x^(n/4) - 1             = (x - ω_0)(x - ω_4)(x - ω_8)(x - ω_12)
-        // x - ω^(4*(n/4 - 1))     = x - ω^n/w^4 = x - 1/w_4 = x - w_12
+        // x^(n/4) - 1              = (x - ω_0)(x - ω_4)(x - ω_8)(x - ω_12)
+        // x - ω^(4*(n/4 - 1))      = x - ω^n/w^4 = x - 1/w_4 = x - w_12
         // (x - w_12) / x^(n/4) - 1 = (x - ω_0)(x - ω_4)(x - ω_8)
         let every_fourth_row_zerofier = X.pow(n / 4) - &one;
         let fourth_last_row_zerofier = X - FieldConstant::Fp(g.pow([4 * (n as u64 / 4 - 1)]));
@@ -580,7 +580,12 @@ impl Air for CairoAir {
         let rc16_minimum = (Trace(7, 2) - RangeCheckMin.hint()) / &first_row_zerofier;
         let rc16_maximum = (Trace(7, 2) - RangeCheckMax.hint()) / &fourth_last_row_zerofier;
 
-        // Done 3,500 of 7,500 (46% - should take 3 days)
+        // TODO: find out what diluted constraints are for. Might be starkex specific
+
+        // Pedersen builtin
+        // ================
+        // pedersen/hash0/ec_subset_sum/bit_unpacking/last_one_is_zero
+        // column8_row82 * (column3_row0 - (column3_row1 + column3_row1))
 
         // NOTE: for composition OODs only seem to involve one random per constraint
         vec![
