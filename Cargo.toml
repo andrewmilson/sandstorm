@@ -28,6 +28,7 @@ serde = "1.0.147"
 serde_json = "1.0.89"
 strum = "0.24.1"
 strum_macros = "0.24"
+pollster = "0.2.4"
 rayon = { version = "1.5.3", optional = true }
 
 [target.'cfg(not(target_env = "msvc"))'.dependencies]

@@ -95,7 +95,7 @@ fn prove(
 
     let prover = CairoProver::new(options);
     let now = Instant::now();
-    let proof = prover.generate_proof(execution_trace).unwrap();
+    let proof = pollster::block_on(prover.generate_proof(execution_trace)).unwrap();
     println!("Proof generated in: {:?}", now.elapsed());
     println!(
         "Proof security (conjectured): {}bit",
