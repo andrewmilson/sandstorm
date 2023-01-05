@@ -1,3 +1,4 @@
+use ark_ff::FftField;
 use ark_ff::batch_inversion;
 use gpu_poly::GpuFftField;
 use ministark::TraceInfo;
@@ -341,7 +342,7 @@ impl ExecutionTraceColumn for Flag {
         0
     }
 
-    fn offset<Fp: GpuFftField, Fq: StarkExtensionOf<Fp>>(
+    fn offset<Fp: GpuFftField + FftField, Fq: StarkExtensionOf<Fp>>(
         &self,
         cycle_offset: isize,
     ) -> AlgebraicExpression<Fp, Fq> {
@@ -379,7 +380,7 @@ impl ExecutionTraceColumn for Npc {
         5
     }
 
-    fn offset<Fp: GpuFftField, Fq: StarkExtensionOf<Fp>>(
+    fn offset<Fp: GpuFftField + FftField, Fq: StarkExtensionOf<Fp>>(
         &self,
         offset: isize,
     ) -> AlgebraicExpression<Fp, Fq> {
@@ -406,7 +407,7 @@ impl ExecutionTraceColumn for Mem {
         6
     }
 
-    fn offset<Fp: GpuFftField, Fq: StarkExtensionOf<Fp>>(
+    fn offset<Fp: GpuFftField + FftField, Fq: StarkExtensionOf<Fp>>(
         &self,
         mem_offset: isize,
     ) -> AlgebraicExpression<Fp, Fq> {
@@ -439,7 +440,7 @@ impl ExecutionTraceColumn for RangeCheck {
         7
     }
 
-    fn offset<Fp: GpuFftField, Fq: StarkExtensionOf<Fp>>(
+    fn offset<Fp: GpuFftField + FftField, Fq: StarkExtensionOf<Fp>>(
         &self,
         cycle_offset: isize,
     ) -> AlgebraicExpression<Fp, Fq> {
@@ -465,7 +466,7 @@ impl ExecutionTraceColumn for Auxiliary {
         8
     }
 
-    fn offset<Fp: GpuFftField, Fq: StarkExtensionOf<Fp>>(
+    fn offset<Fp: GpuFftField + FftField, Fq: StarkExtensionOf<Fp>>(
         &self,
         cycle_offset: isize,
     ) -> AlgebraicExpression<Fp, Fq> {
@@ -488,7 +489,7 @@ impl ExecutionTraceColumn for Permutation {
         9
     }
 
-    fn offset<Fp: GpuFftField, Fq: StarkExtensionOf<Fp>>(
+    fn offset<Fp: GpuFftField + FftField, Fq: StarkExtensionOf<Fp>>(
         &self,
         offset: isize,
     ) -> AlgebraicExpression<Fp, Fq> {
