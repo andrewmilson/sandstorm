@@ -1,3 +1,4 @@
+use alloc::vec::Vec;
 use ark_serialize::CanonicalDeserialize;
 use ark_serialize::CanonicalSerialize;
 use ministark::ProofOptions;

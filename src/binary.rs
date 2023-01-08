@@ -1,19 +1,19 @@
 use crate::trace::Flag;
+use alloc::vec::Vec;
 use gpu_poly::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481::Fp;
 use num_bigint::BigUint;
 use ruint::aliases::U256;
 use ruint::uint;
 use serde::Deserialize;
 use serde::Serialize;
-use std::fs::File;
 use std::io::BufRead;
+use std::io::BufReader;
+use std::io::Read;
 use std::str::FromStr;
 use ark_ff::PrimeField;
 use ark_ff::Zero;
-use std::io::BufReader;
 use ark_ff::Field;
 use std::ops::Deref;
-use std::path::PathBuf;
 
 // https://eprint.iacr.org/2021/1063.pdf figure 3
 /// Word offset of `off_DST`
@@ -45,10 +45,10 @@ pub struct RegisterState {
 pub struct RegisterStates(Vec<RegisterState>);
 
 impl RegisterStates {
-    /// Parses the trace file outputted by a Cairo runner.
-    pub fn from_file(trace_path: &PathBuf) -> Self {
-        let trace_file = File::open(trace_path).expect("could not open trace file");
-        let mut reader = BufReader::new(trace_file);
+    /// Parses trace data in the format outputted by a `cairo-run`.
+    pub fn from_reader(r: impl Read) -> Self {
+        // TODO: errors
+        let mut reader = BufReader::new(r);
         let mut register_states = Vec::new();
         while reader.has_data_left().unwrap() {
             let entry: RegisterState = bincode::deserialize_from(&mut reader).unwrap();
@@ -70,8 +70,9 @@ impl Deref for RegisterStates {
 pub struct Memory(Vec<Option<Word>>);
 
 impl Memory {
-    /// Parses the partial memory file outputted by a Cairo runner.
-    pub fn from_file(memory_path: &PathBuf) -> Self {
+    /// Parses the partial memory data outputted by a `cairo-run`.
+    pub fn from_reader(r: impl Read) -> Self {
+        // TODO: errors
         // TODO: each builtin has its own memory segment.
         // check it also contains other builtins
         // this file contains the contiguous memory segments:
@@ -80,8 +81,7 @@ impl Memory {
         // - builtin 0
         // - builtin 1
         // - ...
-        let memory_file = File::open(memory_path).expect("could not open memory file");
-        let mut reader = BufReader::new(memory_file);
+        let mut reader = BufReader::new(r);
         let mut partial_memory = Vec::new();
         let mut max_address = 0;
         while reader.has_data_left().unwrap() {
@@ -120,13 +120,8 @@ pub struct CompiledProgram {
 }
 
 impl CompiledProgram {
-    /// Parses the compiled .json program file outputted by a Cairo runner.
-    pub fn from_file(program_path: &PathBuf) -> Self {
-        let program_file = File::open(program_path).expect("could not open program file");
-        let reader = BufReader::new(program_file);
-        serde_json::from_reader(reader).unwrap()
-    }
-
+    // TODO: could use https://github.com/Keats/validator instead of calling this everywhere
+    // but seems a bit heave to add as a dependency just to do this
     pub fn validate(&self) {
         // Make sure the field modulus matches the expected
         assert_eq!(
@@ -255,9 +250,6 @@ impl Word {
             }
             _ => unreachable!(),
         }
-        // if pc_update == 4 {
-
-        // } else if pa
     }
 
     pub fn get_flag(&self, flag: Flag) -> bool {

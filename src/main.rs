@@ -1,11 +1,16 @@
 use ark_serialize::CanonicalDeserialize;
 use ark_serialize::CanonicalSerialize;
+// use more performant global allocator
+#[cfg(not(target_env = "msvc"))]
+use jemallocator::Jemalloc;
 use ministark::Proof;
 use ministark::ProofOptions;
 use ministark::Prover;
 use ministark::Trace;
 use sandstorm::air::CairoAir;
 use sandstorm::binary::CompiledProgram;
+use sandstorm::binary::Memory;
+use sandstorm::binary::RegisterStates;
 use sandstorm::prover::CairoProver;
 use sandstorm::trace::ExecutionTrace;
 use std::fs;
@@ -14,6 +19,10 @@ use std::io::Write;
 use std::path::PathBuf;
 use std::time::Instant;
 use structopt::StructOpt;
+
+#[cfg(not(target_env = "msvc"))]
+#[global_allocator]
+static GLOBAL: Jemalloc = Jemalloc;
 
 #[derive(StructOpt, Debug)]
 #[structopt(name = "sandstorm", about = "cairo prover")]
@@ -65,7 +74,8 @@ fn main() {
 }
 
 fn verify(options: ProofOptions, program_path: &PathBuf, proof_path: &PathBuf) {
-    let program = CompiledProgram::from_file(program_path);
+    let program_file = File::open(program_path).expect("could not open program file");
+    let program: CompiledProgram = serde_json::from_reader(program_file).unwrap();
     let proof_bytes = fs::read(proof_path).unwrap();
     let proof: Proof<CairoAir> = Proof::deserialize_compressed(proof_bytes.as_slice()).unwrap();
     let public_inputs = &proof.public_inputs;
@@ -85,7 +95,17 @@ fn prove(
     output_path: &PathBuf,
 ) {
     let now = Instant::now();
-    let execution_trace = ExecutionTrace::from_file(program_path, trace_path, memory_path);
+
+    let trace_file = File::open(trace_path).expect("could not open trace file");
+    let register_states = RegisterStates::from_reader(trace_file);
+
+    let program_file = File::open(program_path).expect("could not open program file");
+    let program = serde_json::from_reader(program_file).unwrap();
+
+    let memory_file = File::open(memory_path).expect("could not open memory file");
+    let memory = Memory::from_reader(memory_file);
+
+    let execution_trace = ExecutionTrace::new(memory, register_states, program);
     println!(
         "Generated execution trace (cols={}, rows={}) in {:.0?}",
         execution_trace.base_columns().num_cols(),

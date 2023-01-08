@@ -54,8 +54,6 @@ cargo +nightly run -r -F parallel,asm -- \
 
 <h2 id="sandstorm-sharp-differences">Differences between Sandstorm and SHARP</h2>
 
-
-
 Sandstorm implements a subset of the constraints and trace layout that's used by [StarkWare's STARK prover (SHARP)](https://starknet.io/docs/sharp.html). This subset contains all of all constraints outlined in the Cairo whitepaper (section 9.10) and characterizes the constraints required to prove correct execution of Cairo programs (no builtins... yet). Sandstorm has a different proof serialization format and calculates verifier randomness differently. These need to be the same to allow users to submit a Sandstorm generated proof to StarkWare's Ethereum STARK verifier (coming soon). 
 
 ## How Sandstorm works

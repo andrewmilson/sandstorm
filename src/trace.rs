@@ -1,3 +1,5 @@
+use alloc::vec;
+use alloc::vec::Vec;
 use ark_ff::FftField;
 use ark_ff::batch_inversion;
 use gpu_poly::GpuFftField;
@@ -27,9 +29,8 @@ use crate::binary::RegisterState;
 use crate::binary::RegisterStates;
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;
-use std::iter::zip;
-use std::ops::Deref;
-use std::path::PathBuf;
+use core::iter::zip;
+use core::ops::Deref;
 
 pub struct ExecutionTrace {
     pub public_memory_padding_address: usize,
@@ -51,7 +52,10 @@ pub struct ExecutionTrace {
 }
 
 impl ExecutionTrace {
-    fn new(mem: Memory, register_states: RegisterStates, program: CompiledProgram) -> Self {
+    pub fn new(mem: Memory, register_states: RegisterStates, program: CompiledProgram) -> Self {
+        #[cfg(debug_assertions)]
+        program.validate();
+
         let num_cycles = register_states.len();
         assert!(num_cycles.is_power_of_two());
         let trace_len = num_cycles * CYCLE_HEIGHT;
@@ -217,21 +221,6 @@ impl ExecutionTrace {
             _register_states: register_states,
             _program: program,
         }
-    }
-
-    pub fn from_file(program_path: &PathBuf, trace_path: &PathBuf, memory_path: &PathBuf) -> Self {
-        // let file = File::open(program_path).expect("program file not found");
-        // let reader = BufReader::new(file);
-        // let compiled_program: CompiledProgram =
-        // serde_json::from_reader(reader).unwrap();
-        let compiled_program = CompiledProgram::from_file(program_path);
-        #[cfg(debug_assertions)]
-        compiled_program.validate();
-
-        let register_states = RegisterStates::from_file(trace_path);
-        let memory = Memory::from_file(memory_path);
-
-        Self::new(memory, register_states, compiled_program)
     }
 }
 
