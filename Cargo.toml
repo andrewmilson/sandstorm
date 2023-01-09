@@ -31,8 +31,6 @@ strum_macros = "0.24"
 pollster = "0.2.4"
 rayon = { version = "1.5.3", optional = true }
 
-[target.'cfg(not(target_env = "msvc"))'.dependencies]
-jemallocator = "0.5.0"
 
 # taken from https://github.com/recmo/uint
 # Compilation profile for any non-workspace member.
