@@ -405,7 +405,6 @@ dependencies = [
 [[package]]
 name = "gpu-poly"
 version = "0.1.0"
-source = "git+https://github.com/andrewmilson/ministark#aeb461e6d4d5008a206a66fca097d38396b92717"
 dependencies = [
  "ark-ff",
  "ark-ff-optimized",
@@ -535,7 +534,6 @@ dependencies = [
 [[package]]
 name = "ministark"
 version = "0.1.0"
-source = "git+https://github.com/andrewmilson/ministark#aeb461e6d4d5008a206a66fca097d38396b92717"
 dependencies = [
  "ark-ff",
  "ark-ff-optimized",
