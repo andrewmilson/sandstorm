@@ -42,7 +42,7 @@ pub struct RegisterState {
     pub pc: usize,
 }
 
-pub struct RegisterStates(Vec<RegisterState>);
+pub struct RegisterStates(pub Vec<RegisterState>);
 
 impl RegisterStates {
     /// Parses trace data in the format outputted by a `cairo-run`.
@@ -67,7 +67,7 @@ impl Deref for RegisterStates {
 }
 
 #[derive(Debug)]
-pub struct Memory(Vec<Option<Word>>);
+pub struct Memory(pub Vec<Option<Word>>);
 
 impl Memory {
     /// Parses the partial memory data outputted by a `cairo-run`.
