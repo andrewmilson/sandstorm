@@ -1,13 +1,10 @@
 use ark_serialize::CanonicalDeserialize;
 use ark_serialize::CanonicalSerialize;
-// use more performant global allocator
-#[cfg(not(target_env = "msvc"))]
-use jemallocator::Jemalloc;
 use ministark::Proof;
 use ministark::ProofOptions;
 use ministark::Prover;
 use ministark::Trace;
-use sandstorm::air::CairoAir;
+use sandstorm::air;
 use sandstorm::binary::CompiledProgram;
 use sandstorm::binary::Memory;
 use sandstorm::binary::RegisterStates;
@@ -19,10 +16,6 @@ use std::io::Write;
 use std::path::PathBuf;
 use std::time::Instant;
 use structopt::StructOpt;
-
-#[cfg(not(target_env = "msvc"))]
-#[global_allocator]
-static GLOBAL: Jemalloc = Jemalloc;
 
 #[derive(StructOpt, Debug)]
 #[structopt(name = "sandstorm", about = "cairo prover")]
@@ -48,8 +41,8 @@ enum SandstormOptions {
 fn main() {
     // TODO:
     // proof options for 95 bit security level
-    let num_queries = 20;
-    let lde_blowup_factor = 4;
+    let num_queries = 100;
+    let lde_blowup_factor = 2;
     let grinding_factor = 16;
     let fri_folding_factor = 8;
     let fri_max_remainder_size = 64;
@@ -77,7 +70,8 @@ fn verify(options: ProofOptions, program_path: &PathBuf, proof_path: &PathBuf) {
     let program_file = File::open(program_path).expect("could not open program file");
     let program: CompiledProgram = serde_json::from_reader(program_file).unwrap();
     let proof_bytes = fs::read(proof_path).unwrap();
-    let proof: Proof<CairoAir> = Proof::deserialize_compressed(proof_bytes.as_slice()).unwrap();
+    let proof: Proof<air::Layout6Config> =
+        Proof::deserialize_compressed(proof_bytes.as_slice()).unwrap();
     let public_inputs = &proof.public_inputs;
     assert_eq!(program.get_public_memory(), public_inputs.public_memory);
     assert_eq!(options, proof.options);

@@ -1,0 +1,16 @@
+[package]
+name = "layouts"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+gpu-poly = { path = "../../ministark-mirror/gpu-poly" }
+ministark = { path = "../../ministark-mirror" }
+ark-poly = { git = "https://github.com/andrewmilson/algebra", branch = "vec-allocator" }
+ark-serialize = "0.4.0"
+num-traits = "0.2.15"
+strum = "0.24.1"
+ark-ff = "0.4.0"
+strum_macros = "0.24"

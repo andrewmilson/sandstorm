@@ -1,28 +1,28 @@
 use alloc::vec;
 use alloc::vec::Vec;
-use ark_ff::FftField;
 use ark_ff::batch_inversion;
-use gpu_poly::GpuFftField;
+use layouts::layout6;
 use ministark::TraceInfo;
 use ministark::challenges::Challenges;
-use strum_macros::EnumIter;
 use gpu_poly::GpuVec;
 use gpu_poly::prelude::PageAlignedAllocator;
 use ministark::Matrix;
 use gpu_poly::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481::Fp;
-use ministark::StarkExtensionOf;
 use ministark::Trace;
 use ark_ff::Zero;
-use ministark::constraints::AlgebraicExpression;
 use ark_ff::One;
-use ministark::constraints::ExecutionTraceColumn;
 use strum::IntoEnumIterator;
-use crate::air::CYCLE_HEIGHT;
-use crate::air::MEMORY_STEP;
-use crate::air::MemoryPermutation;
-use crate::air::PUBLIC_MEMORY_STEP;
-use crate::air::RANGE_CHECK_STEP;
-use crate::air::RangeCheckPermutation;
+use layouts::layout6::CYCLE_HEIGHT;
+use layouts::layout6::MEMORY_STEP;
+use layouts::layout6::MemoryPermutation;
+use layouts::layout6::PUBLIC_MEMORY_STEP;
+use layouts::layout6::RANGE_CHECK_STEP;
+use layouts::layout6::RangeCheckPermutation;
+use layouts::layout6::Flag;
+use layouts::layout6::Npc;
+use layouts::layout6::RangeCheck;
+use layouts::layout6::Permutation;
+use layouts::layout6::Auxiliary;
 use crate::binary::CompiledProgram;
 use crate::binary::Memory;
 use crate::binary::RegisterState;
@@ -225,8 +225,8 @@ impl ExecutionTrace {
 }
 
 impl Trace for ExecutionTrace {
-    const NUM_BASE_COLUMNS: usize = 9;
-    const NUM_EXTENSION_COLUMNS: usize = 1;
+    const NUM_BASE_COLUMNS: usize = layout6::NUM_BASE_COLUMNS;
+    const NUM_EXTENSION_COLUMNS: usize = layout6::NUM_EXTENSION_COLUMNS;
     type Fp = Fp;
     type Fq = Fp;
 
@@ -286,208 +286,6 @@ impl Trace for ExecutionTrace {
         }
 
         Some(Matrix::new(vec![permutation_column]))
-    }
-}
-
-/// Cairo flag
-/// https://eprint.iacr.org/2021/1063.pdf section 9
-#[derive(Clone, Copy, EnumIter, PartialEq, Eq)]
-pub enum Flag {
-    // Group: [FlagGroup::DstReg]
-    DstReg = 0,
-
-    // Group: [FlagGroup::Op0]
-    Op0Reg = 1,
-
-    // Group: [FlagGroup::Op1Src]
-    Op1Imm = 2,
-    Op1Fp = 3,
-    Op1Ap = 4,
-
-    // Group: [FlagGroup::ResLogic]
-    ResAdd = 5,
-    ResMul = 6,
-
-    // Group: [FlagGroup::PcUpdate]
-    PcJumpAbs = 7,
-    PcJumpRel = 8,
-    PcJnz = 9,
-
-    // Group: [FlagGroup::ApUpdate]
-    ApAdd = 10,
-    ApAdd1 = 11,
-
-    // Group: [FlagGroup::Opcode]
-    OpcodeCall = 12,
-    OpcodeRet = 13,
-    OpcodeAssertEq = 14,
-
-    // 0 - padding to make flag cells a power-of-2
-    Zero = 15,
-}
-
-impl ExecutionTraceColumn for Flag {
-    fn index(&self) -> usize {
-        0
-    }
-
-    fn offset<Fp: GpuFftField + FftField, Fq: StarkExtensionOf<Fp>>(
-        &self,
-        cycle_offset: isize,
-    ) -> AlgebraicExpression<Fp, Fq> {
-        use AlgebraicExpression::Trace;
-        // Get the individual bit (as opposed to the bit prefix)
-        let col = self.index();
-        let trace_offset = CYCLE_HEIGHT as isize * cycle_offset;
-        let flag_offset = trace_offset + *self as isize;
-        Trace(col, flag_offset) - (Trace(col, flag_offset + 1) + Trace(col, flag_offset + 1))
-    }
-}
-
-// NPC? not sure what it means yet - next program counter?
-// Trace column 5
-// Perhaps control flow is a better name for this column
-#[derive(Clone, Copy)]
-pub enum Npc {
-    // TODO: first word of each instruction?
-    Pc = 0, // Program counter
-    Instruction = 1,
-    PubMemAddr = 2,
-    PubMemVal = 3,
-    MemOp0Addr = 4,
-    MemOp0 = 5,
-    MemDstAddr = 8,
-    MemDst = 9,
-    // NOTE: cycle cells 10 and 11 is occupied by PubMemAddr since the public memory step is 8.
-    // This means it applies twice (2, 3) then (8+2, 8+3) within a single 16 row cycle.
-    MemOp1Addr = 12,
-    MemOp1 = 13,
-}
-
-impl ExecutionTraceColumn for Npc {
-    fn index(&self) -> usize {
-        5
-    }
-
-    fn offset<Fp: GpuFftField + FftField, Fq: StarkExtensionOf<Fp>>(
-        &self,
-        offset: isize,
-    ) -> AlgebraicExpression<Fp, Fq> {
-        let step = match self {
-            Npc::PubMemAddr | Npc::PubMemVal => PUBLIC_MEMORY_STEP,
-            _ => CYCLE_HEIGHT,
-        } as isize;
-        let column = self.index();
-        let trace_offset = step * offset + *self as isize;
-        AlgebraicExpression::Trace(column, trace_offset)
-    }
-}
-
-// Trace column 6 - memory
-#[derive(Clone, Copy)]
-pub enum Mem {
-    // TODO = 0,
-    Address = 0,
-    Value = 1,
-}
-
-impl ExecutionTraceColumn for Mem {
-    fn index(&self) -> usize {
-        6
-    }
-
-    fn offset<Fp: GpuFftField + FftField, Fq: StarkExtensionOf<Fp>>(
-        &self,
-        mem_offset: isize,
-    ) -> AlgebraicExpression<Fp, Fq> {
-        let column = self.index();
-        let trace_offset = MEMORY_STEP as isize * mem_offset + *self as isize;
-        AlgebraicExpression::Trace(column, trace_offset)
-    }
-}
-
-// Trace column 7
-#[derive(Clone, Copy)]
-pub enum RangeCheck {
-    OffDst = 0,
-    Ordered = 2, // Stores ordered values for the range check
-    Ap = 3,      // Allocation pointer (ap)
-    // TODO 2
-    OffOp1 = 4,
-    // Ordered = 6 - trace step is 4
-    Op0MulOp1 = 7, // =op0*op1
-    OffOp0 = 8,
-    // Ordered = 10 - trace step is 4
-    Fp = 11,     // Frame pointer (fp)
-    Unused = 12, // an unused range checked value (gets stuffed with padding)
-    // Ordered = 14 - trace step is 4
-    Res = 15,
-}
-
-impl ExecutionTraceColumn for RangeCheck {
-    fn index(&self) -> usize {
-        7
-    }
-
-    fn offset<Fp: GpuFftField + FftField, Fq: StarkExtensionOf<Fp>>(
-        &self,
-        cycle_offset: isize,
-    ) -> AlgebraicExpression<Fp, Fq> {
-        let step = match self {
-            RangeCheck::Ordered => RANGE_CHECK_STEP,
-            _ => CYCLE_HEIGHT,
-        } as isize;
-        let column = self.index();
-        let trace_offset = step * cycle_offset + *self as isize;
-        AlgebraicExpression::Trace(column, trace_offset)
-    }
-}
-
-// Auxiliary column 8
-#[derive(Clone, Copy)]
-pub enum Auxiliary {
-    Tmp0 = 0,
-    Tmp1 = 8,
-}
-
-impl ExecutionTraceColumn for Auxiliary {
-    fn index(&self) -> usize {
-        8
-    }
-
-    fn offset<Fp: GpuFftField + FftField, Fq: StarkExtensionOf<Fp>>(
-        &self,
-        cycle_offset: isize,
-    ) -> AlgebraicExpression<Fp, Fq> {
-        let column = self.index();
-        let trace_offset = CYCLE_HEIGHT as isize * cycle_offset + *self as isize;
-        AlgebraicExpression::Trace(column, trace_offset)
-    }
-}
-
-// Trace column 6 - permutations
-#[derive(Clone, Copy)]
-pub enum Permutation {
-    // TODO = 0,
-    Memory = 0,
-    RangeCheck = 1,
-}
-
-impl ExecutionTraceColumn for Permutation {
-    fn index(&self) -> usize {
-        9
-    }
-
-    fn offset<Fp: GpuFftField + FftField, Fq: StarkExtensionOf<Fp>>(
-        &self,
-        offset: isize,
-    ) -> AlgebraicExpression<Fp, Fq> {
-        let column = self.index();
-        let trace_offset = match self {
-            Permutation::Memory => MEMORY_STEP as isize * offset + *self as isize,
-            Permutation::RangeCheck => 4 * offset + *self as isize,
-        };
-        AlgebraicExpression::Trace(column, trace_offset)
     }
 }
 

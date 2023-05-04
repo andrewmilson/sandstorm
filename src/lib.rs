@@ -14,4 +14,3 @@ pub mod air;
 pub mod binary;
 pub mod prover;
 pub mod trace;
-mod utils;

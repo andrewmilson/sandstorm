@@ -1,5 +1,5 @@
 use gpu_poly::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481::Fp;
-use crate::air::PUBLIC_MEMORY_STEP;
+use crate::layout6::PUBLIC_MEMORY_STEP;
 use ark_ff::Field;
 
 /// Computes the value of the public memory quotient:

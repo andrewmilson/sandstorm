@@ -1,5 +1,5 @@
-use crate::air::CairoAir;
-use crate::air::ExecutionInfo;
+use layouts::ExecutionInfo;
+use crate::air;
 use crate::trace::ExecutionTrace;
 use gpu_poly::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481::Fp;
 use ministark::ProofOptions;
@@ -10,7 +10,8 @@ pub struct CairoProver(ProofOptions);
 impl Prover for CairoProver {
     type Fp = Fp;
     type Fq = Fp;
-    type Air = CairoAir;
+    type AirConfig = air::Layout6Config;
+    // type AirConfig = layouts::layout6::AirConfig;
     type Trace = ExecutionTrace;
 
     fn new(options: ProofOptions) -> Self {

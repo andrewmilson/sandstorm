@@ -5,6 +5,9 @@ authors = ["Andrew Milson <andrew.j.milson@gmail.com>"]
 version = "0.1.0"
 edition = "2021"
 
+[workspace]
+members = ["layouts", "codegen"]
+
 [features]
 default = [ ]
 asm = [ "ministark/asm" ]
@@ -12,14 +15,15 @@ gpu = [ "ministark/gpu" ]
 parallel = [ "dep:rayon", "ministark/parallel" ]
 
 [dependencies]
-ministark = { git = "https://github.com/andrewmilson/ministark" }
-gpu-poly = { git = "https://github.com/andrewmilson/ministark" }
-# ministark = { path = "../ministark" }
-# gpu-poly = { path = "../ministark/gpu-poly" }
-ark-std = { git = "https://github.com/arkworks-rs/std" }
-ark-ff = { git = "https://github.com/arkworks-rs/algebra" }
+layouts = { path = "./layouts" }
+gpu-poly = { path = "../ministark-mirror/gpu-poly" }
+ministark = { path = "../ministark-mirror", features = [ "custom_cpu_constraint_eval" ] }
+# ministark = { git = "https://github.com/andrewmilson/ministark" }
+# gpu-poly = { git = "https://github.com/andrewmilson/ministark" }
 ark-poly = { git = "https://github.com/andrewmilson/algebra", branch = "vec-allocator" }
-ark-serialize = { git = "https://github.com/arkworks-rs/algebra" }
+ark-std = "0.4.0"
+ark-ff = "0.4.0"
+ark-serialize = "0.4.0"
 structopt = "0.3.26"
 bincode = "1.2.1"
 num-bigint = "0.4.3"
@@ -27,12 +31,17 @@ ruint = { version = "1.7.0", features = [ "serde", "num-bigint" ] }
 serde = "1.0.147"
 serde_json = "1.0.89"
 strum = "0.24.1"
-strum_macros = "0.24"
+num-traits = "0.2.15"
 pollster = "0.2.4"
 rayon = { version = "1.5.3", optional = true }
 
-[target.'cfg(not(target_env = "msvc"))'.dependencies]
-jemallocator = "0.5.0"
+[build-dependencies]
+ministark = { path = "../ministark-mirror" }
+codegen = { path = "./codegen" }
+proc-macro2 = "1.0"
+anyhow = "1.0.70"
+layouts = { path = "./layouts" }
+ark-poly = { git = "https://github.com/andrewmilson/algebra", branch = "vec-allocator" }
 
 # taken from https://github.com/recmo/uint
 # Compilation profile for any non-workspace member.
