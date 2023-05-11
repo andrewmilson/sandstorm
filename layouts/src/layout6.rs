@@ -1,22 +1,22 @@
+use crate::utils;
+use crate::ExecutionInfo;
+use ark_ff::PrimeField;
+use ark_poly::EvaluationDomain;
+use ark_poly::Radix2EvaluationDomain;
+use gpu_poly::GpuFftField;
 use ministark::challenges::Challenges;
 use ministark::constraints::AlgebraicItem;
 use ministark::constraints::Constraint;
 use ministark::constraints::ExecutionTraceColumn;
 use ministark::constraints::Hint;
+use ministark::constraints::VerifierChallenge;
 use ministark::expression::Expr;
 use ministark::hints::Hints;
 use ministark::utils::FieldVariant;
+use ministark::StarkExtensionOf;
 use num_traits::Pow;
-use ark_ff::Field;
-use ark_poly::EvaluationDomain;
+use std::marker::PhantomData;
 use strum_macros::EnumIter;
-use ark_ff::One;
-use gpu_poly::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481::Fp;
-use ark_poly::Radix2EvaluationDomain;
-use ministark::constraints::VerifierChallenge;
-
-use crate::ExecutionInfo;
-use crate::utils;
 
 // must be a power-of-two
 pub const CYCLE_HEIGHT: usize = 16;
@@ -27,16 +27,18 @@ pub const RANGE_CHECK_STEP: usize = 4;
 pub const NUM_BASE_COLUMNS: usize = 9;
 pub const NUM_EXTENSION_COLUMNS: usize = 1;
 
-pub struct AirConfig;
+pub struct AirConfig<Fp, Fq>(PhantomData<(Fp, Fq)>);
 
-impl ministark::air::AirConfig for AirConfig {
+impl<Fp: GpuFftField + PrimeField, Fq: StarkExtensionOf<Fp>> ministark::air::AirConfig
+    for AirConfig<Fp, Fq>
+{
     const NUM_BASE_COLUMNS: usize = 9;
     const NUM_EXTENSION_COLUMNS: usize = 1;
     type Fp = Fp;
-    type Fq = Fp;
-    type PublicInputs = ExecutionInfo;
+    type Fq = Fq;
+    type PublicInputs = ExecutionInfo<Fp>;
 
-    fn constraints(trace_len: usize) -> Vec<Constraint<FieldVariant<Fp, Fp>>> {
+    fn constraints(trace_len: usize) -> Vec<Constraint<FieldVariant<Fp, Fq>>> {
         use AlgebraicItem::*;
         use PublicInputHint::*;
         // TODO: figure out why this value
@@ -46,33 +48,32 @@ impl ministark::air::AirConfig for AirConfig {
         assert!(n >= CYCLE_HEIGHT, "must be a multiple of cycle height");
         let x = Expr::from(X);
         let one = Expr::from(Constant(FieldVariant::Fp(Fp::one())));
-        let two = Expr::from(Constant(FieldVariant::<Fp, Fp>::Fp(Fp::from(2u32))));
-        let four = Expr::from(Constant(FieldVariant::<Fp, Fp>::Fp(Fp::from(4u32))));
-        let offset_size = Expr::from(Constant(FieldVariant::<Fp, Fp>::Fp(Fp::from(2u32.pow(16)))));
-        let half_offset_size =
-            Expr::from(Constant(FieldVariant::<Fp, Fp>::Fp(Fp::from(2u32.pow(15)))));
+        let two = Expr::from(Constant(FieldVariant::Fp(Fp::from(2u32))));
+        let four = Expr::from(Constant(FieldVariant::Fp(Fp::from(4u32))));
+        let offset_size = Expr::from(Constant(FieldVariant::Fp(Fp::from(2u32.pow(16)))));
+        let half_offset_size = Expr::from(Constant(FieldVariant::Fp(Fp::from(2u32.pow(15)))));
 
         // cpu/decode/flag_op1_base_op0_0
-        let cpu_decode_flag_op1_base_op0_0: Expr<AlgebraicItem<FieldVariant<Fp, Fp>>> =
+        let cpu_decode_flag_op1_base_op0_0: Expr<AlgebraicItem<FieldVariant<Fp, Fq>>> =
             &one - (Flag::Op1Imm.curr() + Flag::Op1Ap.curr() + Flag::Op1Fp.curr());
         // cpu/decode/flag_res_op1_0
-        let cpu_decode_flag_res_op1_0: Expr<AlgebraicItem<FieldVariant<Fp, Fp>>> =
+        let cpu_decode_flag_res_op1_0: Expr<AlgebraicItem<FieldVariant<Fp, Fq>>> =
             &one - (Flag::ResAdd.curr() + Flag::ResMul.curr() + Flag::PcJnz.curr());
         // cpu/decode/flag_pc_update_regular_0
-        let cpu_decode_flag_pc_update_regular_0: Expr<AlgebraicItem<FieldVariant<Fp, Fp>>> =
+        let cpu_decode_flag_pc_update_regular_0: Expr<AlgebraicItem<FieldVariant<Fp, Fq>>> =
             &one - (Flag::PcJumpAbs.curr() + Flag::PcJumpRel.curr() + Flag::PcJnz.curr());
         // cpu/decode/fp_update_regular_0
-        let cpu_decode_fp_update_regular_0: Expr<AlgebraicItem<FieldVariant<Fp, Fp>>> =
+        let cpu_decode_fp_update_regular_0: Expr<AlgebraicItem<FieldVariant<Fp, Fq>>> =
             &one - (Flag::OpcodeCall.curr() + Flag::OpcodeRet.curr());
 
         // NOTE: npc_reg_0 = pc + instruction_size
         // NOTE: instruction_size = fOP1_IMM + 1
         let npc_reg_0 = Npc::Pc.curr() + Flag::Op1Imm.curr() + &one;
 
-        let memory_address_diff_0: Expr<AlgebraicItem<FieldVariant<Fp, Fp>>> =
+        let memory_address_diff_0: Expr<AlgebraicItem<FieldVariant<Fp, Fq>>> =
             Mem::Address.next() - Mem::Address.curr();
 
-        let rc16_diff_0: Expr<AlgebraicItem<FieldVariant<Fp, Fp>>> =
+        let rc16_diff_0: Expr<AlgebraicItem<FieldVariant<Fp, Fq>>> =
             RangeCheck::Ordered.next() - RangeCheck::Ordered.curr();
 
         // TODO: builtins
@@ -86,7 +87,7 @@ impl ministark::air::AirConfig for AirConfig {
         let rc_builtin_value5_0 = &rc_builtin_value4_0 * &offset_size + Trace(7, 172);
         let rc_builtin_value6_0 = &rc_builtin_value5_0 * &offset_size + Trace(7, 204);
         let _rc_builtin_value7_0 = &rc_builtin_value6_0 * &offset_size + Trace(7, 236);
-        let _ecdsa_sig0_doubling_key_x_squared: Expr<AlgebraicItem<FieldVariant<Fp, Fp>>> =
+        let _ecdsa_sig0_doubling_key_x_squared: Expr<AlgebraicItem<FieldVariant<Fp, Fq>>> =
             Trace(8, 4) * Trace(8, 4);
         let ecdsa_sig0_exponentiate_generator_b0 =
             Expr::from(Trace(8, 34)) - (Trace(8, 162) + Trace(8, 162));
@@ -94,7 +95,7 @@ impl ministark::air::AirConfig for AirConfig {
         let ecdsa_sig0_exponentiate_key_b0 =
             Expr::from(Trace(8, 12)) - (Trace(8, 76) + Trace(8, 76));
         let _ecdsa_sig0_exponentiate_key_b0_neg = &one - &ecdsa_sig0_exponentiate_key_b0;
-        let _bitwise_sum_var_0_0: Expr<AlgebraicItem<FieldVariant<Fp, Fp>>> =
+        let _bitwise_sum_var_0_0: Expr<AlgebraicItem<FieldVariant<Fp, Fq>>> =
             Expr::from(Trace(7, 1))
                 + Expr::from(Trace(7, 17)) * (&two).pow(1)
                 + Expr::from(Trace(7, 33)) * (&two).pow(2)
@@ -103,7 +104,7 @@ impl ministark::air::AirConfig for AirConfig {
                 + Expr::from(Trace(7, 81)) * (&two).pow(65)
                 + Expr::from(Trace(7, 97)) * (&two).pow(66)
                 + Expr::from(Trace(7, 113)) * (&two).pow(67);
-        let _bitwise_sum_var_8_0: Expr<AlgebraicItem<FieldVariant<Fp, Fp>>> =
+        let _bitwise_sum_var_8_0: Expr<AlgebraicItem<FieldVariant<Fp, Fq>>> =
             Expr::from(Trace(7, 129)) * (&two).pow(129)
                 + Expr::from(Trace(7, 145)) * (&two).pow(130)
                 + Expr::from(Trace(7, 161)) * (&two).pow(131)
@@ -581,7 +582,7 @@ impl ministark::air::AirConfig for AirConfig {
 
     fn gen_hints(
         trace_len: usize,
-        execution_info: &ExecutionInfo,
+        execution_info: &ExecutionInfo<Self::Fp>,
         challenges: &Challenges<Self::Fq>,
     ) -> Hints<Self::Fq> {
         use PublicInputHint::*;
@@ -610,13 +611,13 @@ impl ministark::air::AirConfig for AirConfig {
         assert!(*range_check_max < 2usize.pow(16));
 
         Hints::new(vec![
-            (InitialAp.index(), *initial_ap),
-            (InitialPc.index(), *initial_pc),
-            (FinalAp.index(), *final_ap),
-            (FinalPc.index(), *final_pc),
+            (InitialAp.index(), (*initial_ap).into()),
+            (InitialPc.index(), (*initial_pc).into()),
+            (FinalAp.index(), (*final_ap).into()),
+            (FinalPc.index(), (*final_pc).into()),
             // TODO: this is a wrong value. Must fix
             (MemoryProduct.index(), memory_product),
-            (RangeCheckProduct.index(), Fp::one()),
+            (RangeCheckProduct.index(), Fq::one()),
             (RangeCheckMin.index(), (*range_check_min as u64).into()),
             (RangeCheckMax.index(), (*range_check_max as u64).into()),
         ])

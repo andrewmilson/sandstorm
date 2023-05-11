@@ -6,7 +6,7 @@ version = "0.1.0"
 edition = "2021"
 
 [workspace]
-members = ["layouts", "codegen"]
+members = ["layouts"]
 
 [features]
 default = [ ]
@@ -17,7 +17,7 @@ parallel = [ "dep:rayon", "ministark/parallel" ]
 [dependencies]
 layouts = { path = "./layouts" }
 gpu-poly = { path = "../ministark-mirror/gpu-poly" }
-ministark = { path = "../ministark-mirror", features = [ "custom_cpu_constraint_eval" ] }
+ministark = { path = "../ministark-mirror" }
 # ministark = { git = "https://github.com/andrewmilson/ministark" }
 # gpu-poly = { git = "https://github.com/andrewmilson/ministark" }
 ark-poly = { git = "https://github.com/andrewmilson/algebra", branch = "vec-allocator" }
@@ -35,13 +35,14 @@ num-traits = "0.2.15"
 pollster = "0.2.4"
 rayon = { version = "1.5.3", optional = true }
 
-[build-dependencies]
-ministark = { path = "../ministark-mirror" }
-codegen = { path = "./codegen" }
-proc-macro2 = "1.0"
-anyhow = "1.0.70"
-layouts = { path = "./layouts" }
-ark-poly = { git = "https://github.com/andrewmilson/algebra", branch = "vec-allocator" }
+# TODO: can remove these
+# [build-dependencies]
+# ministark = { path = "../ministark-mirror" }
+# codegen = { path = "./codegen" }
+# proc-macro2 = "1.0"
+# anyhow = "1.0.70"
+# layouts = { path = "./layouts" }
+# ark-poly = { git = "https://github.com/andrewmilson/algebra", branch = "vec-allocator" }
 
 # taken from https://github.com/recmo/uint
 # Compilation profile for any non-workspace member.

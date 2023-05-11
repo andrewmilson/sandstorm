@@ -1,6 +1,7 @@
-use layouts::layout6::Flag;
 use alloc::vec::Vec;
-use gpu_poly::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481::Fp;
+use ark_ff::Field;
+use ark_ff::PrimeField;
+use layouts::layout6::Flag;
 use num_bigint::BigUint;
 use ruint::aliases::U256;
 use ruint::uint;
@@ -9,11 +10,9 @@ use serde::Serialize;
 use std::io::BufRead;
 use std::io::BufReader;
 use std::io::Read;
-use std::str::FromStr;
-use ark_ff::PrimeField;
-use ark_ff::Zero;
-use ark_ff::Field;
+use std::marker::PhantomData;
 use std::ops::Deref;
+use std::str::FromStr;
 
 // https://eprint.iacr.org/2021/1063.pdf figure 3
 /// Word offset of `off_DST`
@@ -67,11 +66,14 @@ impl Deref for RegisterStates {
 }
 
 #[derive(Debug)]
-pub struct Memory(Vec<Option<Word>>);
+pub struct Memory<F>(Vec<Option<Word<F>>>);
 
-impl Memory {
+impl<F: Field> Memory<F> {
     /// Parses the partial memory data outputted by a `cairo-run`.
-    pub fn from_reader(r: impl Read) -> Self {
+    pub fn from_reader(r: impl Read) -> Self
+    where
+        F: PrimeField,
+    {
         // TODO: errors
         // TODO: each builtin has its own memory segment.
         // check it also contains other builtins
@@ -105,48 +107,67 @@ impl Memory {
     }
 }
 
-impl Deref for Memory {
-    type Target = Vec<Option<Word>>;
+impl<F: Field> Deref for Memory<F> {
+    type Target = Vec<Option<Word<F>>>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-#[derive(Serialize, Deserialize)]
-pub struct CompiledProgram {
+pub struct CompiledProgram<F> {
     data: Vec<String>,
     prime: String,
+    _marker: PhantomData<F>,
 }
 
-impl CompiledProgram {
+impl<F: PrimeField> CompiledProgram<F> {
     // TODO: could use https://github.com/Keats/validator instead of calling this everywhere
     // but seems a bit heave to add as a dependency just to do this
     pub fn validate(&self) {
         // Make sure the field modulus matches the expected
-        assert_eq!(
-            format!("{:#x}", BigUint::from(Fp::MODULUS)),
-            self.prime.to_lowercase(),
-        );
+        let modulus: BigUint = F::MODULUS.into();
+        assert_eq!(format!("{:#x}", modulus), self.prime.to_lowercase());
     }
 
-    pub fn get_public_memory(&self) -> Vec<(usize, Fp)> {
+    pub fn get_public_memory(&self) -> Vec<(usize, F)> {
         self.data
             .iter()
             .enumerate()
             .map(|(i, value_str)| {
                 (
                     i + 1, // address 0, 0 is reserved for dummy accesses
-                    Word::new(U256::from_str(value_str).expect("invalid data item")).into(),
+                    Word::new(U256::from_str(value_str).expect("invalid data item")).into_felt(),
                 )
             })
             .collect()
     }
 
-    pub fn get_padding_address_and_value(&self) -> (usize, Fp) {
+    pub fn get_padding_address_and_value(&self) -> (usize, F) {
         // TODO: make more concrete. By convention seems to be next after public memory
         let address = self.data.len() + 1;
         (address, (address as u64).into())
+    }
+}
+
+impl<'a, F> Deserialize<'a> for CompiledProgram<F> {
+    // Have to implement custom deserialize because serde panics with PhantomData
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'a>,
+    {
+        #[derive(Deserialize)]
+        struct Program {
+            data: Vec<String>,
+            prime: String,
+        }
+
+        let program = Program::deserialize(deserializer)?;
+        Ok(Self {
+            data: program.data,
+            prime: program.prime,
+            _marker: PhantomData,
+        })
     }
 }
 
@@ -154,14 +175,9 @@ impl CompiledProgram {
 /// Value is a field element in the range `[0, Fp::MODULUS)`
 /// Stored as a U256 to make binary decompositions more efficient
 #[derive(Clone, Copy, Debug)]
-pub struct Word(pub U256);
+pub struct Word<F>(pub U256, PhantomData<F>);
 
-impl Word {
-    pub fn new(word: U256) -> Self {
-        debug_assert!(BigUint::from(word) < BigUint::from(Fp::MODULUS));
-        Word(word)
-    }
-
+impl<F> Word<F> {
     /// Calculates $\tilde{f_i}$ - https://eprint.iacr.org/2021/1063.pdf
     pub fn get_flag_prefix(&self, flag: Flag) -> u64 {
         if flag == Flag::Zero {
@@ -174,82 +190,13 @@ impl Word {
         (prefix & mask).try_into().unwrap()
     }
 
-    pub fn get_tmp0(&self, ap: usize, fp: usize, mem: &Memory) -> Fp {
-        if self.get_flag(Flag::PcJnz) {
-            self.get_dst(ap, fp, mem)
-        } else {
-            // TODO: change
-            Fp::zero()
-        }
-    }
-
-    pub fn get_tmp1(&self, pc: usize, ap: usize, fp: usize, mem: &Memory) -> Fp {
-        self.get_tmp0(ap, fp, mem) * self.get_res(pc, ap, fp, mem)
-    }
-
     pub fn get_op0_addr(&self, ap: usize, fp: usize) -> usize {
         // TODO: put the if statement first good for rust quiz
         self.get_off_op0() + if self.get_flag(Flag::Op0Reg) { fp } else { ap } - HALF_OFFSET
     }
 
-    pub fn get_op0(&self, ap: usize, fp: usize, mem: &Memory) -> Fp {
-        mem[self.get_op0_addr(ap, fp)].unwrap().into()
-    }
-
     pub fn get_dst_addr(&self, ap: usize, fp: usize) -> usize {
         self.get_off_dst() + if self.get_flag(Flag::DstReg) { fp } else { ap } - HALF_OFFSET
-    }
-
-    pub fn get_dst(&self, ap: usize, fp: usize, mem: &Memory) -> Fp {
-        mem[self.get_dst_addr(ap, fp)].unwrap().into()
-    }
-
-    pub fn get_op1_addr(&self, pc: usize, ap: usize, fp: usize, mem: &Memory) -> usize {
-        self.get_off_op1()
-            + match self.get_flag_group(FlagGroup::Op1Src) {
-                0 => usize::try_from(mem[self.get_op0_addr(ap, fp)].unwrap().0).unwrap(),
-                1 => pc,
-                2 => fp,
-                4 => ap,
-                _ => unreachable!(),
-            }
-            - HALF_OFFSET
-    }
-
-    pub fn get_op1(&self, pc: usize, ap: usize, fp: usize, mem: &Memory) -> Fp {
-        mem[self.get_op1_addr(pc, ap, fp, mem)].unwrap().into()
-    }
-
-    pub fn get_res(&self, pc: usize, ap: usize, fp: usize, mem: &Memory) -> Fp {
-        let pc_update = self.get_flag_group(FlagGroup::PcUpdate);
-        let res_logic = self.get_flag_group(FlagGroup::ResLogic);
-        match pc_update {
-            4 => {
-                let opcode = self.get_flag_group(FlagGroup::Opcode);
-                let ap_update = self.get_flag_group(FlagGroup::ApUpdate);
-                if res_logic == 0 && opcode == 0 && ap_update != 1 {
-                    // From the Cairo whitepaper "We use the term Unused to
-                    // describe a variable that will not be used later in the
-                    // flow. As such, we don’t need to assign it a concrete
-                    // value.". Note `res` is repurposed when calculating next_pc and
-                    // stores the value of `dst^(-1)` (see air.rs for more details).
-                    self.get_dst(ap, fp, mem).inverse().unwrap_or_else(Fp::zero)
-                } else {
-                    unreachable!()
-                }
-            }
-            0 | 1 | 2 => {
-                let op0: Fp = mem[self.get_op0_addr(ap, fp)].unwrap().into();
-                let op1: Fp = mem[self.get_op1_addr(pc, ap, fp, mem)].unwrap().into();
-                match res_logic {
-                    0 => op1,
-                    1 => op0 + op1,
-                    2 => op0 * op1,
-                    _ => unreachable!(),
-                }
-            }
-            _ => unreachable!(),
-        }
     }
 
     pub fn get_flag(&self, flag: Flag) -> bool {
@@ -303,9 +250,84 @@ impl Word {
     }
 }
 
-impl From<Word> for Fp {
-    fn from(val: Word) -> Self {
-        BigUint::from(val.0).into()
+impl<F: PrimeField> Word<F> {
+    pub fn new(word: U256) -> Self {
+        let modulus: BigUint = F::MODULUS.into();
+        debug_assert!(BigUint::from(word) < modulus);
+        Word(word, PhantomData)
+    }
+
+    pub fn get_op0(&self, ap: usize, fp: usize, mem: &Memory<F>) -> F {
+        mem[self.get_op0_addr(ap, fp)].unwrap().into_felt()
+    }
+
+    pub fn get_dst(&self, ap: usize, fp: usize, mem: &Memory<F>) -> F {
+        mem[self.get_dst_addr(ap, fp)].unwrap().into_felt()
+    }
+
+    pub fn get_op1_addr(&self, pc: usize, ap: usize, fp: usize, mem: &Memory<F>) -> usize {
+        self.get_off_op1()
+            + match self.get_flag_group(FlagGroup::Op1Src) {
+                0 => usize::try_from(mem[self.get_op0_addr(ap, fp)].unwrap().0).unwrap(),
+                1 => pc,
+                2 => fp,
+                4 => ap,
+                _ => unreachable!(),
+            }
+            - HALF_OFFSET
+    }
+
+    pub fn get_op1(&self, pc: usize, ap: usize, fp: usize, mem: &Memory<F>) -> F {
+        mem[self.get_op1_addr(pc, ap, fp, mem)].unwrap().into_felt()
+    }
+
+    pub fn get_res(&self, pc: usize, ap: usize, fp: usize, mem: &Memory<F>) -> F {
+        let pc_update = self.get_flag_group(FlagGroup::PcUpdate);
+        let res_logic = self.get_flag_group(FlagGroup::ResLogic);
+        match pc_update {
+            4 => {
+                let opcode = self.get_flag_group(FlagGroup::Opcode);
+                let ap_update = self.get_flag_group(FlagGroup::ApUpdate);
+                if res_logic == 0 && opcode == 0 && ap_update != 1 {
+                    // From the Cairo whitepaper "We use the term Unused to
+                    // describe a variable that will not be used later in the
+                    // flow. As such, we don’t need to assign it a concrete
+                    // value.". Note `res` is repurposed when calculating next_pc and
+                    // stores the value of `dst^(-1)` (see air.rs for more details).
+                    self.get_dst(ap, fp, mem).inverse().unwrap_or_else(F::zero)
+                } else {
+                    unreachable!()
+                }
+            }
+            0 | 1 | 2 => {
+                let op0: F = mem[self.get_op0_addr(ap, fp)].unwrap().into_felt();
+                let op1: F = mem[self.get_op1_addr(pc, ap, fp, mem)].unwrap().into_felt();
+                match res_logic {
+                    0 => op1,
+                    1 => op0 + op1,
+                    2 => op0 * op1,
+                    _ => unreachable!(),
+                }
+            }
+            _ => unreachable!(),
+        }
+    }
+
+    pub fn get_tmp0(&self, ap: usize, fp: usize, mem: &Memory<F>) -> F {
+        if self.get_flag(Flag::PcJnz) {
+            self.get_dst(ap, fp, mem)
+        } else {
+            // TODO: change
+            F::zero()
+        }
+    }
+
+    pub fn get_tmp1(&self, pc: usize, ap: usize, fp: usize, mem: &Memory<F>) -> F {
+        self.get_tmp0(ap, fp, mem) * self.get_res(pc, ap, fp, mem)
+    }
+
+    pub fn into_felt(self) -> F {
+        BigUint::from(self.0).into()
     }
 }
 

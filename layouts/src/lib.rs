@@ -6,16 +6,16 @@
 //     const RANGE_CHECK_STEP: usize;
 // }
 
+use ark_ff::Field;
 use ark_serialize::CanonicalDeserialize;
 use ark_serialize::CanonicalSerialize;
-use gpu_poly::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481::Fp;
 
 pub mod layout6;
 pub mod utils;
 
 // Section 9.2 https://eprint.iacr.org/2021/1063.pdf
 #[derive(CanonicalSerialize, CanonicalDeserialize, Clone)]
-pub struct ExecutionInfo {
+pub struct ExecutionInfo<Fp: Field> {
     pub initial_ap: Fp,
     pub initial_pc: Fp,
     pub final_ap: Fp,

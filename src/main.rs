@@ -1,10 +1,11 @@
 use ark_serialize::CanonicalDeserialize;
 use ark_serialize::CanonicalSerialize;
+use gpu_poly::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481::Fp;
+use layouts::layout6;
 use ministark::Proof;
 use ministark::ProofOptions;
 use ministark::Prover;
 use ministark::Trace;
-use sandstorm::air;
 use sandstorm::binary::CompiledProgram;
 use sandstorm::binary::Memory;
 use sandstorm::binary::RegisterStates;
@@ -68,9 +69,9 @@ fn main() {
 
 fn verify(options: ProofOptions, program_path: &PathBuf, proof_path: &PathBuf) {
     let program_file = File::open(program_path).expect("could not open program file");
-    let program: CompiledProgram = serde_json::from_reader(program_file).unwrap();
+    let program: CompiledProgram<Fp> = serde_json::from_reader(program_file).unwrap();
     let proof_bytes = fs::read(proof_path).unwrap();
-    let proof: Proof<air::Layout6Config> =
+    let proof: Proof<layout6::AirConfig<Fp, Fp>> =
         Proof::deserialize_compressed(proof_bytes.as_slice()).unwrap();
     let public_inputs = &proof.public_inputs;
     assert_eq!(program.get_public_memory(), public_inputs.public_memory);
@@ -94,12 +95,12 @@ fn prove(
     let register_states = RegisterStates::from_reader(trace_file);
 
     let program_file = File::open(program_path).expect("could not open program file");
-    let program = serde_json::from_reader(program_file).unwrap();
+    let program: CompiledProgram<Fp> = serde_json::from_reader(program_file).unwrap();
 
     let memory_file = File::open(memory_path).expect("could not open memory file");
     let memory = Memory::from_reader(memory_file);
 
-    let execution_trace = ExecutionTrace::new(memory, register_states, program);
+    let execution_trace = ExecutionTrace::<Fp, Fp>::new(memory, register_states, program);
     println!(
         "Generated execution trace (cols={}, rows={}) in {:.0?}",
         execution_trace.base_columns().num_cols(),

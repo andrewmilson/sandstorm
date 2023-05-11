@@ -1,28 +1,36 @@
-use layouts::ExecutionInfo;
-use crate::air;
 use crate::trace::ExecutionTrace;
-use gpu_poly::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481::Fp;
+use ark_ff::PrimeField;
+use gpu_poly::GpuFftField;
+use layouts::layout6;
+use layouts::ExecutionInfo;
 use ministark::ProofOptions;
 use ministark::Prover;
+use ministark::StarkExtensionOf;
+use std::marker::PhantomData;
 
-pub struct CairoProver(ProofOptions);
+pub struct CairoProver<Fp, Fq> {
+    options: ProofOptions,
+    _marker: PhantomData<(Fp, Fq)>,
+}
 
-impl Prover for CairoProver {
+impl<Fp: GpuFftField + PrimeField, Fq: StarkExtensionOf<Fp>> Prover for CairoProver<Fp, Fq> {
     type Fp = Fp;
-    type Fq = Fp;
-    type AirConfig = air::Layout6Config;
-    // type AirConfig = layouts::layout6::AirConfig;
-    type Trace = ExecutionTrace;
+    type Fq = Fq;
+    type AirConfig = layout6::AirConfig<Fp, Fq>;
+    type Trace = ExecutionTrace<Fp, Fq>;
 
     fn new(options: ProofOptions) -> Self {
-        CairoProver(options)
+        CairoProver {
+            options,
+            _marker: PhantomData,
+        }
     }
 
     fn options(&self) -> ProofOptions {
-        self.0
+        self.options
     }
 
-    fn get_pub_inputs(&self, trace: &ExecutionTrace) -> ExecutionInfo {
+    fn get_pub_inputs(&self, trace: &Self::Trace) -> ExecutionInfo<Fp> {
         assert_eq!(trace.initial_registers.ap, trace.initial_registers.fp);
         assert_eq!(trace.initial_registers.ap, trace.final_registers.fp);
         ExecutionInfo {

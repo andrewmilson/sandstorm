@@ -1,38 +1,41 @@
-use alloc::vec;
-use alloc::vec::Vec;
-use ark_ff::batch_inversion;
-use layouts::layout6;
-use ministark::TraceInfo;
-use ministark::challenges::Challenges;
-use gpu_poly::GpuVec;
-use gpu_poly::prelude::PageAlignedAllocator;
-use ministark::Matrix;
-use gpu_poly::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481::Fp;
-use ministark::Trace;
-use ark_ff::Zero;
-use ark_ff::One;
-use strum::IntoEnumIterator;
-use layouts::layout6::CYCLE_HEIGHT;
-use layouts::layout6::MEMORY_STEP;
-use layouts::layout6::MemoryPermutation;
-use layouts::layout6::PUBLIC_MEMORY_STEP;
-use layouts::layout6::RANGE_CHECK_STEP;
-use layouts::layout6::RangeCheckPermutation;
-use layouts::layout6::Flag;
-use layouts::layout6::Npc;
-use layouts::layout6::RangeCheck;
-use layouts::layout6::Permutation;
-use layouts::layout6::Auxiliary;
 use crate::binary::CompiledProgram;
 use crate::binary::Memory;
 use crate::binary::RegisterState;
 use crate::binary::RegisterStates;
-#[cfg(feature = "parallel")]
-use rayon::prelude::*;
+use alloc::vec;
+use alloc::vec::Vec;
+use ark_ff::batch_inversion;
+use ark_ff::FftField;
+use ark_ff::Field;
+use ark_ff::PrimeField;
 use core::iter::zip;
 use core::ops::Deref;
+use gpu_poly::prelude::PageAlignedAllocator;
+use gpu_poly::GpuFftField;
+use gpu_poly::GpuVec;
+use layouts::layout6;
+use layouts::layout6::Auxiliary;
+use layouts::layout6::Flag;
+use layouts::layout6::MemoryPermutation;
+use layouts::layout6::Npc;
+use layouts::layout6::Permutation;
+use layouts::layout6::RangeCheck;
+use layouts::layout6::RangeCheckPermutation;
+use layouts::layout6::CYCLE_HEIGHT;
+use layouts::layout6::MEMORY_STEP;
+use layouts::layout6::PUBLIC_MEMORY_STEP;
+use layouts::layout6::RANGE_CHECK_STEP;
+use ministark::challenges::Challenges;
+use ministark::Matrix;
+use ministark::StarkExtensionOf;
+use ministark::Trace;
+use ministark::TraceInfo;
+#[cfg(feature = "parallel")]
+use rayon::prelude::*;
+use std::marker::PhantomData;
+use strum::IntoEnumIterator;
 
-pub struct ExecutionTrace {
+pub struct ExecutionTrace<Fp, Fq> {
     pub public_memory_padding_address: usize,
     pub public_memory_padding_value: Fp,
     pub range_check_min: usize,
@@ -41,18 +44,23 @@ pub struct ExecutionTrace {
     pub initial_registers: RegisterState,
     pub final_registers: RegisterState,
     _register_states: RegisterStates,
-    _program: CompiledProgram,
-    _mem: Memory,
+    _program: CompiledProgram<Fp>,
+    _mem: Memory<Fp>,
     _flags_column: GpuVec<Fp>,
     npc_column: GpuVec<Fp>,
     memory_column: GpuVec<Fp>,
     range_check_column: GpuVec<Fp>,
     _auxiliary_column: GpuVec<Fp>,
     base_trace: Matrix<Fp>,
+    _marker: PhantomData<Fq>,
 }
 
-impl ExecutionTrace {
-    pub fn new(mem: Memory, register_states: RegisterStates, program: CompiledProgram) -> Self {
+impl<Fp: GpuFftField + PrimeField, Fq: StarkExtensionOf<Fp>> ExecutionTrace<Fp, Fq> {
+    pub fn new(
+        mem: Memory<Fp>,
+        register_states: RegisterStates,
+        program: CompiledProgram<Fp>,
+    ) -> Self {
         #[cfg(debug_assertions)]
         program.validate();
 
@@ -126,7 +134,7 @@ impl ExecutionTrace {
 
                     // NPC
                     npc_cycle[Npc::Pc as usize] = (pc as u64).into();
-                    npc_cycle[Npc::Instruction as usize] = word.into();
+                    npc_cycle[Npc::Instruction as usize] = word.into_felt();
                     npc_cycle[Npc::MemOp0Addr as usize] = op0_addr;
                     npc_cycle[Npc::MemOp0 as usize] = op0;
                     npc_cycle[Npc::MemDstAddr as usize] = dst_addr;
@@ -220,21 +228,22 @@ impl ExecutionTrace {
             _mem: mem,
             _register_states: register_states,
             _program: program,
+            _marker: PhantomData,
         }
     }
 }
 
-impl Trace for ExecutionTrace {
+impl<Fp: GpuFftField + FftField, Fq: StarkExtensionOf<Fp>> Trace for ExecutionTrace<Fp, Fq> {
     const NUM_BASE_COLUMNS: usize = layout6::NUM_BASE_COLUMNS;
     const NUM_EXTENSION_COLUMNS: usize = layout6::NUM_EXTENSION_COLUMNS;
     type Fp = Fp;
-    type Fq = Fp;
+    type Fq = Fq;
 
     fn base_columns(&self) -> &Matrix<Self::Fp> {
         &self.base_trace
     }
 
-    fn build_extension_columns(&self, challenges: &Challenges<Fp>) -> Option<Matrix<Fp>> {
+    fn build_extension_columns(&self, challenges: &Challenges<Fq>) -> Option<Matrix<Fq>> {
         // TODO: multithread
         // Generate memory permutation product
         // ===================================
@@ -245,11 +254,11 @@ impl Trace for ExecutionTrace {
         let address_order_accesses = self.memory_column.array_chunks::<MEMORY_STEP>();
         let mut mem_perm_numerators = Vec::new();
         let mut mem_perm_denominators = Vec::new();
-        let mut numerator_acc = Fp::one();
-        let mut denominator_acc = Fp::one();
+        let mut numerator_acc = Fq::one();
+        let mut denominator_acc = Fq::one();
         for (&[a, v], &[a_prime, v_prime]) in program_order_accesses.zip(address_order_accesses) {
-            numerator_acc *= z - (a + alpha * v);
-            denominator_acc *= z - (a_prime + alpha * v_prime);
+            numerator_acc *= z - (alpha * v + a);
+            denominator_acc *= z - (alpha * v_prime + a_prime);
             mem_perm_numerators.push(numerator_acc);
             mem_perm_denominators.push(denominator_acc);
         }
@@ -261,8 +270,8 @@ impl Trace for ExecutionTrace {
         let range_check_chunks = self.range_check_column.array_chunks::<RANGE_CHECK_STEP>();
         let mut rc_perm_numerators = Vec::new();
         let mut rc_perm_denominators = Vec::new();
-        let mut numerator_acc = Fp::one();
-        let mut denominator_acc = Fp::one();
+        let mut numerator_acc = Fq::one();
+        let mut denominator_acc = Fq::one();
         for chunk in range_check_chunks {
             numerator_acc *= z - chunk[RangeCheck::OffDst as usize];
             denominator_acc *= z - chunk[RangeCheck::Ordered as usize];
@@ -273,7 +282,7 @@ impl Trace for ExecutionTrace {
         debug_assert!((numerator_acc / denominator_acc).is_one());
 
         let mut permutation_column = Vec::new_in(PageAlignedAllocator);
-        permutation_column.resize(self.base_columns().num_rows(), Fp::zero());
+        permutation_column.resize(self.base_columns().num_rows(), Fq::zero());
 
         // Insert intermediate memory permutation results
         for (i, (n, d)) in zip(mem_perm_numerators, mem_perm_denominators).enumerate() {
@@ -292,9 +301,9 @@ impl Trace for ExecutionTrace {
 /// Returns the (unpadded) range check column values
 /// Currently only offset (off_dst, off_op0, off_op1) are used
 /// Output is of the form `(ordered_vals, padding_vals)`
-fn ordered_range_check_values(
+fn ordered_range_check_values<F: Field>(
     num_cycles: usize,
-    mem: &Memory,
+    mem: &Memory<F>,
     register_states: &RegisterStates,
 ) -> (Vec<usize>, Vec<usize>) {
     let mut res = Vec::new();
@@ -336,11 +345,11 @@ fn ordered_range_check_values(
 
 // TODO: support input, output and builtins
 // Output is of the form `(ordered_mem_column, padding_vals)`
-fn get_ordered_memory_accesses(
+fn get_ordered_memory_accesses<F: PrimeField>(
     trace_len: usize,
-    npc_column: &[Fp],
-    program: &CompiledProgram,
-) -> Vec<Fp, PageAlignedAllocator> {
+    npc_column: &[F],
+    program: &CompiledProgram<F>,
+) -> Vec<F, PageAlignedAllocator> {
     // the number of cells allocated for the public memory
     let num_pub_mem_cells = trace_len / PUBLIC_MEMORY_STEP;
     let pub_mem = program.get_public_memory();
@@ -355,7 +364,7 @@ fn get_ordered_memory_accesses(
         .copied()
         .chain((0..num_pub_mem_cells - pub_mem_accesses.len()).map(|_| padding_entry))
         .chain(pub_mem_accesses)
-        .collect::<Vec<[Fp; MEMORY_STEP]>>();
+        .collect::<Vec<[F; MEMORY_STEP]>>();
 
     ordered_accesses.sort();
 
@@ -371,7 +380,7 @@ fn get_ordered_memory_accesses(
         .enumerate()
         .for_each(|(i, &[[a, v], [a_next, v_next]])| {
             assert!(
-                (a == a_next && v == v_next) || a == a_next - Fp::one(),
+                (a == a_next && v == v_next) || a == a_next - F::one(),
                 "mismatch at {i}: a={a}, v={v}, a_next={a_next}, v_next={v_next}"
             );
         });

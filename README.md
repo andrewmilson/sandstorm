@@ -30,10 +30,10 @@ The verifier, supplied with this proof and the original code, can run `sandstorm
 source ~/cairo_venv/bin/activate
 
 # 2. (optional) Compile and run the Cairo program
-cairo-compile array-sum.cairo --proof_mode --output array-sum.json
-cairo-run --program array-sum.json \
-          --trace_file trace.bin \
-          --memory_file memory.bin \
+cairo-compile example/array-sum.cairo --proof_mode --output example/array-sum.json
+cairo-run --program example/array-sum.json \
+          --trace_file example/trace.bin \
+          --memory_file example/memory.bin \
           --min_steps 128 \
           --proof_mode
 
@@ -41,15 +41,15 @@ cairo-run --program array-sum.json \
 # use `-F parallel,asm` if not using an M1 Mac
 # make sure latest macOS is installed
 cargo +nightly run -r -F gpu,parallel,asm -- \
-    prove --program array-sum.json \
-          --trace trace.bin \
-          --memory memory.bin \
-          --output array-sum.proof
+    prove --program example/array-sum.json \
+          --trace example/trace.bin \
+          --memory example/memory.bin \
+          --output example/array-sum.proof
 
 # 4. verify the proof
 cargo +nightly run -r -F parallel,asm -- \
-    verify --program array-sum.json \
-           --proof array-sum.proof
+    verify --program example/array-sum.json \
+           --proof example/array-sum.proof
 ```
 
 <h2 id="sandstorm-sharp-differences">Differences between Sandstorm and SHARP</h2>

@@ -10,7 +10,6 @@
 #[macro_use]
 extern crate alloc;
 
-pub mod air;
 pub mod binary;
 pub mod prover;
 pub mod trace;

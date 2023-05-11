@@ -1,17 +1,18 @@
-use gpu_poly::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481::Fp;
 use crate::layout6::PUBLIC_MEMORY_STEP;
-use ark_ff::Field;
+use ark_ff::PrimeField;
+use gpu_poly::GpuFftField;
+use ministark::StarkExtensionOf;
 
 /// Computes the value of the public memory quotient:
 /// Adapted from https://github.com/starkware-libs/starkex-contracts
-pub fn compute_public_memory_quotient(
-    z: Fp,
-    alpha: Fp,
+pub fn compute_public_memory_quotient<Fp: GpuFftField + PrimeField, Fq: StarkExtensionOf<Fp>>(
+    z: Fq,
+    alpha: Fq,
     trace_len: usize,
     public_memory: &[(usize, Fp)],
     public_memory_padding_address: Fp,
     public_memory_padding_value: Fp,
-) -> Fp {
+) -> Fq {
     // the actual number of public memory cells
     let n = public_memory.len();
     // the num of cells allocated for the pub mem (include padding)
@@ -22,10 +23,10 @@ pub fn compute_public_memory_quotient(
     // denominator = \prod_i( z - (addr_i + alpha * value_i) ),
     let denominator = public_memory
         .iter()
-        .map(|(a, v)| z - (Fp::from(*a as u64) + alpha * v))
-        .product::<Fp>();
+        .map(|(a, v)| z - (alpha * v + Fp::from(*a as u64)))
+        .product::<Fq>();
     // padding = (z - (padding_addr + alpha * padding_value))^(S - N),
-    let padding = (z - (public_memory_padding_address + alpha * public_memory_padding_value))
+    let padding = (z - (alpha * public_memory_padding_value + public_memory_padding_address))
         .pow([(s - n) as u64]);
 
     // numerator / (denominator * padding)
