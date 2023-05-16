@@ -54,9 +54,9 @@ cargo +nightly run -r -F parallel,asm -- \
 
 ## How to prove Cairo programs with Goldilocks field
 
-The goldilocks field is a magical 64-bit prime field that has very fast arithmetic. This field was discovered after StarkWare built their Solidity verifier for Cairo programs. By default Cairo uses a 252-bit prime field. Arithmetic in this 252-bit field is slow and it can be hard to practically utilize all the storage provided by each field element. 
+The goldilocks field is a magical 64-bit prime field that has very fast arithmetic. This field was discovered after StarkWare built their Solidity verifier for Cairo programs. As a result Cairo uses a much larger 252-bit prime field by default. Arithmetic in this 252-bit field is slow and it can be hard to practically utilize the storage provided by each field element. 
 
-Sandstorm recently supported proving Cairo programs with the 64-bit Goldilocks field instead of StarkWare's default 252-bit field. Before running the example below a few changes need to be made to StarkWare's Cairo runner. On a M1 Max proof generation is 5x faster using 64-bit Goldilocks and only uses ~1/4 of the overall memory as the default 252-bit field.
+Sandstorm recently supported proving Cairo programs with the 64-bit Goldilocks field instead of StarkWare's default 252-bit field. Before running the example below a few changes need to be made to StarkWare's Cairo runner. On a M1 Max proof generation is 5x faster using the 64-bit Goldilocks field and only uses ~1/4 of the overall memory when compared against Cairo's default 252-bit field.
 
 ```bash
 # 1. (optional) Install Cairo and activate the venv
@@ -70,13 +70,13 @@ cairo-compile example/array-sum.cairo \
         --output example/array-sum.json \
         --proof_mode
 
-# 3. modify the Cairo runner
+# 3. modify the Cairo runner to support Goldilocks
 # there are a few overly protective asserts that need to be commented out to get 
 # things working. The location of these files is based on where you installed Cairo.
 # For me they were in `~/cairo_venv/lib/python3.9/site-packages/starkware/cairo/`.
-# Comment out the following asserts:
-#   1. lang/vm/relocatable.py line 84 `assert value < 2 ** (8 * n_bytes - 1)`
-#   2. lang/compiler/encode.py line 38 `assert prime > 2 ** (3 * OFFSET_BITS + 16)`
+# Remove or comment out the following asserts:
+#   - lang/vm/relocatable.py line 84 `assert value < 2 ** (8 * n_bytes - 1)`
+#   - lang/compiler/encode.py line 38 `assert prime > 2 ** (3 * OFFSET_BITS + 16)`
 
 # 4. run the Cairo program
 cairo-run --program example/array-sum.json \
@@ -105,4 +105,4 @@ Sandstorm implements a subset of the constraints and trace layout that's used by
 
 ## How Sandstorm works
 
-Those curious about the inner workings of Sandstorm can read the comments in [air.rs](src/air.rs#L115). The comments expect some understanding of how STARK proofs are generated - if you need some background on this then [Anatomy of a STARK (part 4)](https://aszepieniec.github.io/stark-anatomy/) by [Alan Szepieniec](https://twitter.com/aszepieniec) is a great resource. The pseudo code in section 4.5 of the [Cairo whitepaper](https://eprint.iacr.org/2021/1063.pdf) provides a nice high level overview of how some pieces fit together.
+Those curious about the inner workings of Sandstorm can read the comments in [air.rs](layouts/src/layout6/air.rs#36). The comments expect some understanding of how STARK proofs are generated - if you need some background on this then [Anatomy of a STARK (part 4)](https://aszepieniec.github.io/stark-anatomy/) by [Alan Szepieniec](https://twitter.com/aszepieniec) is a great resource. The pseudo code in section 4.5 of the [Cairo whitepaper](https://eprint.iacr.org/2021/1063.pdf) provides a nice high level overview of how some pieces fit together.
