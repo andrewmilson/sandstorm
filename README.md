@@ -63,37 +63,37 @@ Sandstorm recently supported proving Cairo programs with the 64-bit Goldilocks f
 # https://www.cairo-lang.org/docs/quickstart.html
 source ~/cairo_venv/bin/
 
-export GOLDILOCKS_PRIME=18446744069414584321
-
 # 2. compile the Cairo program
-cairo-compile example/array-sum.cairo --proof_mode \
+export GOLDILOCKS_PRIME=18446744069414584321
+cairo-compile example/array-sum.cairo \
         --prime $GOLDILOCKS_PRIME \
-        --output example/array-sum.json
+        --output example/array-sum.json \
+        --proof_mode
 
-# 3. run the Cairo program - there are a few overly protective asserts
-# that need to be commented out to get this working. The location of
-# these files will be based on where you installed Cairo. For me they 
-# were in `~/cairo_venv/lib/python3.9/site-packages/starkware/cairo/`:
-#   1. cairo/lang/vm/relocatable.py line 84
-#      `# assert value < 2 ** (8 * n_bytes - 1)`
-#   2. cairo/lang/compiler/encode.py line 38
-#      `# assert prime > 2 ** (3 * OFFSET_BITS + 16)`
+# 3. modify the Cairo runner
+# there are a few overly protective asserts that need to be commented out to get 
+# things working. The location of these files is based on where you installed Cairo.
+# For me they were in `~/cairo_venv/lib/python3.9/site-packages/starkware/cairo/`.
+# Comment out the following asserts:
+#   1. lang/vm/relocatable.py line 84 `assert value < 2 ** (8 * n_bytes - 1)`
+#   2. lang/compiler/encode.py line 38 `assert prime > 2 ** (3 * OFFSET_BITS + 16)`
+
+# 4. run the Cairo program
 cairo-run --program example/array-sum.json \
           --trace_file example/trace.bin \
           --memory_file example/memory.bin \
           --min_steps 128 \
           --proof_mode
 
-# 3. generate the proof
+# 5. generate the proof
 # use `-F parallel,asm` if not using an M1 Mac
-# make sure latest macOS is installed
 cargo +nightly run -r -F gpu,parallel,asm -- \
     --program example/array-sum.json \
     prove --trace example/trace.bin \
           --memory example/memory.bin \
           --output example/array-sum.proof
 
-# 4. verify the proof
+# 6. verify the proof
 cargo +nightly run -r -F parallel,asm -- \
     --program example/array-sum.json \
     verify --proof example/array-sum.proof

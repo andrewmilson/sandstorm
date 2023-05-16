@@ -83,9 +83,10 @@ pub fn ordered_range_check_values<F: Field>(
     (res, padding)
 }
 
-// TODO: support input, output and builtins
-// Accesses must be of the form (address, value)
-// Output is of the form (address, value)
+/// Orders memory accesses
+/// Accesses must be of the form (address, value)
+/// Output is of the form (address, value)
+// TODO: make sure supports input, output and builtins
 pub fn get_ordered_memory_accesses<F: PrimeField>(
     trace_len: usize,
     accesses: &[(F, F)],
@@ -110,7 +111,7 @@ pub fn get_ordered_memory_accesses<F: PrimeField>(
     ordered_accesses.sort();
 
     // justification for this is explained in section 9.8 of the Cairo paper https://eprint.iacr.org/2021/1063.pdf.
-    // SHARP requires the first address to start at address 1
+    // SHARP starts the first address at address 1
     let (zeros, ordered_accesses) = ordered_accesses.split_at(num_pub_mem_cells);
     assert!(zeros.iter().all(|(a, v)| a.is_zero() && v.is_zero()));
     assert!(ordered_accesses[0].0.is_one());

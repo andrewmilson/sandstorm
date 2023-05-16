@@ -16,6 +16,7 @@ pub mod layout6;
 pub mod utils;
 
 // Section 9.2 https://eprint.iacr.org/2021/1063.pdf
+// TODO: might need to have an execution info per layout
 #[derive(CanonicalSerialize, CanonicalDeserialize, Clone)]
 pub struct ExecutionInfo<Fp: Field> {
     pub initial_ap: Fp,
