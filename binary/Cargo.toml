@@ -1,0 +1,14 @@
+[package]
+name = "sandstorm-binary"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+ark-ff = "0.4"
+serde = "1.0"
+ruint = { version = "1.7", features = [ "serde", "num-bigint" ] }
+num-bigint = "0.4"
+bincode = "1.2"
+

@@ -1,7 +1,10 @@
+#![feature(buf_read_has_data_left)]
+
+extern crate alloc;
+
 use alloc::vec::Vec;
 use ark_ff::Field;
 use ark_ff::PrimeField;
-use layouts::layout6::Flag;
 use num_bigint::BigUint;
 use ruint::aliases::U256;
 use ruint::uint;
@@ -90,8 +93,10 @@ impl<F: Field> Memory<F> {
             // TODO: ensure always deserializes u64 and both are always little-endian
             let address = bincode::deserialize_from(&mut reader).unwrap();
             // TODO: U256 bincode has memory overallocation bug
-            let word_bytes: [u8; 32] = bincode::deserialize_from(&mut reader).unwrap();
-            let word = U256::from_le_bytes(word_bytes);
+            // let word_bytes: [u8; size_of::<F>()] = bincode::deserialize_from(&mut
+            // reader).unwrap();
+            let value = F::deserialize_uncompressed(&mut reader).unwrap();
+            let word = U256::from::<BigUint>(value.into_bigint().into());
             partial_memory.push((address, Word::new(word)));
             max_address = std::cmp::max(max_address, address);
         }
@@ -115,22 +120,24 @@ impl<F: Field> Deref for Memory<F> {
     }
 }
 
-pub struct CompiledProgram<F> {
-    data: Vec<String>,
-    prime: String,
-    _marker: PhantomData<F>,
+#[derive(Deserialize)]
+pub struct CompiledProgram {
+    pub data: Vec<String>,
+    pub prime: String,
 }
 
-impl<F: PrimeField> CompiledProgram<F> {
+impl CompiledProgram {
     // TODO: could use https://github.com/Keats/validator instead of calling this everywhere
     // but seems a bit heave to add as a dependency just to do this
-    pub fn validate(&self) {
+    // TODO: is this even being used. maybe remove
+    pub fn validate<F: PrimeField>(&self) {
         // Make sure the field modulus matches the expected
         let modulus: BigUint = F::MODULUS.into();
         assert_eq!(format!("{:#x}", modulus), self.prime.to_lowercase());
     }
 
-    pub fn get_public_memory(&self) -> Vec<(usize, F)> {
+    pub fn get_public_memory<F: PrimeField>(&self) -> Vec<(usize, F)> {
+        self.validate::<F>();
         self.data
             .iter()
             .enumerate()
@@ -143,31 +150,10 @@ impl<F: PrimeField> CompiledProgram<F> {
             .collect()
     }
 
-    pub fn get_padding_address_and_value(&self) -> (usize, F) {
+    pub fn get_padding_address_and_value<F: Field>(&self) -> (usize, F) {
         // TODO: make more concrete. By convention seems to be next after public memory
         let address = self.data.len() + 1;
         (address, (address as u64).into())
-    }
-}
-
-impl<'a, F> Deserialize<'a> for CompiledProgram<F> {
-    // Have to implement custom deserialize because serde panics with PhantomData
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'a>,
-    {
-        #[derive(Deserialize)]
-        struct Program {
-            data: Vec<String>,
-            prime: String,
-        }
-
-        let program = Program::deserialize(deserializer)?;
-        Ok(Self {
-            data: program.data,
-            prime: program.prime,
-            _marker: PhantomData,
-        })
     }
 }
 
@@ -342,4 +328,41 @@ pub enum FlagGroup {
     PcUpdate,
     ApUpdate,
     Opcode,
+}
+
+/// Cairo flag
+/// https://eprint.iacr.org/2021/1063.pdf section 9
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum Flag {
+    // Group: [FlagGroup::DstReg]
+    DstReg = 0,
+
+    // Group: [FlagGroup::Op0]
+    Op0Reg = 1,
+
+    // Group: [FlagGroup::Op1Src]
+    Op1Imm = 2,
+    Op1Fp = 3,
+    Op1Ap = 4,
+
+    // Group: [FlagGroup::ResLogic]
+    ResAdd = 5,
+    ResMul = 6,
+
+    // Group: [FlagGroup::PcUpdate]
+    PcJumpAbs = 7,
+    PcJumpRel = 8,
+    PcJnz = 9,
+
+    // Group: [FlagGroup::ApUpdate]
+    ApAdd = 10,
+    ApAdd1 = 11,
+
+    // Group: [FlagGroup::Opcode]
+    OpcodeCall = 12,
+    OpcodeRet = 13,
+    OpcodeAssertEq = 14,
+
+    // 0 - padding to make flag cells a power-of-2
+    Zero = 15,
 }

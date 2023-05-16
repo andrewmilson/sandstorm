@@ -1,30 +1,31 @@
-use crate::binary::CompiledProgram;
-use crate::binary::Memory;
-use crate::binary::RegisterState;
-use crate::binary::RegisterStates;
+use super::air::Auxiliary;
+use super::air::Flag;
+use super::air::MemoryPermutation;
+use super::air::Npc;
+use super::air::RangeCheck;
+use super::CYCLE_HEIGHT;
+use super::NUM_BASE_COLUMNS;
+use super::NUM_EXTENSION_COLUMNS;
+use super::PUBLIC_MEMORY_STEP;
+use super::RANGE_CHECK_STEP;
+use crate::layout6::air::Permutation;
+use crate::layout6::air::RangeCheckPermutation;
+use crate::layout6::MEMORY_STEP;
+use crate::utils::get_ordered_memory_accesses;
+use crate::utils::ordered_range_check_values;
 use alloc::vec;
 use alloc::vec::Vec;
 use ark_ff::batch_inversion;
 use ark_ff::FftField;
-use ark_ff::Field;
 use ark_ff::PrimeField;
+use binary::CompiledProgram;
+use binary::Memory;
+use binary::RegisterState;
+use binary::RegisterStates;
 use core::iter::zip;
-use core::ops::Deref;
 use gpu_poly::prelude::PageAlignedAllocator;
 use gpu_poly::GpuFftField;
 use gpu_poly::GpuVec;
-use layouts::layout6;
-use layouts::layout6::Auxiliary;
-use layouts::layout6::Flag;
-use layouts::layout6::MemoryPermutation;
-use layouts::layout6::Npc;
-use layouts::layout6::Permutation;
-use layouts::layout6::RangeCheck;
-use layouts::layout6::RangeCheckPermutation;
-use layouts::layout6::CYCLE_HEIGHT;
-use layouts::layout6::MEMORY_STEP;
-use layouts::layout6::PUBLIC_MEMORY_STEP;
-use layouts::layout6::RANGE_CHECK_STEP;
 use ministark::challenges::Challenges;
 use ministark::Matrix;
 use ministark::StarkExtensionOf;
@@ -44,7 +45,7 @@ pub struct ExecutionTrace<Fp, Fq> {
     pub initial_registers: RegisterState,
     pub final_registers: RegisterState,
     _register_states: RegisterStates,
-    _program: CompiledProgram<Fp>,
+    _program: CompiledProgram,
     _mem: Memory<Fp>,
     _flags_column: GpuVec<Fp>,
     npc_column: GpuVec<Fp>,
@@ -56,14 +57,7 @@ pub struct ExecutionTrace<Fp, Fq> {
 }
 
 impl<Fp: GpuFftField + PrimeField, Fq: StarkExtensionOf<Fp>> ExecutionTrace<Fp, Fq> {
-    pub fn new(
-        mem: Memory<Fp>,
-        register_states: RegisterStates,
-        program: CompiledProgram<Fp>,
-    ) -> Self {
-        #[cfg(debug_assertions)]
-        program.validate();
-
+    pub fn new(mem: Memory<Fp>, register_states: RegisterStates, program: CompiledProgram) -> Self {
         let num_cycles = register_states.len();
         assert!(num_cycles.is_power_of_two());
         let trace_len = num_cycles * CYCLE_HEIGHT;
@@ -106,12 +100,12 @@ impl<Fp: GpuFftField + PrimeField, Fq: StarkExtensionOf<Fp>> ExecutionTrace<Fp, 
             .zip(auxiliary_cycles)
             .zip(npc_cycles)
             .zip(flag_cycles)
-            .zip(register_states.deref())
+            .zip(&*register_states)
             .for_each(
                 |((((rc_cycle, aux_cycle), npc_cycle), flag_cycle), registers)| {
                     let &RegisterState { pc, ap, fp } = registers;
                     let word = mem[pc].unwrap();
-                    debug_assert!(!word.get_flag(Flag::Zero));
+                    debug_assert!(!word.get_flag(Flag::Zero.into()));
 
                     // range check all offset values
                     let off_dst = (word.get_off_dst() as u64).into();
@@ -129,7 +123,7 @@ impl<Fp: GpuFftField + PrimeField, Fq: StarkExtensionOf<Fp>> ExecutionTrace<Fp, 
 
                     // FLAGS
                     for flag in Flag::iter() {
-                        flag_cycle[flag as usize] = word.get_flag_prefix(flag).into();
+                        flag_cycle[flag as usize] = word.get_flag_prefix(flag.into()).into();
                     }
 
                     // NPC
@@ -194,7 +188,17 @@ impl<Fp: GpuFftField + PrimeField, Fq: StarkExtensionOf<Fp>> ExecutionTrace<Fp, 
         assert!(ordered_rc_vals.next().is_none());
 
         // generate the memory column by ordering memory accesses
-        let memory_column = get_ordered_memory_accesses(trace_len, &npc_column, &program);
+        let memory_accesses: Vec<(Fp, Fp)> = npc_column
+            .array_chunks()
+            .map(|&[mem_addr, mem_val]| (mem_addr, mem_val))
+            .collect();
+        let ordered_memory_accesses =
+            get_ordered_memory_accesses(trace_len, &memory_accesses, &program);
+        let memory_column = ordered_memory_accesses
+            .into_iter()
+            .flat_map(|(a, v)| [a, v])
+            .collect::<Vec<Fp>>()
+            .to_vec_in(PageAlignedAllocator);
 
         let base_trace = Matrix::new(vec![
             flags_column.to_vec_in(PageAlignedAllocator),
@@ -234,8 +238,8 @@ impl<Fp: GpuFftField + PrimeField, Fq: StarkExtensionOf<Fp>> ExecutionTrace<Fp, 
 }
 
 impl<Fp: GpuFftField + FftField, Fq: StarkExtensionOf<Fp>> Trace for ExecutionTrace<Fp, Fq> {
-    const NUM_BASE_COLUMNS: usize = layout6::NUM_BASE_COLUMNS;
-    const NUM_EXTENSION_COLUMNS: usize = layout6::NUM_EXTENSION_COLUMNS;
+    const NUM_BASE_COLUMNS: usize = NUM_BASE_COLUMNS;
+    const NUM_EXTENSION_COLUMNS: usize = NUM_EXTENSION_COLUMNS;
     type Fp = Fp;
     type Fq = Fq;
 
@@ -296,94 +300,4 @@ impl<Fp: GpuFftField + FftField, Fq: StarkExtensionOf<Fp>> Trace for ExecutionTr
 
         Some(Matrix::new(vec![permutation_column]))
     }
-}
-
-/// Returns the (unpadded) range check column values
-/// Currently only offset (off_dst, off_op0, off_op1) are used
-/// Output is of the form `(ordered_vals, padding_vals)`
-fn ordered_range_check_values<F: Field>(
-    num_cycles: usize,
-    mem: &Memory<F>,
-    register_states: &RegisterStates,
-) -> (Vec<usize>, Vec<usize>) {
-    let mut res = Vec::new();
-    for &RegisterState { pc, .. } in register_states.iter() {
-        // TODO: this seems wasteful. Could combine with public_memory_padding_address?
-        let word = mem[pc].unwrap();
-        let cycle_rc_values = [word.get_off_dst(), word.get_off_op0(), word.get_off_op1()];
-        res.push(cycle_rc_values);
-    }
-
-    // The trace is padded to a power-of-two by copying the trace rows of the last
-    // cycle. These copied values need to be accounted for in the range check.
-    res.resize(num_cycles, *res.last().unwrap());
-
-    // Get the individual range check values in order
-    let mut res = res.flatten().to_vec();
-    res.sort();
-
-    // range check values need to be continuos therefore any gaps
-    // e.g. [..., 3, 4, 7, 8, ...] need to be filled with [5, 6] as padding.
-    let mut padding = Vec::new();
-    for &[a, b] in res.array_windows() {
-        for v in a + 1..b {
-            padding.push(v);
-        }
-    }
-
-    // Add padding to the ordered vals (res)
-    for v in &padding {
-        res.push(*v);
-    }
-
-    // re-sort the values.
-    // padding is already sorted.
-    res.sort();
-
-    (res, padding)
-}
-
-// TODO: support input, output and builtins
-// Output is of the form `(ordered_mem_column, padding_vals)`
-fn get_ordered_memory_accesses<F: PrimeField>(
-    trace_len: usize,
-    npc_column: &[F],
-    program: &CompiledProgram<F>,
-) -> Vec<F, PageAlignedAllocator> {
-    // the number of cells allocated for the public memory
-    let num_pub_mem_cells = trace_len / PUBLIC_MEMORY_STEP;
-    let pub_mem = program.get_public_memory();
-    let pub_mem_accesses = pub_mem.iter().map(|&(a, v)| [(a as u64).into(), v]);
-    let (padding_address, padding_value) = program.get_padding_address_and_value();
-    let padding_entry = [(padding_address as u64).into(), padding_value];
-
-    // order all memory accesses by address
-    // memory accesses are of the form [address, value]
-    let mut ordered_accesses = npc_column
-        .array_chunks()
-        .copied()
-        .chain((0..num_pub_mem_cells - pub_mem_accesses.len()).map(|_| padding_entry))
-        .chain(pub_mem_accesses)
-        .collect::<Vec<[F; MEMORY_STEP]>>();
-
-    ordered_accesses.sort();
-
-    // justification for this is explained in section 9.8 of the Cairo paper https://eprint.iacr.org/2021/1063.pdf.
-    // SHARP requires the first address to start at address 1
-    let (zeros, ordered_accesses) = ordered_accesses.split_at(num_pub_mem_cells);
-    assert!(zeros.iter().all(|[a, v]| a.is_zero() && v.is_zero()));
-    assert!(ordered_accesses[0][0].is_one());
-
-    // check memory is "continuous" and "single valued"
-    ordered_accesses
-        .array_windows()
-        .enumerate()
-        .for_each(|(i, &[[a, v], [a_next, v_next]])| {
-            assert!(
-                (a == a_next && v == v_next) || a == a_next - F::one(),
-                "mismatch at {i}: a={a}, v={v}, a_next={a_next}, v_next={v_next}"
-            );
-        });
-
-    ordered_accesses.flatten().to_vec_in(PageAlignedAllocator)
 }

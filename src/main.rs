@@ -1,16 +1,19 @@
+use ark_ff::PrimeField;
 use ark_serialize::CanonicalDeserialize;
 use ark_serialize::CanonicalSerialize;
-use gpu_poly::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481::Fp;
+use binary::CompiledProgram;
+use binary::Memory;
+use binary::RegisterStates;
+use gpu_poly::fields::p18446744069414584321;
+use gpu_poly::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481;
+use gpu_poly::GpuFftField;
 use layouts::layout6;
 use ministark::Proof;
 use ministark::ProofOptions;
 use ministark::Prover;
+use ministark::StarkExtensionOf;
 use ministark::Trace;
-use sandstorm::binary::CompiledProgram;
-use sandstorm::binary::Memory;
-use sandstorm::binary::RegisterStates;
 use sandstorm::prover::CairoProver;
-use sandstorm::trace::ExecutionTrace;
 use std::fs;
 use std::fs::File;
 use std::io::Write;
@@ -20,10 +23,16 @@ use structopt::StructOpt;
 
 #[derive(StructOpt, Debug)]
 #[structopt(name = "sandstorm", about = "cairo prover")]
-enum SandstormOptions {
+struct SandstormOptions {
+    #[structopt(long, parse(from_os_str))]
+    program: PathBuf,
+    #[structopt(subcommand)]
+    command: SandstormCommand,
+}
+
+#[derive(StructOpt, Debug)]
+enum SandstormCommand {
     Prove {
-        #[structopt(long, parse(from_os_str))]
-        program: PathBuf,
         #[structopt(long, parse(from_os_str))]
         trace: PathBuf,
         #[structopt(long, parse(from_os_str))]
@@ -32,8 +41,6 @@ enum SandstormOptions {
         output: PathBuf,
     },
     Verify {
-        #[structopt(long, parse(from_os_str))]
-        program: PathBuf,
         #[structopt(long, parse(from_os_str))]
         proof: PathBuf,
     },
@@ -56,22 +63,47 @@ fn main() {
     );
 
     // read command-line args
-    match SandstormOptions::from_args() {
-        SandstormOptions::Prove {
-            program,
-            trace,
-            memory,
-            output,
-        } => prove(options, &program, &trace, &memory, &output),
-        SandstormOptions::Verify { program, proof } => verify(options, &program, &proof),
+    let SandstormOptions { program, command } = SandstormOptions::from_args();
+    let program_file = File::open(program).expect("could not open program file");
+    let program: CompiledProgram = serde_json::from_reader(program_file).unwrap();
+    use SandstormCommand::*;
+    match &*program.prime.to_lowercase() {
+        // Starkware's 252-bit Cairo field
+        "0x800000000000011000000000000000000000000000000000000000000000001" => {
+            use p3618502788666131213697322783095070105623107215331596699973092056135872020481::Fp;
+            match command {
+                Prove {
+                    trace,
+                    memory,
+                    output,
+                } => prove::<Fp, Fp>(options, program, &trace, &memory, &output),
+                Verify { proof } => verify::<Fp, Fp>(options, program, &proof),
+            }
+        }
+        // Goldilocks
+        "0xffffffff00000001" => {
+            use p18446744069414584321::Fp;
+            use p18446744069414584321::Fq3;
+            match command {
+                Prove {
+                    trace,
+                    memory,
+                    output,
+                } => prove::<Fp, Fq3>(options, program, &trace, &memory, &output),
+                Verify { proof } => verify::<Fp, Fq3>(options, program, &proof),
+            }
+        }
+        prime => unimplemented!("prime field p={prime} is not implemented yet"),
     }
 }
 
-fn verify(options: ProofOptions, program_path: &PathBuf, proof_path: &PathBuf) {
-    let program_file = File::open(program_path).expect("could not open program file");
-    let program: CompiledProgram<Fp> = serde_json::from_reader(program_file).unwrap();
+fn verify<Fp: GpuFftField + PrimeField, Fq: StarkExtensionOf<Fp>>(
+    options: ProofOptions,
+    program: CompiledProgram,
+    proof_path: &PathBuf,
+) {
     let proof_bytes = fs::read(proof_path).unwrap();
-    let proof: Proof<layout6::AirConfig<Fp, Fp>> =
+    let proof: Proof<layout6::AirConfig<Fp, Fq>> =
         Proof::deserialize_compressed(proof_bytes.as_slice()).unwrap();
     let public_inputs = &proof.public_inputs;
     assert_eq!(program.get_public_memory(), public_inputs.public_memory);
@@ -82,9 +114,9 @@ fn verify(options: ProofOptions, program_path: &PathBuf, proof_path: &PathBuf) {
     println!("Proof verified in: {:?}", now.elapsed());
 }
 
-fn prove(
+fn prove<Fp: GpuFftField + PrimeField, Fq: StarkExtensionOf<Fp>>(
     options: ProofOptions,
-    program_path: &PathBuf,
+    program: CompiledProgram,
     trace_path: &PathBuf,
     memory_path: &PathBuf,
     output_path: &PathBuf,
@@ -94,13 +126,10 @@ fn prove(
     let trace_file = File::open(trace_path).expect("could not open trace file");
     let register_states = RegisterStates::from_reader(trace_file);
 
-    let program_file = File::open(program_path).expect("could not open program file");
-    let program: CompiledProgram<Fp> = serde_json::from_reader(program_file).unwrap();
-
     let memory_file = File::open(memory_path).expect("could not open memory file");
     let memory = Memory::from_reader(memory_file);
 
-    let execution_trace = ExecutionTrace::<Fp, Fp>::new(memory, register_states, program);
+    let execution_trace = layout6::ExecutionTrace::<Fp, Fq>::new(memory, register_states, program);
     println!(
         "Generated execution trace (cols={}, rows={}) in {:.0?}",
         execution_trace.base_columns().num_cols(),

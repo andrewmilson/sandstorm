@@ -1,4 +1,3 @@
-use crate::trace::ExecutionTrace;
 use ark_ff::PrimeField;
 use gpu_poly::GpuFftField;
 use layouts::layout6;
@@ -17,7 +16,7 @@ impl<Fp: GpuFftField + PrimeField, Fq: StarkExtensionOf<Fp>> Prover for CairoPro
     type Fp = Fp;
     type Fq = Fq;
     type AirConfig = layout6::AirConfig<Fp, Fq>;
-    type Trace = ExecutionTrace<Fp, Fq>;
+    type Trace = layout6::ExecutionTrace<Fp, Fq>;
 
     fn new(options: ProofOptions) -> Self {
         CairoProver {

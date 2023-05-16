@@ -1,5 +1,5 @@
 [package]
-name = "layouts"
+name = "sandstorm-layouts"
 version = "0.1.0"
 edition = "2021"
 
@@ -8,9 +8,11 @@ edition = "2021"
 [dependencies]
 gpu-poly = { path = "../../ministark-mirror/gpu-poly" }
 ministark = { path = "../../ministark-mirror" }
+binary = { path = "../binary", package = "sandstorm-binary" }
 ark-poly = { git = "https://github.com/andrewmilson/algebra", branch = "vec-allocator" }
-ark-serialize = "0.4.0"
-num-traits = "0.2.15"
-strum = "0.24.1"
-ark-ff = "0.4.0"
+ark-serialize = "0.4"
+num-traits = "0.2"
+strum = "0.24"
+ark-ff = "0.4"
+ark-std = "0.4"
 strum_macros = "0.24"

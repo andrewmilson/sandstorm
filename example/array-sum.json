@@ -20,14 +20,14 @@
         "0x482680017ffc8000",
         "0x1",
         "0x482680017ffd8000",
-        "0x800000000000011000000000000000000000000000000000000000000000000",
+        "0xffffffff00000000",
         "0x1104800180018000",
-        "0x800000000000010fffffffffffffffffffffffffffffffffffffffffffffff8",
+        "0xfffffffefffffff8",
         "0x480280007ffc8000",
         "0x48307ffe7fff8000",
         "0x208b7fff7fff7ffe",
         "0x1104800180018000",
-        "0x800000000000010fffffffffffffffffffffffffffffffffffffffffffffff0",
+        "0xfffffffefffffff0",
         "0x480680017fff8000",
         "0x9",
         "0x400080007ffe7fff",
@@ -41,7 +41,7 @@
         "0x480680017fff8000",
         "0x3",
         "0x1104800180018000",
-        "0x800000000000010ffffffffffffffffffffffffffffffffffffffffffffffe5",
+        "0xfffffffeffffffe5",
         "0x400680017fff7fff",
         "0x19",
         "0x208b7fff7fff7ffe"
@@ -196,7 +196,7 @@
                     "end_col": 7,
                     "end_line": 4,
                     "input_file": {
-                        "filename": "array-sum.cairo"
+                        "filename": "example/array-sum.cairo"
                     },
                     "start_col": 5,
                     "start_line": 4
@@ -222,7 +222,7 @@
                     "end_col": 17,
                     "end_line": 5,
                     "input_file": {
-                        "filename": "array-sum.cairo"
+                        "filename": "example/array-sum.cairo"
                     },
                     "start_col": 16,
                     "start_line": 5
@@ -248,7 +248,7 @@
                     "end_col": 18,
                     "end_line": 5,
                     "input_file": {
-                        "filename": "array-sum.cairo"
+                        "filename": "example/array-sum.cairo"
                     },
                     "start_col": 9,
                     "start_line": 5
@@ -274,7 +274,7 @@
                     "end_col": 42,
                     "end_line": 7,
                     "input_file": {
-                        "filename": "array-sum.cairo"
+                        "filename": "example/array-sum.cairo"
                     },
                     "start_col": 35,
                     "start_line": 7
@@ -300,7 +300,7 @@
                     "end_col": 51,
                     "end_line": 7,
                     "input_file": {
-                        "filename": "array-sum.cairo"
+                        "filename": "example/array-sum.cairo"
                     },
                     "start_col": 46,
                     "start_line": 7
@@ -326,7 +326,7 @@
                     "end_col": 52,
                     "end_line": 7,
                     "input_file": {
-                        "filename": "array-sum.cairo"
+                        "filename": "example/array-sum.cairo"
                     },
                     "start_col": 21,
                     "start_line": 7
@@ -353,7 +353,7 @@
                     "end_col": 18,
                     "end_line": 8,
                     "input_file": {
-                        "filename": "array-sum.cairo"
+                        "filename": "example/array-sum.cairo"
                     },
                     "start_col": 12,
                     "start_line": 8
@@ -381,7 +381,7 @@
                     "end_col": 30,
                     "end_line": 8,
                     "input_file": {
-                        "filename": "array-sum.cairo"
+                        "filename": "example/array-sum.cairo"
                     },
                     "start_col": 12,
                     "start_line": 8
@@ -409,7 +409,7 @@
                     "end_col": 31,
                     "end_line": 8,
                     "input_file": {
-                        "filename": "array-sum.cairo"
+                        "filename": "example/array-sum.cairo"
                     },
                     "start_col": 5,
                     "start_line": 8
@@ -432,7 +432,7 @@
                     "end_col": 24,
                     "end_line": 14,
                     "input_file": {
-                        "filename": "array-sum.cairo"
+                        "filename": "example/array-sum.cairo"
                     },
                     "start_col": 17,
                     "start_line": 14
@@ -457,7 +457,7 @@
                     "end_col": 21,
                     "end_line": 17,
                     "input_file": {
-                        "filename": "array-sum.cairo"
+                        "filename": "example/array-sum.cairo"
                     },
                     "start_col": 20,
                     "start_line": 17
@@ -483,7 +483,7 @@
                     "end_col": 22,
                     "end_line": 17,
                     "input_file": {
-                        "filename": "array-sum.cairo"
+                        "filename": "example/array-sum.cairo"
                     },
                     "start_col": 5,
                     "start_line": 17
@@ -509,7 +509,7 @@
                     "end_col": 26,
                     "end_line": 18,
                     "input_file": {
-                        "filename": "array-sum.cairo"
+                        "filename": "example/array-sum.cairo"
                     },
                     "start_col": 24,
                     "start_line": 18
@@ -536,7 +536,7 @@
                     "end_col": 27,
                     "end_line": 18,
                     "input_file": {
-                        "filename": "array-sum.cairo"
+                        "filename": "example/array-sum.cairo"
                     },
                     "start_col": 5,
                     "start_line": 18
@@ -563,7 +563,7 @@
                     "end_col": 25,
                     "end_line": 19,
                     "input_file": {
-                        "filename": "array-sum.cairo"
+                        "filename": "example/array-sum.cairo"
                     },
                     "start_col": 24,
                     "start_line": 19
@@ -591,7 +591,7 @@
                     "end_col": 26,
                     "end_line": 19,
                     "input_file": {
-                        "filename": "array-sum.cairo"
+                        "filename": "example/array-sum.cairo"
                     },
                     "start_col": 5,
                     "start_line": 19
@@ -619,14 +619,14 @@
                     "end_col": 13,
                     "end_line": 14,
                     "input_file": {
-                        "filename": "array-sum.cairo"
+                        "filename": "example/array-sum.cairo"
                     },
                     "parent_location": [
                         {
                             "end_col": 32,
                             "end_line": 22,
                             "input_file": {
-                                "filename": "array-sum.cairo"
+                                "filename": "example/array-sum.cairo"
                             },
                             "start_col": 29,
                             "start_line": 22
@@ -659,7 +659,7 @@
                     "end_col": 46,
                     "end_line": 22,
                     "input_file": {
-                        "filename": "array-sum.cairo"
+                        "filename": "example/array-sum.cairo"
                     },
                     "start_col": 36,
                     "start_line": 22
@@ -687,7 +687,7 @@
                     "end_col": 47,
                     "end_line": 22,
                     "input_file": {
-                        "filename": "array-sum.cairo"
+                        "filename": "example/array-sum.cairo"
                     },
                     "start_col": 15,
                     "start_line": 22
@@ -716,7 +716,7 @@
                     "end_col": 21,
                     "end_line": 23,
                     "input_file": {
-                        "filename": "array-sum.cairo"
+                        "filename": "example/array-sum.cairo"
                     },
                     "start_col": 5,
                     "start_line": 23
@@ -745,7 +745,7 @@
                     "end_col": 15,
                     "end_line": 24,
                     "input_file": {
-                        "filename": "array-sum.cairo"
+                        "filename": "example/array-sum.cairo"
                     },
                     "start_col": 5,
                     "start_line": 24
@@ -1009,7 +1009,7 @@
         }
     },
     "main_scope": "__main__",
-    "prime": "0x800000000000011000000000000000000000000000000000000000000000001",
+    "prime": "0xffffffff00000001",
     "reference_manager": {
         "references": [
             {

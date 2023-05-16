@@ -41,15 +41,62 @@ cairo-run --program example/array-sum.json \
 # use `-F parallel,asm` if not using an M1 Mac
 # make sure latest macOS is installed
 cargo +nightly run -r -F gpu,parallel,asm -- \
-    prove --program example/array-sum.json \
-          --trace example/trace.bin \
+    --program example/array-sum.json \
+    prove --trace example/trace.bin \
           --memory example/memory.bin \
           --output example/array-sum.proof
 
 # 4. verify the proof
 cargo +nightly run -r -F parallel,asm -- \
-    verify --program example/array-sum.json \
-           --proof example/array-sum.proof
+    --program example/array-sum.json \
+    verify --proof example/array-sum.proof
+```
+
+## How to prove Cairo programs with Goldilocks field
+
+The goldilocks field is a magical 64-bit prime field that has very fast arithmetic. This field was discovered after StarkWare built their Solidity verifier for Cairo programs. By default Cairo uses a 252-bit prime field. Arithmetic in this 252-bit field is slow and it can be hard to practically utilize all the storage provided by each field element. 
+
+Sandstorm recently supported proving Cairo programs with the 64-bit Goldilocks field instead of StarkWare's default 252-bit field. Before running the example below a few changes need to be made to StarkWare's Cairo runner. On a M1 Max proof generation is 5x faster using 64-bit Goldilocks and only uses ~1/4 of the overall memory as the default 252-bit field.
+
+```bash
+# 1. (optional) Install Cairo and activate the venv
+# https://www.cairo-lang.org/docs/quickstart.html
+source ~/cairo_venv/bin/
+
+export GOLDILOCKS_PRIME=18446744069414584321
+
+# 2. compile the Cairo program
+cairo-compile example/array-sum.cairo --proof_mode \
+        --prime $GOLDILOCKS_PRIME \
+        --output example/array-sum.json
+
+# 3. run the Cairo program - there are a few overly protective asserts
+# that need to be commented out to get this working. The location of
+# these files will be based on where you installed Cairo. For me they 
+# were in `~/cairo_venv/lib/python3.9/site-packages/starkware/cairo/`:
+#   1. cairo/lang/vm/relocatable.py line 84
+#      `# assert value < 2 ** (8 * n_bytes - 1)`
+#   2. cairo/lang/compiler/encode.py line 38
+#      `# assert prime > 2 ** (3 * OFFSET_BITS + 16)`
+cairo-run --program example/array-sum.json \
+          --trace_file example/trace.bin \
+          --memory_file example/memory.bin \
+          --min_steps 128 \
+          --proof_mode
+
+# 3. generate the proof
+# use `-F parallel,asm` if not using an M1 Mac
+# make sure latest macOS is installed
+cargo +nightly run -r -F gpu,parallel,asm -- \
+    --program example/array-sum.json \
+    prove --trace example/trace.bin \
+          --memory example/memory.bin \
+          --output example/array-sum.proof
+
+# 4. verify the proof
+cargo +nightly run -r -F parallel,asm -- \
+    --program example/array-sum.json \
+    verify --proof example/array-sum.proof
 ```
 
 <h2 id="sandstorm-sharp-differences">Differences between Sandstorm and SHARP</h2>

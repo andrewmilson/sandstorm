@@ -1,10 +1,12 @@
-// TODO: make an interface for layouts
-// pub trait Layout {
-//     const CYCLE_HEIGHT: usize;
-//     const PUBLIC_MEMORY_STEP: usize;
-//     const MEMORY_STEP: usize;
-//     const RANGE_CHECK_STEP: usize;
-// }
+#![feature(
+    allocator_api,
+    slice_flatten,
+    array_windows,
+    array_chunks,
+    slice_as_chunks
+)]
+
+extern crate alloc;
 
 use ark_ff::Field;
 use ark_serialize::CanonicalDeserialize;

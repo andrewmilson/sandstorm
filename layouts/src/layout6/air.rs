@@ -1,3 +1,7 @@
+use super::CYCLE_HEIGHT;
+use super::MEMORY_STEP;
+use super::PUBLIC_MEMORY_STEP;
+use super::RANGE_CHECK_STEP;
 use crate::utils;
 use crate::ExecutionInfo;
 use ark_ff::PrimeField;
@@ -17,15 +21,6 @@ use ministark::StarkExtensionOf;
 use num_traits::Pow;
 use std::marker::PhantomData;
 use strum_macros::EnumIter;
-
-// must be a power-of-two
-pub const CYCLE_HEIGHT: usize = 16;
-pub const PUBLIC_MEMORY_STEP: usize = 8;
-pub const MEMORY_STEP: usize = 2;
-pub const RANGE_CHECK_STEP: usize = 4;
-
-pub const NUM_BASE_COLUMNS: usize = 9;
-pub const NUM_EXTENSION_COLUMNS: usize = 1;
 
 pub struct AirConfig<Fp, Fq>(PhantomData<(Fp, Fq)>);
 
@@ -659,6 +654,29 @@ pub enum Flag {
 
     // 0 - padding to make flag cells a power-of-2
     Zero = 15,
+}
+
+impl From<Flag> for binary::Flag {
+    fn from(value: Flag) -> Self {
+        match value {
+            Flag::DstReg => Self::DstReg,
+            Flag::Op0Reg => Self::Op0Reg,
+            Flag::Op1Imm => Self::Op1Imm,
+            Flag::Op1Fp => Self::Op1Fp,
+            Flag::Op1Ap => Self::Op1Ap,
+            Flag::ResAdd => Self::ResAdd,
+            Flag::ResMul => Self::ResMul,
+            Flag::PcJumpAbs => Self::PcJumpAbs,
+            Flag::PcJumpRel => Self::PcJumpRel,
+            Flag::PcJnz => Self::PcJnz,
+            Flag::ApAdd => Self::ApAdd,
+            Flag::ApAdd1 => Self::ApAdd1,
+            Flag::OpcodeCall => Self::OpcodeCall,
+            Flag::OpcodeRet => Self::OpcodeRet,
+            Flag::OpcodeAssertEq => Self::OpcodeAssertEq,
+            Flag::Zero => Self::Zero,
+        }
+    }
 }
 
 impl ExecutionTraceColumn for Flag {

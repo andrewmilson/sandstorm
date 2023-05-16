@@ -6,7 +6,7 @@ version = "0.1.0"
 edition = "2021"
 
 [workspace]
-members = ["layouts"]
+members = ["layouts", "binary"]
 
 [features]
 default = [ ]
@@ -15,25 +15,22 @@ gpu = [ "ministark/gpu" ]
 parallel = [ "dep:rayon", "ministark/parallel" ]
 
 [dependencies]
-layouts = { path = "./layouts" }
+layouts = { path = "./layouts", package = "sandstorm-layouts" }
+binary = { path = "./binary", package = "sandstorm-binary" }
 gpu-poly = { path = "../ministark-mirror/gpu-poly" }
 ministark = { path = "../ministark-mirror" }
 # ministark = { git = "https://github.com/andrewmilson/ministark" }
 # gpu-poly = { git = "https://github.com/andrewmilson/ministark" }
 ark-poly = { git = "https://github.com/andrewmilson/algebra", branch = "vec-allocator" }
-ark-std = "0.4.0"
-ark-ff = "0.4.0"
-ark-serialize = "0.4.0"
-structopt = "0.3.26"
-bincode = "1.2.1"
-num-bigint = "0.4.3"
-ruint = { version = "1.7.0", features = [ "serde", "num-bigint" ] }
-serde = "1.0.147"
-serde_json = "1.0.89"
-strum = "0.24.1"
-num-traits = "0.2.15"
-pollster = "0.2.4"
-rayon = { version = "1.5.3", optional = true }
+ark-std = "0.4"
+ark-ff = "0.4"
+ark-serialize = "0.4"
+structopt = "0.3"
+serde = "1.0"
+serde_json = "1.0"
+num-traits = "0.2"
+pollster = "0.2"
+rayon = { version = "1.5", optional = true }
 
 # TODO: can remove these
 # [build-dependencies]
