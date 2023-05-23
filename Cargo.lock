@@ -91,6 +91,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "ark-poly"
+version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d320bfc44ee185d899ccbadfa8bc31aab923ce1558716e1997a1e74057fe86bf"
+dependencies = [
+ "ark-ff",
+ "ark-serialize",
+ "ark-std",
+ "derivative",
+ "hashbrown",
+]
+
+[[package]]
 name = "ark-serialize"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -320,9 +333,9 @@ dependencies = [
 
 [[package]]
 name = "digest"
-version = "0.10.6"
+version = "0.10.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8168378f4e5023e7218c89c891c0fd8ecdb5e5e4f18cb78f38cf245dd021e76f"
+checksum = "9ed9a281f7bc9b7576e61468ba615a66a5c8cfdff42420a70aa82701a3b1e292"
 dependencies = [
  "block-buffer",
  "crypto-common",
@@ -401,25 +414,6 @@ dependencies = [
  "cfg-if",
  "libc",
  "wasi",
-]
-
-[[package]]
-name = "gpu-poly"
-version = "0.1.0"
-dependencies = [
- "ark-ff",
- "ark-ff-optimized",
- "ark-poly",
- "ark-serialize",
- "ark-std",
- "libc",
- "metal",
- "num-traits",
- "once_cell",
- "rand",
- "rayon",
- "serde",
- "zeroize",
 ]
 
 [[package]]
@@ -521,7 +515,8 @@ dependencies = [
 [[package]]
 name = "metal"
 version = "0.25.0"
-source = "git+https://github.com/gfx-rs/metal-rs#05df13a4f751910ef54d7805e8e4682488b23b8d"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "550b24b0cd4cf923f36bae78eca457b3a10d8a6a14a9c84cb2687b527e6a84af"
 dependencies = [
  "bitflags",
  "block",
@@ -538,18 +533,33 @@ version = "0.1.0"
 dependencies = [
  "ark-ff",
  "ark-ff-optimized",
- "ark-poly",
+ "ark-poly 0.4.2",
  "ark-serialize",
  "ark-std",
  "digest",
- "gpu-poly",
- "metal",
+ "ministark-gpu",
  "num-traits",
  "rand",
  "rand_chacha",
  "rayon",
  "sha2",
  "snafu",
+]
+
+[[package]]
+name = "ministark-gpu"
+version = "0.1.0"
+dependencies = [
+ "ark-ff",
+ "ark-ff-optimized",
+ "ark-poly 0.4.2",
+ "ark-serialize",
+ "ark-std",
+ "metal",
+ "once_cell",
+ "rand",
+ "rayon",
+ "zeroize",
 ]
 
 [[package]]
@@ -661,9 +671,9 @@ dependencies = [
 
 [[package]]
 name = "proc-macro2"
-version = "1.0.57"
+version = "1.0.58"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c4ec6d5fe0b140acb27c9a0444118cf55bfbb4e0b259739429abb4521dd67c16"
+checksum = "fa1fb82fc0c281dd9671101b66b771ebbe1eaf967b96ac8740dcba4b70005ca8"
 dependencies = [
  "unicode-ident",
 ]
@@ -775,17 +785,16 @@ name = "sandstorm"
 version = "0.1.0"
 dependencies = [
  "ark-ff",
- "ark-poly",
+ "ark-poly 0.4.0",
  "ark-serialize",
  "ark-std",
- "gpu-poly",
  "ministark",
+ "ministark-gpu",
  "num-traits",
  "pollster",
  "rayon",
  "sandstorm-binary",
  "sandstorm-layouts",
- "serde",
  "serde_json",
  "structopt",
 ]
@@ -806,11 +815,11 @@ name = "sandstorm-layouts"
 version = "0.1.0"
 dependencies = [
  "ark-ff",
- "ark-poly",
+ "ark-poly 0.4.0",
  "ark-serialize",
  "ark-std",
- "gpu-poly",
  "ministark",
+ "ministark-gpu",
  "num-traits",
  "sandstorm-binary",
  "strum",

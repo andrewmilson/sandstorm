@@ -23,14 +23,14 @@ use binary::Memory;
 use binary::RegisterState;
 use binary::RegisterStates;
 use core::iter::zip;
-use gpu_poly::prelude::PageAlignedAllocator;
-use gpu_poly::GpuFftField;
-use gpu_poly::GpuVec;
 use ministark::challenges::Challenges;
+use ministark::utils::GpuAllocator;
+use ministark::utils::GpuVec;
 use ministark::Matrix;
 use ministark::StarkExtensionOf;
 use ministark::Trace;
 use ministark::TraceInfo;
+use ministark_gpu::GpuFftField;
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;
 use std::marker::PhantomData;
@@ -64,10 +64,10 @@ impl<Fp: GpuFftField + PrimeField, Fq: StarkExtensionOf<Fp>> ExecutionTrace<Fp, 
         assert!(trace_len >= TraceInfo::MIN_TRACE_LENGTH);
         let public_memory = program.get_public_memory();
 
-        let mut flags_column = Vec::new_in(PageAlignedAllocator);
+        let mut flags_column = Vec::new_in(GpuAllocator);
         flags_column.resize(trace_len, Fp::zero());
 
-        let mut zeros_column = Vec::new_in(PageAlignedAllocator);
+        let mut zeros_column = Vec::new_in(GpuAllocator);
         zeros_column.resize(trace_len, Fp::zero());
 
         // set `padding_address == padding_value` to make filling the column easy
@@ -75,7 +75,7 @@ impl<Fp: GpuFftField + PrimeField, Fq: StarkExtensionOf<Fp>> ExecutionTrace<Fp, 
         // &register_states);
         let (public_memory_padding_address, public_memory_padding_value) =
             program.get_padding_address_and_value();
-        let mut npc_column = Vec::new_in(PageAlignedAllocator);
+        let mut npc_column = Vec::new_in(GpuAllocator);
         npc_column.resize(trace_len, public_memory_padding_value);
 
         let (ordered_rc_vals, ordered_rc_padding_vals) =
@@ -85,10 +85,10 @@ impl<Fp: GpuFftField + PrimeField, Fq: StarkExtensionOf<Fp>> ExecutionTrace<Fp, 
         let range_check_padding_value = Fp::from(range_check_max as u64);
         let mut ordered_rc_vals = ordered_rc_vals.into_iter();
         let mut ordered_rc_padding_vals = ordered_rc_padding_vals.into_iter();
-        let mut range_check_column = Vec::new_in(PageAlignedAllocator);
+        let mut range_check_column = Vec::new_in(GpuAllocator);
         range_check_column.resize(trace_len, range_check_padding_value);
 
-        let mut auxiliary_column = Vec::new_in(PageAlignedAllocator);
+        let mut auxiliary_column = Vec::new_in(GpuAllocator);
         auxiliary_column.resize(trace_len, Fp::zero());
 
         let (range_check_cycles, _) = range_check_column.as_chunks_mut::<CYCLE_HEIGHT>();
@@ -198,18 +198,18 @@ impl<Fp: GpuFftField + PrimeField, Fq: StarkExtensionOf<Fp>> ExecutionTrace<Fp, 
             .into_iter()
             .flat_map(|(a, v)| [a, v])
             .collect::<Vec<Fp>>()
-            .to_vec_in(PageAlignedAllocator);
+            .to_vec_in(GpuAllocator);
 
         let base_trace = Matrix::new(vec![
-            flags_column.to_vec_in(PageAlignedAllocator),
-            zeros_column.to_vec_in(PageAlignedAllocator),
-            zeros_column.to_vec_in(PageAlignedAllocator),
-            zeros_column.to_vec_in(PageAlignedAllocator),
-            zeros_column.to_vec_in(PageAlignedAllocator),
-            npc_column.to_vec_in(PageAlignedAllocator),
-            memory_column.to_vec_in(PageAlignedAllocator),
-            range_check_column.to_vec_in(PageAlignedAllocator),
-            auxiliary_column.to_vec_in(PageAlignedAllocator),
+            flags_column.to_vec_in(GpuAllocator),
+            zeros_column.to_vec_in(GpuAllocator),
+            zeros_column.to_vec_in(GpuAllocator),
+            zeros_column.to_vec_in(GpuAllocator),
+            zeros_column.to_vec_in(GpuAllocator),
+            npc_column.to_vec_in(GpuAllocator),
+            memory_column.to_vec_in(GpuAllocator),
+            range_check_column.to_vec_in(GpuAllocator),
+            auxiliary_column.to_vec_in(GpuAllocator),
         ]);
 
         let initial_registers = *register_states.first().unwrap();
@@ -285,7 +285,7 @@ impl<Fp: GpuFftField + FftField, Fq: StarkExtensionOf<Fp>> Trace for ExecutionTr
         batch_inversion(&mut rc_perm_denominators);
         debug_assert!((numerator_acc / denominator_acc).is_one());
 
-        let mut permutation_column = Vec::new_in(PageAlignedAllocator);
+        let mut permutation_column = Vec::new_in(GpuAllocator);
         permutation_column.resize(self.base_columns().num_rows(), Fq::zero());
 
         // Insert intermediate memory permutation results

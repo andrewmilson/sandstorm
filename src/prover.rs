@@ -1,10 +1,10 @@
 use ark_ff::PrimeField;
-use gpu_poly::GpuFftField;
 use layouts::layout6;
 use layouts::ExecutionInfo;
 use ministark::ProofOptions;
 use ministark::Prover;
 use ministark::StarkExtensionOf;
+use ministark_gpu::GpuFftField;
 use std::marker::PhantomData;
 
 pub struct CairoProver<Fp, Fq> {

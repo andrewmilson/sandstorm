@@ -3,10 +3,8 @@ name = "sandstorm-layouts"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
-gpu-poly = { path = "../../ministark-mirror/gpu-poly" }
+ministark-gpu = { path = "../../ministark-mirror/gpu" }
 ministark = { path = "../../ministark-mirror" }
 binary = { path = "../binary", package = "sandstorm-binary" }
 ark-poly = { git = "https://github.com/andrewmilson/algebra", branch = "vec-allocator" }

@@ -5,8 +5,8 @@ use binary::CompiledProgram;
 use binary::Memory;
 use binary::RegisterState;
 use binary::RegisterStates;
-use gpu_poly::GpuFftField;
 use ministark::StarkExtensionOf;
+use ministark_gpu::GpuFftField;
 
 /// Computes the value of the public memory quotient:
 /// Adapted from https://github.com/starkware-libs/starkex-contracts

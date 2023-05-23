@@ -25,11 +25,11 @@ In this demo, the prover has a Cairo program that appears to sum the values of a
 The verifier, supplied with this proof and the original code, can run `sandstorm verify` to assert the program was executed correctly without having to run the program themselves. This is a small program for demonstration purposes and it'd probably be faster for the verifier to run the program themselves. Sandstorm is capable of generating proofs for much larger programs, where proof verification would run orders of magnitude faster than running the program. To run this demo locally:
 
 ```bash
-# 1. (optional) Install Cairo and activate the venv
+# 1. (optional) install Cairo and activate the venv
 # https://www.cairo-lang.org/docs/quickstart.html
 source ~/cairo_venv/bin/activate
 
-# 2. (optional) Compile and run the Cairo program
+# 2. (optional) compile and run the Cairo program
 cairo-compile example/array-sum.cairo --proof_mode --output example/array-sum.json
 cairo-run --program example/array-sum.json \
           --trace_file example/trace.bin \
@@ -52,21 +52,20 @@ cargo +nightly run -r -F parallel,asm -- \
     verify --proof example/array-sum.proof
 ```
 
-## How to prove Cairo programs with Goldilocks field
+## Proving Cairo programs with Goldilocks field
 
 The goldilocks field is a magical 64-bit prime field that has very fast arithmetic. This field was discovered after StarkWare built their Solidity verifier for Cairo programs. As a result Cairo uses a much larger 252-bit prime field by default. Arithmetic in this 252-bit field is slow and it can be hard to practically utilize the storage provided by each field element. 
 
-Sandstorm recently supported proving Cairo programs with the 64-bit Goldilocks field instead of StarkWare's default 252-bit field. Before running the example below a few changes need to be made to StarkWare's Cairo runner. On a M1 Max proof generation is 5x faster using the 64-bit Goldilocks field and only uses ~1/4 of the overall memory when compared against Cairo's default 252-bit field.
+Sandstorm recently supported proving Cairo programs with the 64-bit Goldilocks field instead of StarkWare's default 252-bit field. On a M1 Max proof generation is 5x faster using the 64-bit Goldilocks field and only uses ~1/4 of the overall memory when compared against Cairo's default 252-bit field. To run and prove with Goldilocks field locally:
 
 ```bash
-# 1. (optional) Install Cairo and activate the venv
+# 1. install Cairo and activate the venv
 # https://www.cairo-lang.org/docs/quickstart.html
 source ~/cairo_venv/bin/
 
-# 2. compile the Cairo program
-export GOLDILOCKS_PRIME=18446744069414584321
+# 2. compile the Cairo program with Goldilocks field
 cairo-compile example/array-sum.cairo \
-        --prime $GOLDILOCKS_PRIME \
+        --prime 18446744069414584321 \
         --output example/array-sum.json \
         --proof_mode
 
@@ -75,8 +74,8 @@ cairo-compile example/array-sum.cairo \
 # things working. The location of these files is based on where you installed Cairo.
 # For me they were in `~/cairo_venv/lib/python3.9/site-packages/starkware/cairo/`.
 # Remove or comment out the following asserts:
-#   - lang/vm/relocatable.py line 84 `assert value < 2 ** (8 * n_bytes - 1)`
-#   - lang/compiler/encode.py line 38 `assert prime > 2 ** (3 * OFFSET_BITS + 16)`
+# - lang/vm/relocatable.py line 84 `assert value < 2 ** (8 * n_bytes - 1)`
+# - lang/compiler/encode.py line 38 `assert prime > 2 ** (3 * OFFSET_BITS + 16)`
 
 # 4. run the Cairo program
 cairo-run --program example/array-sum.json \

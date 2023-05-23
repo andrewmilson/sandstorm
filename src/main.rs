@@ -4,15 +4,15 @@ use ark_serialize::CanonicalSerialize;
 use binary::CompiledProgram;
 use binary::Memory;
 use binary::RegisterStates;
-use gpu_poly::fields::p18446744069414584321;
-use gpu_poly::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481;
-use gpu_poly::GpuFftField;
 use layouts::layout6;
 use ministark::Proof;
 use ministark::ProofOptions;
 use ministark::Prover;
 use ministark::StarkExtensionOf;
 use ministark::Trace;
+use ministark_gpu::fields::p18446744069414584321;
+use ministark_gpu::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481;
+use ministark_gpu::GpuFftField;
 use sandstorm::prover::CairoProver;
 use std::fs;
 use std::fs::File;
@@ -70,7 +70,7 @@ fn main() {
     match &*program.prime.to_lowercase() {
         // Starkware's 252-bit Cairo field
         "0x800000000000011000000000000000000000000000000000000000000000001" => {
-            use p3618502788666131213697322783095070105623107215331596699973092056135872020481::Fp;
+            use p3618502788666131213697322783095070105623107215331596699973092056135872020481::ark::Fp;
             match command {
                 Prove {
                     trace,
@@ -82,8 +82,8 @@ fn main() {
         }
         // Goldilocks
         "0xffffffff00000001" => {
-            use p18446744069414584321::Fp;
-            use p18446744069414584321::Fq3;
+            use p18446744069414584321::ark::Fp;
+            use p18446744069414584321::ark::Fq3;
             match command {
                 Prove {
                     trace,
