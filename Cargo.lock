@@ -530,6 +530,7 @@ dependencies = [
 [[package]]
 name = "ministark"
 version = "0.1.0"
+source = "git+https://github.com/andrewmilson/ministark#4e7d909060e992cab49af043d6bff4eb159c0279"
 dependencies = [
  "ark-ff",
  "ark-ff-optimized",
@@ -549,6 +550,7 @@ dependencies = [
 [[package]]
 name = "ministark-gpu"
 version = "0.1.0"
+source = "git+https://github.com/andrewmilson/ministark#4e7d909060e992cab49af043d6bff4eb159c0279"
 dependencies = [
  "ark-ff",
  "ark-ff-optimized",
