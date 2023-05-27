@@ -26,6 +26,7 @@ ark-serialize = "0.4"
 structopt = "0.3"
 serde_json = "1.0"
 num-traits = "0.2"
+strum = { version = "0.21", features = ["derive"] }
 pollster = "0.2"
 rayon = { version = "1.5", optional = true }
 
@@ -43,3 +44,8 @@ lto = true
 [profile.bench]
 codegen-units = 1
 lto = true
+
+# TODO: remove
+[dev-dependencies]
+num-bigint = "0.4"
+ark-ec = "0.4"

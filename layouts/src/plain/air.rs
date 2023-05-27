@@ -1,18 +1,12 @@
 use super::CYCLE_HEIGHT;
 use super::MEMORY_STEP;
-use super::PEDERSEN_BUILTIN_RATIO;
 use super::PUBLIC_MEMORY_STEP;
-use super::RANGE_CHECK_BUILTIN_PARTS;
-use super::RANGE_CHECK_BUILTIN_RATIO;
 use super::RANGE_CHECK_STEP;
 use crate::utils;
 use crate::ExecutionInfo;
+use ark_ff::PrimeField;
 use ark_poly::EvaluationDomain;
 use ark_poly::Radix2EvaluationDomain;
-use ministark_gpu::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481::ark::Fp;
-use core::ops::Add;
-use core::ops::Mul;
-use ark_ff::Field;
 use ministark::challenges::Challenges;
 use ministark::constraints::AlgebraicItem;
 use ministark::constraints::Constraint;
@@ -22,21 +16,24 @@ use ministark::constraints::VerifierChallenge;
 use ministark::expression::Expr;
 use ministark::hints::Hints;
 use ministark::utils::FieldVariant;
-use num_bigint::BigUint;
+use ministark::StarkExtensionOf;
+use ministark_gpu::GpuFftField;
 use num_traits::Pow;
-use num_traits::Zero;
+use std::marker::PhantomData;
 use strum_macros::EnumIter;
 
-pub struct AirConfig;
+pub struct AirConfig<Fp, Fq>(PhantomData<(Fp, Fq)>);
 
-impl ministark::air::AirConfig for AirConfig {
+impl<Fp: GpuFftField + PrimeField, Fq: StarkExtensionOf<Fp>> ministark::air::AirConfig
+    for AirConfig<Fp, Fq>
+{
     const NUM_BASE_COLUMNS: usize = 9;
     const NUM_EXTENSION_COLUMNS: usize = 1;
     type Fp = Fp;
-    type Fq = Fp;
+    type Fq = Fq;
     type PublicInputs = ExecutionInfo<Fp>;
 
-    fn constraints(trace_len: usize) -> Vec<Constraint<FieldVariant<Fp, Fp>>> {
+    fn constraints(trace_len: usize) -> Vec<Constraint<FieldVariant<Fp, Fq>>> {
         use AlgebraicItem::*;
         use PublicInputHint::*;
         // TODO: figure out why this value
@@ -45,72 +42,34 @@ impl ministark::air::AirConfig for AirConfig {
         let g = trace_domain.group_gen();
         assert!(n >= CYCLE_HEIGHT, "must be a multiple of cycle height");
         let x = Expr::from(X);
-        let one = Expr::from(Constant(FieldVariant::Fp(Fp::ONE)));
+        let one = Expr::from(Constant(FieldVariant::Fp(Fp::one())));
         let two = Expr::from(Constant(FieldVariant::Fp(Fp::from(2u32))));
         let four = Expr::from(Constant(FieldVariant::Fp(Fp::from(4u32))));
         let offset_size = Expr::from(Constant(FieldVariant::Fp(Fp::from(2u32.pow(16)))));
         let half_offset_size = Expr::from(Constant(FieldVariant::Fp(Fp::from(2u32.pow(15)))));
 
         // cpu/decode/flag_op1_base_op0_0
-        let cpu_decode_flag_op1_base_op0_0: Expr<AlgebraicItem<FieldVariant<Fp, Fp>>> =
+        let cpu_decode_flag_op1_base_op0_0: Expr<AlgebraicItem<FieldVariant<Fp, Fq>>> =
             &one - (Flag::Op1Imm.curr() + Flag::Op1Ap.curr() + Flag::Op1Fp.curr());
         // cpu/decode/flag_res_op1_0
-        let cpu_decode_flag_res_op1_0: Expr<AlgebraicItem<FieldVariant<Fp, Fp>>> =
+        let cpu_decode_flag_res_op1_0: Expr<AlgebraicItem<FieldVariant<Fp, Fq>>> =
             &one - (Flag::ResAdd.curr() + Flag::ResMul.curr() + Flag::PcJnz.curr());
         // cpu/decode/flag_pc_update_regular_0
-        let cpu_decode_flag_pc_update_regular_0: Expr<AlgebraicItem<FieldVariant<Fp, Fp>>> =
+        let cpu_decode_flag_pc_update_regular_0: Expr<AlgebraicItem<FieldVariant<Fp, Fq>>> =
             &one - (Flag::PcJumpAbs.curr() + Flag::PcJumpRel.curr() + Flag::PcJnz.curr());
         // cpu/decode/fp_update_regular_0
-        let cpu_decode_fp_update_regular_0: Expr<AlgebraicItem<FieldVariant<Fp, Fp>>> =
+        let cpu_decode_fp_update_regular_0: Expr<AlgebraicItem<FieldVariant<Fp, Fq>>> =
             &one - (Flag::OpcodeCall.curr() + Flag::OpcodeRet.curr());
 
         // NOTE: npc_reg_0 = pc + instruction_size
         // NOTE: instruction_size = fOP1_IMM + 1
         let npc_reg_0 = Npc::Pc.curr() + Flag::Op1Imm.curr() + &one;
 
-        let memory_address_diff_0: Expr<AlgebraicItem<FieldVariant<Fp, Fp>>> =
+        let memory_address_diff_0: Expr<AlgebraicItem<FieldVariant<Fp, Fq>>> =
             Mem::Address.next() - Mem::Address.curr();
 
-        let rc16_diff_0: Expr<AlgebraicItem<FieldVariant<Fp, Fp>>> =
+        let rc16_diff_0: Expr<AlgebraicItem<FieldVariant<Fp, Fq>>> =
             RangeCheck::Ordered.next() - RangeCheck::Ordered.curr();
-
-        // TODO: builtins
-        let pedersen_hash0_ec_subset_sum_b0 = Pedersen::Suffix.curr() - (Pedersen::Suffix.next() + Pedersen::Suffix.next());
-        let pedersen_hash0_ec_subset_sum_b0_negate = &one - &pedersen_hash0_ec_subset_sum_b0;
-        let rc_builtin_value0_0 = RangeCheckBuiltin::Rc16Component.offset(0);
-        let rc_builtin_value1_0 = &rc_builtin_value0_0 * &offset_size + RangeCheckBuiltin::Rc16Component.offset(1);
-        let rc_builtin_value2_0 = &rc_builtin_value1_0 * &offset_size + RangeCheckBuiltin::Rc16Component.offset(2);
-        let rc_builtin_value3_0 = &rc_builtin_value2_0 * &offset_size + RangeCheckBuiltin::Rc16Component.offset(3);
-        let rc_builtin_value4_0 = &rc_builtin_value3_0 * &offset_size + RangeCheckBuiltin::Rc16Component.offset(4);
-        let rc_builtin_value5_0 = &rc_builtin_value4_0 * &offset_size + RangeCheckBuiltin::Rc16Component.offset(5);
-        let rc_builtin_value6_0 = &rc_builtin_value5_0 * &offset_size + RangeCheckBuiltin::Rc16Component.offset(6);
-        let rc_builtin_value7_0 = &rc_builtin_value6_0 * &offset_size + RangeCheckBuiltin::Rc16Component.offset(7);
-        let _ecdsa_sig0_doubling_key_x_squared: Expr<AlgebraicItem<FieldVariant<Fp, Fp>>> =
-            Trace(8, 4) * Trace(8, 4);
-        let ecdsa_sig0_exponentiate_generator_b0 =
-            Expr::from(Trace(8, 34)) - (Trace(8, 162) + Trace(8, 162));
-        let _ecdsa_sig0_exponentiate_generator_b0_neg = &one - ecdsa_sig0_exponentiate_generator_b0;
-        let ecdsa_sig0_exponentiate_key_b0 =
-            Expr::from(Trace(8, 12)) - (Trace(8, 76) + Trace(8, 76));
-        let _ecdsa_sig0_exponentiate_key_b0_neg = &one - &ecdsa_sig0_exponentiate_key_b0;
-        let _bitwise_sum_var_0_0: Expr<AlgebraicItem<FieldVariant<Fp, Fp>>> =
-            Expr::from(Trace(7, 1))
-                + Expr::from(Trace(7, 17)) * (&two).pow(1)
-                + Expr::from(Trace(7, 33)) * (&two).pow(2)
-                + Expr::from(Trace(7, 49)) * (&two).pow(3)
-                + Expr::from(Trace(7, 65)) * (&two).pow(64)
-                + Expr::from(Trace(7, 81)) * (&two).pow(65)
-                + Expr::from(Trace(7, 97)) * (&two).pow(66)
-                + Expr::from(Trace(7, 113)) * (&two).pow(67);
-        let _bitwise_sum_var_8_0: Expr<AlgebraicItem<FieldVariant<Fp, Fp>>> =
-            Expr::from(Trace(7, 129)) * (&two).pow(129)
-                + Expr::from(Trace(7, 145)) * (&two).pow(130)
-                + Expr::from(Trace(7, 161)) * (&two).pow(131)
-                + Expr::from(Trace(7, 177)) * (&two).pow(132)
-                + Expr::from(Trace(7, 193)) * (&two).pow(193)
-                + Expr::from(Trace(7, 209)) * (&two).pow(194)
-                + Expr::from(Trace(7, 255)) * (&two).pow(195)
-                + Expr::from(Trace(7, 241)) * (&two).pow(196);
 
         // example for trace length n=64
         // =============================
@@ -472,7 +431,7 @@ impl ministark::air::AirConfig for AirConfig {
         // Read cairo whitepaper section 9.8 as to why the public memory cells are 0.
         // The high level is that the way public memory works is that the prover is
         // forced (with these constraints) to exclude the public memory from one of
-        // the permutation products. This means the running permutation column
+        // the permuration products. This means the running permuration column
         // terminates with more-or-less the permutation of just the public input. The
         // verifier can relatively cheaply calculate this terminal. The constraint for
         // this terminal is `memory_multi_column_perm_perm_last`.
@@ -515,325 +474,6 @@ impl ministark::air::AirConfig for AirConfig {
             (RangeCheck::Ordered.curr() - RangeCheckMin.hint()) / &first_row_zerofier;
         let rc16_maximum =
             (RangeCheck::Ordered.curr() - RangeCheckMax.hint()) / &fourth_last_row_zerofier;
-
-        // TODO: find out what diluted constraints are for. Might be starkex specific
-
-        // Pedersen builtin
-        // ================
-        // Each hash spans across 256 rows - that's one hash per 16 cairo steps.
-        let every_256_row_zerofier = X.pow(n / 256) - &one;
-
-        // These first few pedersen constraints check that the number is in the range
-        // 100000000000000000000000000000000000000000000000000000010001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001
-
-        // pedersen/hash0/ec_subset_sum/bit_unpacking/last_one_is_zero
-        // column8_row82 * (column3_row0 - (column3_row1 + column3_row1))
-        // TODO: figure out what Trace(8, 86) is
-        let pedersen_hash0_ec_subset_sub_bit_unpacking_last_one_is_zero =
-            (Expr::from(Trace(8, 86))
-                * (Pedersen::Suffix.curr() - (Pedersen::Suffix.next() + Pedersen::Suffix.next())))
-                / &every_256_row_zerofier;
-
-        // pedersen/hash0/ec_subset_sum/bit_unpacking/zeroes_between_ones0
-        // TODO: better name than shift
-        let shift191 = Constant(FieldVariant::Fp(Fp::from(BigUint::from(2u32).pow(191u32))));
-        let pedersen_hash0_ec_subset_sub_bit_unpacking_zeros_between_ones =
-            (Expr::from(Trace(8, 86))
-                * (Pedersen::Suffix.next() - Pedersen::Suffix.offset(192) * shift191))
-                / &every_256_row_zerofier;
-
-        // pedersen/hash0/ec_subset_sum/bit_unpacking/cumulative_bit192
-        // TODO: column 4
-        let pedersen_hash0_ec_subset_sum_bit_unpacking_cumulative_bit192 =
-            (Expr::from(Trace(8, 86))
-                - Expr::from(Trace(4, 255))
-                    * (Pedersen::Suffix.offset(192)
-                        - (Pedersen::Suffix.offset(193) + Pedersen::Suffix.offset(193))))
-                / &every_256_row_zerofier;
-
-        // pedersen/hash0/ec_subset_sum/bit_unpacking/zeroes_between_ones192
-        let pedersen_hash0_ec_subset_sum_bit_unpacking_zeroes_between_ones192 =
-            (Expr::from(Trace(4, 255)) * Pedersen::Suffix.offset(193)
-                - Pedersen::Suffix.offset(196) * Constant(FieldVariant::Fp(Fp::from(8u32))))
-                / &every_256_row_zerofier;
-
-        // pedersen/hash0/ec_subset_sum/bit_unpacking/cumulative_bit196
-        let pedersen_hash0_ec_subset_sum_bit_unpacking_cumulative_bit196 =
-            (Expr::from(Trace(4, 255))
-                - (Pedersen::Suffix.offset(251)
-                    - (Pedersen::Suffix.offset(252) + Pedersen::Suffix.offset(252)))
-                    * (Pedersen::Suffix.offset(196)
-                        - (Pedersen::Suffix.offset(197) + Pedersen::Suffix.offset(197))))
-                / &every_256_row_zerofier;
-
-        // pedersen/hash0/ec_subset_sum/bit_unpacking/zeroes_between_ones196
-        // (column3_row251 - (column3_row252 + column3_row252)) * (column3_row197 -
-        // 18014398509481984 * column3_row251)
-        let shift54 = Constant(FieldVariant::Fp(Fp::from(BigUint::from(2u32).pow(54u32))));
-        let pedersen_hash0_ec_subset_sum_bit_unpacking_zeroes_between_ones196 = ((Pedersen::Suffix
-            .offset(251)
-            - (Pedersen::Suffix.offset(252) + Pedersen::Suffix.offset(252)))
-            * (Pedersen::Suffix.offset(197) - Pedersen::Suffix.offset(251) * shift54))
-            / &every_256_row_zerofier;
-
-        // example for trace length n=512
-        // =============================
-        // X^(n/256) - ω^(255*n/256)    = (x-ω^255)(x-ω^511)
-        // (x-ω^255)(x-ω^511) / (X^n-1) = 1/(x-ω^0)..(x-ω^254)(x-ω^256)..(x-ω^510)
-        // vanishes on groups of 256 consecutive rows except the last row in each group
-        // TODO: come up with better names for these
-        let pedersen_transition_zerofier = (X.pow(n / 256)
-            * Constant(FieldVariant::Fp(g.pow([(255 * n / 256) as u64]))))
-            / &all_cycles_zerofier;
-
-        // Constraint operated on groups of 256 rows.
-        // Each row shifts a large number to the right. E.g.
-        // ```text
-        // row0:   10101...10001 <- constraint applied
-        // row1:    1010...11000 <- constraint applied
-        // ...               ... <- constraint applied
-        // row255:             0 <- constraint disabled
-        // row256: 11101...10001 <- constraint applied
-        // row257:  1110...01000 <- constraint applied
-        // ...               ... <- constraint applied
-        // row511:             0 <- constraint disabled
-        // ...               ...
-        // ```
-        let pedersen_hash0_ec_subset_sum_booleanity_test = (&pedersen_hash0_ec_subset_sum_b0
-            * (&pedersen_hash0_ec_subset_sum_b0 - &one))
-            * &pedersen_transition_zerofier;
-
-        // example for trace length n=512
-        // =============================
-        // X^(n/256) - ω^(63*n/64)      = X^(n/256) - ω^(252*n/256)
-        // X^(n/256) - ω^(255*n/256)    = (x-ω^252)(x-ω^508)
-        // (x-ω^255)(x-ω^511) / (X^n-1) = 1/(x-ω^0)..(x-ω^254)(x-ω^256)..(x-ω^510)
-        // vanishes on groups of 256 consecutive rows except the 252nd row of each group
-        let pedersen_zero_suffix_zerofier =
-            X.pow(n / 256) * Constant(FieldVariant::Fp(g.pow([(63 * n / 64) as u64])));
-
-        // Note that with cairo's default field each element is 252 bits.
-        // Therefore we are decomposing 252 bit numbers to do pedersen hash.
-        // Since we have a column that right shifts a number each row we check that the
-        // suffix of row 252 (of every 256 row group) equals 0 e.g.
-        // ```text
-        // row0:   10101...10001
-        // row1:    1010...11000
-        // ...               ...
-        // row250:            10
-        // row251:             1
-        // row252:             0 <- check zero
-        // row253:             0
-        // row254:             0
-        // row255:             0
-        // row256: 11101...10001
-        // row257:  1110...01000
-        // ...               ...
-        // row506:            11
-        // row507:             1
-        // row508:             0 <- check zero
-        // row509:             0
-        // ...               ...
-        // ```
-        // <https://docs.starkware.co/starkex/crypto/pedersen-hash-function.html>
-        let pedersen_hash0_ec_subset_sum_bit_extraction_end =
-            Pedersen::Suffix.curr() / &pedersen_zero_suffix_zerofier;
-
-        // TODO: is this constraint even needed?
-        // check suffix in row 255 of each 256 row group is zero
-        let pedersen_hash0_ec_subset_sum_zeros_tail = Pedersen::Suffix.curr()
-            / (X.pow(n / 256) - Constant(FieldVariant::Fp(g.pow([255 * n as u64 / 256]))));
-
-        // Create a periodic table comprising of the constant Pedersen points we need to
-        // add together. The columns of this table are represented by polynomials that
-        // evaluate to the `i`th row when evaluated on the `i`th power of the 512th root
-        // of unity. e.g.
-        //
-        // let:
-        // - `[P]_x` denotes the x-coordinate of an elliptic-curve point P
-        // - P_1, P_2, P_3, P_4 be fixed elliptic curve points that parameterize the
-        //   Pedersen hash function
-        //
-        // then our point table is:
-        // ┌───────────┬────────────────────┬────────────────────┐
-        // │     X     │       F_x(X)       │       F_y(X)       │
-        // ├───────────┼────────────────────┼────────────────────┤
-        // │    ω^0    │   [P_1 * 2^0]_x    │   [P_1 * 2^0]_y    │
-        // ├───────────┼────────────────────┼────────────────────┤
-        // │    ω^1    │   [P_1 * 2^1]_x    │   [P_1 * 2^1]_y    │
-        // ├───────────┼────────────────────┼────────────────────┤
-        // │    ...    │         ...        │         ...        │
-        // ├───────────┼────────────────────┼────────────────────┤
-        // │   ω^247   │  [P_1 * 2^247]_x   │  [P_1 * 2^247]_y   │
-        // ├───────────┼────────────────────┼────────────────────┤
-        // │   ω^248   │   [P_2 * 2^0]_x    │   [P_2 * 2^0]_y    │
-        // ├───────────┼────────────────────┼────────────────────┤
-        // │   ω^249   │   [P_2 * 2^1]_x    │   [P_2 * 2^1]_y    │
-        // ├───────────┼────────────────────┼────────────────────┤
-        // │   ω^250   │   [P_2 * 2^2]_x    │   [P_2 * 2^2]_y    │
-        // ├───────────┼────────────────────┼────────────────────┤
-        // │   ω^251   │   [P_2 * 2^3]_x    │   [P_2 * 2^3]_y    │
-        // ├───────────┼────────────────────┼────────────────────┤
-        // │   ω^252   │         0          │         0          │
-        // ├───────────┼────────────────────┼────────────────────┤
-        // │   ω^253   │         0          │         0          │
-        // ├───────────┼────────────────────┼────────────────────┤
-        // │   ω^254   │         0          │         0          │
-        // ├───────────┼────────────────────┼────────────────────┤
-        // │   ω^255   │         0          │         0          │
-        // ├───────────┼────────────────────┼────────────────────┤
-        // │   ω^256   │   [P_3 * 2^0]_x    │   [P_3 * 2^0]_y    │
-        // ├───────────┼────────────────────┼────────────────────┤
-        // │   ω^257   │   [P_3 * 2^1]_x    │   [P_3 * 2^1]_y    │
-        // ├───────────┼────────────────────┼────────────────────┤
-        // │    ...    │         ...        │         ...        │
-        // ├───────────┼────────────────────┼────────────────────┤
-        // │   ω^503   │  [P_3 * 2^247]_x   │  [P_3 * 2^247]_y   │
-        // ├───────────┼────────────────────┼────────────────────┤
-        // │   ω^504   │   [P_4 * 2^0]_x    │   [P_4 * 2^0]_y    │
-        // ├───────────┼────────────────────┼────────────────────┤
-        // │   ω^505   │   [P_4 * 2^1]_x    │   [P_4 * 2^1]_y    │
-        // ├───────────┼────────────────────┼────────────────────┤
-        // │   ω^506   │   [P_4 * 2^2]_x    │   [P_4 * 2^2]_y    │
-        // ├───────────┼────────────────────┼────────────────────┤
-        // │   ω^507   │   [P_4 * 2^3]_x    │   [P_4 * 2^3]_y    │
-        // ├───────────┼────────────────────┼────────────────────┤
-        // │   ω^508   │         0          │         0          │
-        // ├───────────┼────────────────────┼────────────────────┤
-        // │   ω^509   │         0          │         0          │
-        // ├───────────┼────────────────────┼────────────────────┤
-        // │   ω^510   │         0          │         0          │
-        // ├───────────┼────────────────────┼────────────────────┤
-        // │   ω^511   │         0          │         0          │
-        // └───────────┴────────────────────┴────────────────────┘
-        let (pedersen_x_coeffs, pedersen_y_coeffs) = super::pedersen::points_poly();
-        let pedersen_points_x = Polynomial::new(pedersen_x_coeffs);
-        let pedersen_points_y = Polynomial::new(pedersen_y_coeffs);
-
-        // TODO: double check if the value that's being evaluated is correct
-        let pedersen_point_y = pedersen_points_y.eval(X.pow(n / 512));
-        let pedersen_point_x = pedersen_points_x.eval(X.pow(n / 512));
-
-        // let `P = (Px, Py)` be the point to be added (see above)
-        // let `Q = (Qx, Qy)` be the partial result
-        // note that the slope = dy/dx with dy = Qy - Py, dx = Qx - Px
-        // this constraint is equivalent to: bit * dy = dy/dx * dx
-        // TODO: slope is 0 if bit is 0?
-        let pedersen_hash0_ec_subset_sum_add_points_slope = (&pedersen_hash0_ec_subset_sum_b0
-            * (Pedersen::PartialSumY.curr() - &pedersen_point_y)
-            - Pedersen::Slope.curr() * (Pedersen::PartialSumX.curr() - &pedersen_point_x))
-            * &pedersen_transition_zerofier;
-
-        // These two constraint check classic short Weierstrass curve point addition.
-        // Constraint is equivalent to:
-        // - `Qx_next = m^2 - Qx - Px, m = dy/dx`
-        // - `Qy_next = m*(Qx - Qx_next) - Qy, m = dy/dx`
-        let pedersen_hash0_ec_subset_sum_add_points_x = (Pedersen::Slope.curr()
-            * Pedersen::Slope.curr()
-            - &pedersen_hash0_ec_subset_sum_b0
-                * (Pedersen::PartialSumX.curr()
-                    + &pedersen_point_x
-                    + Pedersen::PartialSumX.next()))
-            * &pedersen_transition_zerofier;
-        let pedersen_hash0_ec_subset_sum_add_points_y = (&pedersen_hash0_ec_subset_sum_b0
-            * (Pedersen::PartialSumY.curr() + Pedersen::PartialSumY.next())
-            - Pedersen::Slope.curr()
-                * (Pedersen::PartialSumX.curr() - Pedersen::PartialSumX.next()))
-            * &pedersen_transition_zerofier;
-        // if the bit is 0 then just copy the previous point
-        let pedersen_hash0_ec_subset_sum_copy_point_x = (&pedersen_hash0_ec_subset_sum_b0_negate
-            * (Pedersen::PartialSumX.next() - Pedersen::PartialSumX.curr()))
-            * &pedersen_transition_zerofier;
-        let pedersen_hash0_ec_subset_sum_copy_point_y = (&pedersen_hash0_ec_subset_sum_b0_negate
-            * (Pedersen::PartialSumY.next() - Pedersen::PartialSumY.curr()))
-            * &pedersen_transition_zerofier;
-
-        // example for trace length n=1024
-        // =============================
-        // X^(n/512) - ω^(n/2)                = X^(n/512) - ω^(256*n/512)
-        // X^(n/512) - ω^(256*n/512)          = (x-ω^256)(x-ω^768)
-        // x^(n/256) - 1                      = (x-ω_0)(x-ω_256)(x-ω_512)(x-ω_768)
-        // (x-ω^256)(x-ω^768) / (X^(n/256)-1) = 1/(x-ω_0)(x-ω_512)
-        // 1/(X^(n/512) - 1)                  = 1/(x-ω_0)(x-ω_512)
-        // NOTE: By using `(x-ω^256)(x-ω^768) / (X^(n/256)-1)` rather than
-        // `1/(X^(n/512) - 1)` we save an inversion operation since 1 / (X^(n/256)-1)
-        // has been calculated already and as a result of how constraints are
-        // evaluated it will be cached.
-        // TODO: check all zerofiers are being multiplied or divided correctly
-        let every_512_row_zerofier = (X.pow(n / 512)
-            - Constant(FieldVariant::Fp(g.pow([n as u64 / 2]))))
-            / every_256_row_zerofier;
-
-        // A single pedersen hash `H(a, b)` is computed every 512 cycles.
-        // The constraints for each hash is split in two consecutive 256 row groups.
-        // - 1st group computes `e0 = P0 + a_low * P1 + a_high * P2`
-        // - 2nd group computes `e1 = e0 + B_low * P3 + B_high * P4`
-        // We make sure the initial value of each group is loaded correctly:
-        // - 1st group we check P0 (the shift point) is the first partial sum
-        // - 2nd group we check e0 (processed `a`) is the first partial sum
-        let pedersen_hash0_copy_point_x = (Pedersen::PartialSumX.offset(256)
-            - Pedersen::PartialSumX.offset(255))
-            * &every_512_row_zerofier;
-        let pedersen_hash0_copy_point_y = (Pedersen::PartialSumY.offset(256)
-            - Pedersen::PartialSumY.offset(255))
-            * &every_512_row_zerofier;
-        // TODO: introducing a new zerofier that's equivalent to the
-        // previous one? double check every_512_row_zerofier
-        let every_512_row_zerofier = X.pow(n / 512) - Constant(FieldVariant::Fp(Fp::ONE));
-        let shift_point = super::pedersen::params::PEDERSEN_SHIFT_POINT;
-        let pedersen_hash0_init_x = (Pedersen::PartialSumX.curr()
-            - Constant(FieldVariant::Fp(shift_point.x)))
-            / &every_512_row_zerofier;
-        let pedersen_hash0_init_y = (Pedersen::PartialSumY.curr()
-            - Constant(FieldVariant::Fp(shift_point.y)))
-            / &every_512_row_zerofier;
-
-        // TODO: fix naming
-        let zerofier_512th_last_row =
-            X - Constant(FieldVariant::Fp(g.pow([512 * (n as u64 / 512 - 1)])));
-        let every_512_rows_except_last_zerofier =
-            &zerofier_512th_last_row / &every_512_row_zerofier;
-
-        // Link Input0 into the memory pool.
-        let pedersen_input0_value0 =
-            (Npc::PedersenInput0Val.curr() - Pedersen::Suffix.curr()) / &every_512_row_zerofier;
-        // Input0's next address should be the address directly
-        // after the output address of the previous hash
-        let pedersen_input0_addr = (Npc::PedersenInput0Addr.next()
-            - (Npc::PedersenOutputAddr.curr() + &one))
-            * &every_512_rows_except_last_zerofier;
-        // Ensure the first pedersen address matches the hint
-        let pedersen_init_addr = (Npc::PedersenInput0Addr.curr()
-            - PublicInputHint::InitialPedersenAddr.hint())
-            / &first_row_zerofier;
-
-        // Link Input1 into the memory pool.
-        // Input1's address should be the address directly after input0's address
-        let pedersen_input1_value0 = (Npc::PedersenInput1Val.curr() - Pedersen::Suffix.offset(256))
-            / &every_512_row_zerofier;
-        let pedersen_input1_addr = (Npc::PedersenInput1Addr.curr()
-            - (Npc::PedersenInput0Addr.curr() + &one))
-            / &every_512_row_zerofier;
-
-        // Link pedersen output into the memory pool.
-        // Output's address should be the address directly after input1's address.
-        let pedersen_output_value0 = (Npc::PedersenOutputVal.curr()
-            - Pedersen::PartialSumX.offset(511))
-            / &every_512_row_zerofier;
-        let pedersen_output_addr = (Npc::PedersenOutputAddr.curr()
-            - (Npc::PedersenInput1Addr.curr() + &one))
-            / &every_512_row_zerofier;
-
-        // Range check builtin
-        // ===================
-        let rc_builtin_value = rc_builtin_value7_0 - Npc::RangeCheck128Val.curr()
-
-        // X^(n/512) - ω^(n/2)    = (x-ω^255)(x-ω^511)
-        // (x-ω^255)(x-ω^511) / (X^n-1) = 1/(x-ω^0)..(x-ω^254)(x-ω^256)..(x-ω^510)
-        // vanishes on groups of 256 consecutive rows except the last row in each group
-
-        // point^(trace_length / 512) - trace_generator^(trace_length / 2).
-        // let pedersen_hash0_copy_point_x =
 
         // NOTE: for composition OODs only seem to involve one random per constraint
         vec![
@@ -884,32 +524,6 @@ impl ministark::air::AirConfig for AirConfig {
             rc16_diff_is_bit,
             rc16_minimum,
             rc16_maximum,
-            // TODO: diluted constraints
-            pedersen_hash0_ec_subset_sub_bit_unpacking_last_one_is_zero,
-            pedersen_hash0_ec_subset_sub_bit_unpacking_zeros_between_ones,
-            pedersen_hash0_ec_subset_sum_bit_unpacking_cumulative_bit192,
-            pedersen_hash0_ec_subset_sum_bit_unpacking_zeroes_between_ones192,
-            pedersen_hash0_ec_subset_sum_bit_unpacking_cumulative_bit196,
-            pedersen_hash0_ec_subset_sum_bit_unpacking_zeroes_between_ones196,
-            pedersen_hash0_ec_subset_sum_booleanity_test,
-            pedersen_hash0_ec_subset_sum_bit_extraction_end,
-            pedersen_hash0_ec_subset_sum_zeros_tail,
-            pedersen_hash0_ec_subset_sum_add_points_slope,
-            pedersen_hash0_ec_subset_sum_add_points_x,
-            pedersen_hash0_ec_subset_sum_add_points_y,
-            pedersen_hash0_ec_subset_sum_copy_point_x,
-            pedersen_hash0_ec_subset_sum_copy_point_y,
-            pedersen_hash0_copy_point_x,
-            pedersen_hash0_copy_point_y,
-            pedersen_hash0_init_x,
-            pedersen_hash0_init_y,
-            pedersen_input0_value0,
-            pedersen_input0_addr,
-            pedersen_init_addr,
-            pedersen_input1_value0,
-            pedersen_input1_addr,
-            pedersen_output_value0,
-            pedersen_output_addr,
         ]
         .into_iter()
         .map(Constraint::new)
@@ -947,16 +561,15 @@ impl ministark::air::AirConfig for AirConfig {
         assert!(*range_check_max < 2usize.pow(16));
 
         Hints::new(vec![
-            (InitialAp.index(), *initial_ap),
-            (InitialPc.index(), *initial_pc),
-            (FinalAp.index(), *final_ap),
-            (FinalPc.index(), *final_pc),
+            (InitialAp.index(), (*initial_ap).into()),
+            (InitialPc.index(), (*initial_pc).into()),
+            (FinalAp.index(), (*final_ap).into()),
+            (FinalPc.index(), (*final_pc).into()),
             // TODO: this is a wrong value. Must fix
             (MemoryProduct.index(), memory_product),
-            (RangeCheckProduct.index(), Fp::ONE),
+            (RangeCheckProduct.index(), Fq::one()),
             (RangeCheckMin.index(), (*range_check_min as u64).into()),
             (RangeCheckMax.index(), (*range_check_max as u64).into()),
-            (InitialPedersenAddr.index(), Fp::ONE),
         ])
     }
 }
@@ -1037,51 +650,6 @@ impl ExecutionTraceColumn for Flag {
     }
 }
 
-pub enum RangeCheckBuiltin {
-    Rc16Component = 12,
-}
-
-impl ExecutionTraceColumn for RangeCheckBuiltin {
-    fn index(&self) -> usize {
-        7
-    }
-
-    fn offset<T>(&self, offset: isize) -> Expr<AlgebraicItem<T>> {
-        let column = self.index();
-        let step = RANGE_CHECK_BUILTIN_RATIO * CYCLE_HEIGHT / RANGE_CHECK_BUILTIN_PARTS;
-        let trace_offset = match self {
-            Self::Rc16Component => step as isize * offset + *self as isize,
-        };
-        AlgebraicItem::Trace(column, trace_offset).into()
-    }
-}
-
-pub enum Pedersen {
-    PartialSumX,
-    PartialSumY,
-    Suffix,
-    Slope,
-}
-
-impl ExecutionTraceColumn for Pedersen {
-    fn index(&self) -> usize {
-        match self {
-            Self::PartialSumX => 1,
-            Self::PartialSumY => 2,
-            Self::Suffix => 3,
-            Self::Slope => 4,
-        }
-    }
-
-    fn offset<T>(&self, offset: isize) -> Expr<AlgebraicItem<T>> {
-        let column = self.index();
-        let trace_offset = match self {
-            Self::PartialSumX | Self::PartialSumY | Self::Suffix | Self::Slope => offset,
-        };
-        AlgebraicItem::Trace(column, trace_offset).into()
-    }
-}
-
 // NPC? not sure what it means yet - next program counter?
 // Trace column 5
 // Perhaps control flow is a better name for this column
@@ -1095,23 +663,9 @@ pub enum Npc {
     MemOp0Addr = 4,
     MemOp0 = 5,
 
-    PedersenInput0Addr = 6,
-    PedersenInput0Val = 7,
-
-    // 262 % 16 = 6
-    // 263 % 16 = 7
-    PedersenInput1Addr = 262,
-    PedersenInput1Val = 263,
-
-    // 134 % 16 = 6
-    // 135 % 16 = 7
-    PedersenOutputAddr = 134,
-    PedersenOutputVal = 135,
-
-    // 70 % 16 = 6
-    // 71 % 16 = 7
-    RangeCheck128Addr = 70,
-    RangeCheck128Val = 71,
+    // TODO: investigate. currently a bandaid fix for a builtin issue
+    _GapAddr = 6,
+    _GapVal = 7,
 
     MemDstAddr = 8,
     MemDst = 9,
@@ -1123,20 +677,14 @@ pub enum Npc {
 
 impl ExecutionTraceColumn for Npc {
     fn index(&self) -> usize {
-        5
+        1
     }
 
     fn offset<T>(&self, offset: isize) -> Expr<AlgebraicItem<T>> {
         let step = match self {
             Self::PubMemAddr | Self::PubMemVal => PUBLIC_MEMORY_STEP,
-            Self::PedersenInput0Addr
-            | Self::PedersenInput0Val
-            | Self::PedersenInput1Addr
-            | Self::PedersenInput1Val
-            | Self::PedersenOutputAddr
-            | Self::PedersenOutputVal => CYCLE_HEIGHT * PEDERSEN_BUILTIN_RATIO,
-            Self::RangeCheck128Addr
-            |Self::RangeCheck128Val => CYCLE_HEIGHT * RANGE_CHECK_BUILTIN_RATIO,
+            // TODO: remove. this is a bandaid
+            Self::_GapAddr | Self::_GapVal => unimplemented!(),
             Self::Pc
             | Self::Instruction
             | Self::MemOp0Addr
@@ -1162,7 +710,7 @@ pub enum Mem {
 
 impl ExecutionTraceColumn for Mem {
     fn index(&self) -> usize {
-        6
+        2
     }
 
     fn offset<T>(&self, mem_offset: isize) -> Expr<AlgebraicItem<T>> {
@@ -1185,17 +733,14 @@ pub enum RangeCheck {
     OffOp0 = 8,
     // Ordered = 10 - trace step is 4
     Fp = 11,     // Frame pointer (fp)
-    // This cell alternates cycle to cycle between:
-    // - Being used for the 128 bit range checks builtin - even cycles
-    // - Filled with padding to fill any gaps - odd cycles
-    Unused = 12, 
+    Unused = 12, // an unused range checked value (gets stuffed with padding)
     // Ordered = 14 - trace step is 4
     Res = 15,
 }
 
 impl ExecutionTraceColumn for RangeCheck {
     fn index(&self) -> usize {
-        7
+        3
     }
 
     fn offset<T>(&self, cycle_offset: isize) -> Expr<AlgebraicItem<T>> {
@@ -1218,7 +763,7 @@ pub enum Auxiliary {
 
 impl ExecutionTraceColumn for Auxiliary {
     fn index(&self) -> usize {
-        8
+        4
     }
 
     fn offset<T>(&self, cycle_offset: isize) -> Expr<AlgebraicItem<T>> {
@@ -1238,7 +783,7 @@ pub enum Permutation {
 
 impl ExecutionTraceColumn for Permutation {
     fn index(&self) -> usize {
-        9
+        5
     }
 
     fn offset<T>(&self, offset: isize) -> Expr<AlgebraicItem<T>> {
@@ -1261,7 +806,6 @@ pub enum PublicInputHint {
     RangeCheckProduct,
     RangeCheckMin,
     RangeCheckMax,
-    InitialPedersenAddr,
 }
 
 impl Hint for PublicInputHint {
@@ -1296,25 +840,5 @@ pub enum RangeCheckPermutation {
 impl VerifierChallenge for RangeCheckPermutation {
     fn index(&self) -> usize {
         *self as usize
-    }
-}
-
-struct Polynomial<T>(Vec<T>);
-
-impl<T: Clone + Zero + Mul<Output = T> + Add<Output = T>> Polynomial<T> {
-    fn new(coeffs: Vec<T>) -> Self {
-        assert!(!coeffs.is_empty());
-        assert!(!coeffs.iter().all(|v| v.is_zero()));
-        Polynomial(coeffs)
-    }
-
-    fn eval(&self, x: Expr<AlgebraicItem<T>>) -> Expr<AlgebraicItem<T>> {
-        let mut res = Expr::Leaf(AlgebraicItem::Constant(T::zero()));
-        let mut acc = x;
-        for coeff in &self.0 {
-            res += &acc * AlgebraicItem::Constant(coeff.clone());
-            acc *= acc.clone();
-        }
-        res
     }
 }

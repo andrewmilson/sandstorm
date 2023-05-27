@@ -23,6 +23,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "ark-ec"
+version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "defd9a439d56ac24968cca0571f598a61bc8c55f71d50a89cda591cb750670ba"
+dependencies = [
+ "ark-ff",
+ "ark-poly 0.4.2",
+ "ark-serialize",
+ "ark-std",
+ "derivative",
+ "hashbrown",
+ "itertools",
+ "num-traits",
+ "zeroize",
+]
+
+[[package]]
 name = "ark-ff"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -786,12 +803,14 @@ checksum = "f91339c0467de62360649f8d3e185ca8de4224ff281f66000de5eb2a77a79041"
 name = "sandstorm"
 version = "0.1.0"
 dependencies = [
+ "ark-ec",
  "ark-ff",
  "ark-poly 0.4.0",
  "ark-serialize",
  "ark-std",
  "ministark",
  "ministark-gpu",
+ "num-bigint",
  "num-traits",
  "pollster",
  "rayon",
@@ -799,6 +818,7 @@ dependencies = [
  "sandstorm-layouts",
  "serde_json",
  "structopt",
+ "strum 0.21.0",
 ]
 
 [[package]]
@@ -816,16 +836,18 @@ dependencies = [
 name = "sandstorm-layouts"
 version = "0.1.0"
 dependencies = [
+ "ark-ec",
  "ark-ff",
  "ark-poly 0.4.0",
  "ark-serialize",
  "ark-std",
  "ministark",
  "ministark-gpu",
+ "num-bigint",
  "num-traits",
  "sandstorm-binary",
- "strum",
- "strum_macros",
+ "strum 0.24.1",
+ "strum_macros 0.24.3",
 ]
 
 [[package]]
@@ -946,9 +968,30 @@ dependencies = [
 
 [[package]]
 name = "strum"
+version = "0.21.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "aaf86bbcfd1fa9670b7a129f64fc0c9fcbbfe4f1bc4210e9e98fe71ffc12cde2"
+dependencies = [
+ "strum_macros 0.21.1",
+]
+
+[[package]]
+name = "strum"
 version = "0.24.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "063e6045c0e62079840579a7e47a355ae92f60eb74daaf156fb1e84ba164e63f"
+
+[[package]]
+name = "strum_macros"
+version = "0.21.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d06aaeeee809dbc59eb4556183dd927df67db1540de5be8d3ec0b6636358a5ec"
+dependencies = [
+ "heck 0.3.3",
+ "proc-macro2",
+ "quote",
+ "syn 1.0.109",
+]
 
 [[package]]
 name = "strum_macros"

@@ -2,24 +2,24 @@ use super::air::Auxiliary;
 use super::air::Flag;
 use super::air::MemoryPermutation;
 use super::air::Npc;
+use super::air::Permutation;
 use super::air::RangeCheck;
+use super::air::RangeCheckPermutation;
 use super::CYCLE_HEIGHT;
+use super::MEMORY_STEP;
 use super::NUM_BASE_COLUMNS;
 use super::NUM_EXTENSION_COLUMNS;
 use super::PUBLIC_MEMORY_STEP;
 use super::RANGE_CHECK_STEP;
-use ark_ff::Zero;
-use ark_ff::One;
-use crate::ExecutionInfo;
-use crate::layout6::air::Permutation;
-use crate::layout6::air::RangeCheckPermutation;
-use crate::layout6::MEMORY_STEP;
 use crate::utils::get_ordered_memory_accesses;
 use crate::utils::ordered_range_check_values;
 use crate::CairoExecutionTrace;
+use crate::ExecutionInfo;
 use alloc::vec;
 use alloc::vec::Vec;
 use ark_ff::batch_inversion;
+use ark_ff::FftField;
+use ark_ff::PrimeField;
 use binary::CompiledProgram;
 use binary::Memory;
 use binary::RegisterState;
@@ -29,14 +29,16 @@ use ministark::challenges::Challenges;
 use ministark::utils::GpuAllocator;
 use ministark::utils::GpuVec;
 use ministark::Matrix;
+use ministark::StarkExtensionOf;
 use ministark::Trace;
 use ministark::TraceInfo;
+use ministark_gpu::GpuFftField;
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;
-use ministark_gpu::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481::ark::Fp;
+use std::marker::PhantomData;
 use strum::IntoEnumIterator;
 
-pub struct ExecutionTrace {
+pub struct ExecutionTrace<Fp, Fq> {
     pub public_memory_padding_address: usize,
     pub public_memory_padding_value: Fp,
     pub range_check_min: usize,
@@ -53,9 +55,12 @@ pub struct ExecutionTrace {
     range_check_column: GpuVec<Fp>,
     _auxiliary_column: GpuVec<Fp>,
     base_trace: Matrix<Fp>,
+    _marker: PhantomData<Fq>,
 }
 
-impl CairoExecutionTrace for ExecutionTrace {
+impl<Fp: GpuFftField + PrimeField, Fq: StarkExtensionOf<Fp>> CairoExecutionTrace
+    for ExecutionTrace<Fp, Fq>
+{
     fn new(mem: Memory<Fp>, register_states: RegisterStates, program: CompiledProgram) -> Self {
         let num_cycles = register_states.len();
         assert!(num_cycles.is_power_of_two());
@@ -66,9 +71,6 @@ impl CairoExecutionTrace for ExecutionTrace {
         let mut flags_column = Vec::new_in(GpuAllocator);
         flags_column.resize(trace_len, Fp::zero());
 
-        let mut zeros_column = Vec::new_in(GpuAllocator);
-        zeros_column.resize(trace_len, Fp::zero());
-
         // set `padding_address == padding_value` to make filling the column easy
         // let public_memory_padding_address = public_memory_padding_address(&mem,
         // &register_states);
@@ -76,6 +78,16 @@ impl CairoExecutionTrace for ExecutionTrace {
             program.get_padding_address_and_value();
         let mut npc_column = Vec::new_in(GpuAllocator);
         npc_column.resize(trace_len, public_memory_padding_value);
+
+        // fill memory gaps to make memory "continuous"
+        // skip the memory at address 0 - this is a special memory address in Cairo
+        // TODO: a little brittle. investigate more.
+        let mut npc_gap_iter = npc_column.array_chunks_mut().skip(3).step_by(4);
+        for (a, v) in mem.iter().enumerate().skip(1) {
+            if v.is_none() {
+                *npc_gap_iter.next().unwrap() = [(a as u64).into(), Fp::zero()];
+            }
+        }
 
         let (ordered_rc_vals, ordered_rc_padding_vals) =
             ordered_range_check_values(num_cycles, &mem, &register_states);
@@ -201,10 +213,6 @@ impl CairoExecutionTrace for ExecutionTrace {
 
         let base_trace = Matrix::new(vec![
             flags_column.to_vec_in(GpuAllocator),
-            zeros_column.to_vec_in(GpuAllocator),
-            zeros_column.to_vec_in(GpuAllocator),
-            zeros_column.to_vec_in(GpuAllocator),
-            zeros_column.to_vec_in(GpuAllocator),
             npc_column.to_vec_in(GpuAllocator),
             memory_column.to_vec_in(GpuAllocator),
             range_check_column.to_vec_in(GpuAllocator),
@@ -231,6 +239,7 @@ impl CairoExecutionTrace for ExecutionTrace {
             _mem: mem,
             _register_states: register_states,
             _program: program,
+            _marker: PhantomData,
         }
     }
 
@@ -251,17 +260,17 @@ impl CairoExecutionTrace for ExecutionTrace {
     }
 }
 
-impl Trace for ExecutionTrace {
+impl<Fp: GpuFftField + FftField, Fq: StarkExtensionOf<Fp>> Trace for ExecutionTrace<Fp, Fq> {
     const NUM_BASE_COLUMNS: usize = NUM_BASE_COLUMNS;
     const NUM_EXTENSION_COLUMNS: usize = NUM_EXTENSION_COLUMNS;
     type Fp = Fp;
-    type Fq = Fp;
+    type Fq = Fq;
 
     fn base_columns(&self) -> &Matrix<Self::Fp> {
         &self.base_trace
     }
 
-    fn build_extension_columns(&self, challenges: &Challenges<Fp>) -> Option<Matrix<Fp>> {
+    fn build_extension_columns(&self, challenges: &Challenges<Fq>) -> Option<Matrix<Fq>> {
         // TODO: multithread
         // Generate memory permutation product
         // ===================================
@@ -272,8 +281,8 @@ impl Trace for ExecutionTrace {
         let address_order_accesses = self.memory_column.array_chunks::<MEMORY_STEP>();
         let mut mem_perm_numerators = Vec::new();
         let mut mem_perm_denominators = Vec::new();
-        let mut numerator_acc = Fp::one();
-        let mut denominator_acc = Fp::one();
+        let mut numerator_acc = Fq::one();
+        let mut denominator_acc = Fq::one();
         for (&[a, v], &[a_prime, v_prime]) in program_order_accesses.zip(address_order_accesses) {
             numerator_acc *= z - (alpha * v + a);
             denominator_acc *= z - (alpha * v_prime + a_prime);
@@ -288,8 +297,8 @@ impl Trace for ExecutionTrace {
         let range_check_chunks = self.range_check_column.array_chunks::<RANGE_CHECK_STEP>();
         let mut rc_perm_numerators = Vec::new();
         let mut rc_perm_denominators = Vec::new();
-        let mut numerator_acc = Fp::one();
-        let mut denominator_acc = Fp::one();
+        let mut numerator_acc = Fq::one();
+        let mut denominator_acc = Fq::one();
         for chunk in range_check_chunks {
             numerator_acc *= z - chunk[RangeCheck::OffDst as usize];
             denominator_acc *= z - chunk[RangeCheck::Ordered as usize];
@@ -300,7 +309,7 @@ impl Trace for ExecutionTrace {
         debug_assert!((numerator_acc / denominator_acc).is_one());
 
         let mut permutation_column = Vec::new_in(GpuAllocator);
-        permutation_column.resize(self.base_columns().num_rows(), Fp::zero());
+        permutation_column.resize(self.base_columns().num_rows(), Fq::zero());
 
         // Insert intermediate memory permutation results
         for (i, (n, d)) in zip(mem_perm_numerators, mem_perm_denominators).enumerate() {

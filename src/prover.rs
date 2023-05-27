@@ -1,22 +1,27 @@
 use ark_ff::PrimeField;
-use layouts::layout6;
+use layouts::CairoAirConfig;
+use layouts::CairoExecutionTrace;
 use layouts::ExecutionInfo;
 use ministark::ProofOptions;
 use ministark::Prover;
-use ministark::StarkExtensionOf;
-use ministark_gpu::GpuFftField;
 use std::marker::PhantomData;
 
-pub struct CairoProver<Fp, Fq> {
+pub struct CairoProver<A: CairoAirConfig, T: CairoExecutionTrace>
+where
+    A::Fp: PrimeField,
+{
     options: ProofOptions,
-    _marker: PhantomData<(Fp, Fq)>,
+    _marker: PhantomData<(A, T)>,
 }
 
-impl<Fp: GpuFftField + PrimeField, Fq: StarkExtensionOf<Fp>> Prover for CairoProver<Fp, Fq> {
-    type Fp = Fp;
-    type Fq = Fq;
-    type AirConfig = layout6::AirConfig<Fp, Fq>;
-    type Trace = layout6::ExecutionTrace<Fp, Fq>;
+impl<A: CairoAirConfig, T: CairoExecutionTrace<Fp = A::Fp, Fq = A::Fq>> Prover for CairoProver<A, T>
+where
+    A::Fp: PrimeField,
+{
+    type Fp = A::Fp;
+    type Fq = A::Fq;
+    type AirConfig = A;
+    type Trace = T;
 
     fn new(options: ProofOptions) -> Self {
         CairoProver {
@@ -29,19 +34,7 @@ impl<Fp: GpuFftField + PrimeField, Fq: StarkExtensionOf<Fp>> Prover for CairoPro
         self.options
     }
 
-    fn get_pub_inputs(&self, trace: &Self::Trace) -> ExecutionInfo<Fp> {
-        assert_eq!(trace.initial_registers.ap, trace.initial_registers.fp);
-        assert_eq!(trace.initial_registers.ap, trace.final_registers.fp);
-        ExecutionInfo {
-            initial_ap: (trace.initial_registers.ap as u64).into(),
-            initial_pc: (trace.initial_registers.pc as u64).into(),
-            final_ap: (trace.final_registers.ap as u64).into(),
-            final_pc: (trace.final_registers.pc as u64).into(),
-            public_memory: trace.public_memory.clone(),
-            range_check_min: trace.range_check_min,
-            range_check_max: trace.range_check_max,
-            public_memory_padding_address: trace.public_memory_padding_address,
-            public_memory_padding_value: trace.public_memory_padding_value,
-        }
+    fn get_pub_inputs(&self, trace: &Self::Trace) -> ExecutionInfo<A::Fp> {
+        trace.execution_info()
     }
 }

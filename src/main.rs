@@ -4,15 +4,13 @@ use ark_serialize::CanonicalSerialize;
 use binary::CompiledProgram;
 use binary::Memory;
 use binary::RegisterStates;
-use layouts::layout6;
+use layouts::CairoAirConfig;
+use layouts::CairoExecutionTrace;
 use ministark::Proof;
 use ministark::ProofOptions;
 use ministark::Prover;
-use ministark::StarkExtensionOf;
-use ministark::Trace;
 use ministark_gpu::fields::p18446744069414584321;
 use ministark_gpu::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481;
-use ministark_gpu::GpuFftField;
 use sandstorm::prover::CairoProver;
 use std::fs;
 use std::fs::File;
@@ -20,18 +18,35 @@ use std::io::Write;
 use std::path::PathBuf;
 use std::time::Instant;
 use structopt::StructOpt;
+use strum::EnumString;
+use strum::EnumVariantNames;
+use strum::VariantNames;
 
 #[derive(StructOpt, Debug)]
 #[structopt(name = "sandstorm", about = "cairo prover")]
 struct SandstormOptions {
     #[structopt(long, parse(from_os_str))]
     program: PathBuf,
+    #[structopt(
+        long, 
+        possible_values = Layout::VARIANTS, 
+        case_insensitive = true, 
+        default_value = "plain"
+    )]
+    layout: Layout,
     #[structopt(subcommand)]
-    command: SandstormCommand,
+    command: Command,
+}
+
+#[derive(EnumString, EnumVariantNames, Debug)]
+#[strum(serialize_all = "kebab_case")]
+enum Layout {
+    Plain,
+    Layout6,
 }
 
 #[derive(StructOpt, Debug)]
-enum SandstormCommand {
+enum Command {
     Prove {
         #[structopt(long, parse(from_os_str))]
         trace: PathBuf,
@@ -63,48 +78,65 @@ fn main() {
     );
 
     // read command-line args
-    let SandstormOptions { program, command } = SandstormOptions::from_args();
+    let SandstormOptions {
+        program,
+        layout,
+        command,
+    } = SandstormOptions::from_args();
     let program_file = File::open(program).expect("could not open program file");
     let program: CompiledProgram = serde_json::from_reader(program_file).unwrap();
-    use SandstormCommand::*;
     match &*program.prime.to_lowercase() {
         // Starkware's 252-bit Cairo field
         "0x800000000000011000000000000000000000000000000000000000000000001" => {
             use p3618502788666131213697322783095070105623107215331596699973092056135872020481::ark::Fp;
-            match command {
-                Prove {
-                    trace,
-                    memory,
-                    output,
-                } => prove::<Fp, Fp>(options, program, &trace, &memory, &output),
-                Verify { proof } => verify::<Fp, Fp>(options, program, &proof),
+            match layout {
+                Layout::Plain => {
+                    type A = layouts::plain::AirConfig<Fp, Fp>;
+                    type T = layouts::plain::ExecutionTrace<Fp, Fp>;
+                    execute_command::<A, T>(command, options, program);
+                },
+                Layout::Layout6 => {
+                    type A = layouts::layout6::AirConfig;
+                    type T = layouts::layout6::ExecutionTrace;
+                    execute_command::<A, T>(command, options, program);
+                }
             }
         }
         // Goldilocks
         "0xffffffff00000001" => {
             use p18446744069414584321::ark::Fp;
             use p18446744069414584321::ark::Fq3;
-            match command {
-                Prove {
-                    trace,
-                    memory,
-                    output,
-                } => prove::<Fp, Fq3>(options, program, &trace, &memory, &output),
-                Verify { proof } => verify::<Fp, Fq3>(options, program, &proof),
+            match layout {
+                Layout::Plain => {
+                    type A = layouts::plain::AirConfig<Fp, Fq3>;
+                    type T = layouts::plain::ExecutionTrace<Fp, Fq3>;
+                    execute_command::<A, T>(command, options, program);
+                },
+                Layout::Layout6 => unimplemented!("layout6 does not support Goldilocks field"),
             }
         }
-        prime => unimplemented!("prime field p={prime} is not implemented yet"),
+        prime => unimplemented!("prime field p={prime} is not supported yet"),
     }
 }
 
-fn verify<Fp: GpuFftField + PrimeField, Fq: StarkExtensionOf<Fp>>(
-    options: ProofOptions,
-    program: CompiledProgram,
-    proof_path: &PathBuf,
-) {
+fn execute_command<A: CairoAirConfig, T: CairoExecutionTrace<Fp = A::Fp, Fq = A::Fq>>(command: Command, options: ProofOptions, program: CompiledProgram)where
+A::Fp: PrimeField, {
+    match command {
+        Command::Prove {
+            trace,
+            memory,
+            output,
+        } => prove::<A, T>(options, program, &trace, &memory, &output),
+        Command::Verify { proof } => verify::<A>(options, program, &proof),
+    }
+}
+
+fn verify<A: CairoAirConfig>(options: ProofOptions, program: CompiledProgram, proof_path: &PathBuf)
+where
+    A::Fp: PrimeField,
+{
     let proof_bytes = fs::read(proof_path).unwrap();
-    let proof: Proof<layout6::AirConfig<Fp, Fq>> =
-        Proof::deserialize_compressed(proof_bytes.as_slice()).unwrap();
+    let proof: Proof<A> = Proof::deserialize_compressed(proof_bytes.as_slice()).unwrap();
     let public_inputs = &proof.public_inputs;
     assert_eq!(program.get_public_memory(), public_inputs.public_memory);
     assert_eq!(options, proof.options);
@@ -114,13 +146,15 @@ fn verify<Fp: GpuFftField + PrimeField, Fq: StarkExtensionOf<Fp>>(
     println!("Proof verified in: {:?}", now.elapsed());
 }
 
-fn prove<Fp: GpuFftField + PrimeField, Fq: StarkExtensionOf<Fp>>(
+fn prove<A: CairoAirConfig, T: CairoExecutionTrace<Fp = A::Fp, Fq = A::Fq>>(
     options: ProofOptions,
     program: CompiledProgram,
     trace_path: &PathBuf,
     memory_path: &PathBuf,
     output_path: &PathBuf,
-) {
+) where
+    A::Fp: PrimeField,
+{
     let now = Instant::now();
 
     let trace_file = File::open(trace_path).expect("could not open trace file");
@@ -129,7 +163,7 @@ fn prove<Fp: GpuFftField + PrimeField, Fq: StarkExtensionOf<Fp>>(
     let memory_file = File::open(memory_path).expect("could not open memory file");
     let memory = Memory::from_reader(memory_file);
 
-    let execution_trace = layout6::ExecutionTrace::<Fp, Fq>::new(memory, register_states, program);
+    let execution_trace = T::new(memory, register_states, program);
     println!(
         "Generated execution trace (cols={}, rows={}) in {:.0?}",
         execution_trace.base_columns().num_cols(),
@@ -137,7 +171,7 @@ fn prove<Fp: GpuFftField + PrimeField, Fq: StarkExtensionOf<Fp>>(
         now.elapsed(),
     );
 
-    let prover = CairoProver::new(options);
+    let prover = CairoProver::<A, T>::new(options);
     let now = Instant::now();
     let proof = pollster::block_on(prover.generate_proof(execution_trace)).unwrap();
     println!("Proof generated in: {:?}", now.elapsed());
