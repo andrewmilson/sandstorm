@@ -1,0 +1,1025 @@
+{
+    "attributes": [],
+    "builtins": [
+        "output",
+        "pedersen"
+    ],
+    "compiler_version": "0.10.2",
+    "data": [
+        "0x40780017fff7fff",
+        "0x2",
+        "0x1104800180018000",
+        "0xa",
+        "0x10780017fff7fff",
+        "0x0",
+        "0x400380007ffb7ffc",
+        "0x400380017ffb7ffd",
+        "0x482680017ffb8000",
+        "0x3",
+        "0x480280027ffb8000",
+        "0x208b7fff7fff7ffe",
+        "0x480a7ffd7fff8000",
+        "0x480680017fff8000",
+        "0x1",
+        "0x480680017fff8000",
+        "0x2",
+        "0x1104800180018000",
+        "0x800000000000010fffffffffffffffffffffffffffffffffffffffffffffff6",
+        "0x400280007ffc7fff",
+        "0x482680017ffc8000",
+        "0x1",
+        "0x48127ffd7fff8000",
+        "0x208b7fff7fff7ffe"
+    ],
+    "debug_info": {
+        "file_contents": {
+            "<start>": "__start__:\nap += main.Args.SIZE + main.ImplicitArgs.SIZE;\ncall main;\n\n__end__:\njmp rel 0;\n"
+        },
+        "instruction_locations": {
+            "0": {
+                "accessible_scopes": [
+                    "__main__"
+                ],
+                "flow_tracking_data": {
+                    "ap_tracking": {
+                        "group": 0,
+                        "offset": 0
+                    },
+                    "reference_ids": {}
+                },
+                "hints": [],
+                "inst": {
+                    "end_col": 46,
+                    "end_line": 2,
+                    "input_file": {
+                        "filename": "<start>"
+                    },
+                    "start_col": 1,
+                    "start_line": 2
+                }
+            },
+            "2": {
+                "accessible_scopes": [
+                    "__main__"
+                ],
+                "flow_tracking_data": {
+                    "ap_tracking": {
+                        "group": 0,
+                        "offset": 2
+                    },
+                    "reference_ids": {}
+                },
+                "hints": [],
+                "inst": {
+                    "end_col": 10,
+                    "end_line": 3,
+                    "input_file": {
+                        "filename": "<start>"
+                    },
+                    "start_col": 1,
+                    "start_line": 3
+                }
+            },
+            "4": {
+                "accessible_scopes": [
+                    "__main__"
+                ],
+                "flow_tracking_data": {
+                    "ap_tracking": {
+                        "group": 1,
+                        "offset": 0
+                    },
+                    "reference_ids": {}
+                },
+                "hints": [],
+                "inst": {
+                    "end_col": 10,
+                    "end_line": 6,
+                    "input_file": {
+                        "filename": "<start>"
+                    },
+                    "start_col": 1,
+                    "start_line": 6
+                }
+            },
+            "6": {
+                "accessible_scopes": [
+                    "starkware.cairo.common.hash",
+                    "starkware.cairo.common.hash.hash2"
+                ],
+                "flow_tracking_data": {
+                    "ap_tracking": {
+                        "group": 2,
+                        "offset": 0
+                    },
+                    "reference_ids": {
+                        "starkware.cairo.common.hash.hash2.hash_ptr": 2,
+                        "starkware.cairo.common.hash.hash2.x": 0,
+                        "starkware.cairo.common.hash.hash2.y": 1
+                    }
+                },
+                "hints": [],
+                "inst": {
+                    "end_col": 19,
+                    "end_line": 14,
+                    "input_file": {
+                        "filename": "/Users/andrewmilson/cairo_venv/lib/python3.9/site-packages/starkware/cairo/common/hash.cairo"
+                    },
+                    "start_col": 5,
+                    "start_line": 14
+                }
+            },
+            "7": {
+                "accessible_scopes": [
+                    "starkware.cairo.common.hash",
+                    "starkware.cairo.common.hash.hash2"
+                ],
+                "flow_tracking_data": {
+                    "ap_tracking": {
+                        "group": 2,
+                        "offset": 0
+                    },
+                    "reference_ids": {
+                        "starkware.cairo.common.hash.hash2.hash_ptr": 2,
+                        "starkware.cairo.common.hash.hash2.x": 0,
+                        "starkware.cairo.common.hash.hash2.y": 1
+                    }
+                },
+                "hints": [],
+                "inst": {
+                    "end_col": 19,
+                    "end_line": 15,
+                    "input_file": {
+                        "filename": "/Users/andrewmilson/cairo_venv/lib/python3.9/site-packages/starkware/cairo/common/hash.cairo"
+                    },
+                    "start_col": 5,
+                    "start_line": 15
+                }
+            },
+            "8": {
+                "accessible_scopes": [
+                    "starkware.cairo.common.hash",
+                    "starkware.cairo.common.hash.hash2"
+                ],
+                "flow_tracking_data": {
+                    "ap_tracking": {
+                        "group": 2,
+                        "offset": 0
+                    },
+                    "reference_ids": {
+                        "starkware.cairo.common.hash.hash2.hash_ptr": 4,
+                        "starkware.cairo.common.hash.hash2.result": 3,
+                        "starkware.cairo.common.hash.hash2.x": 0,
+                        "starkware.cairo.common.hash.hash2.y": 1
+                    }
+                },
+                "hints": [],
+                "inst": {
+                    "end_col": 47,
+                    "end_line": 17,
+                    "input_file": {
+                        "filename": "/Users/andrewmilson/cairo_venv/lib/python3.9/site-packages/starkware/cairo/common/hash.cairo"
+                    },
+                    "parent_location": [
+                        {
+                            "end_col": 34,
+                            "end_line": 13,
+                            "input_file": {
+                                "filename": "/Users/andrewmilson/cairo_venv/lib/python3.9/site-packages/starkware/cairo/common/hash.cairo"
+                            },
+                            "parent_location": [
+                                {
+                                    "end_col": 28,
+                                    "end_line": 18,
+                                    "input_file": {
+                                        "filename": "/Users/andrewmilson/cairo_venv/lib/python3.9/site-packages/starkware/cairo/common/hash.cairo"
+                                    },
+                                    "start_col": 5,
+                                    "start_line": 18
+                                },
+                                "While trying to retrieve the implicit argument 'hash_ptr' in:"
+                            ],
+                            "start_col": 12,
+                            "start_line": 13
+                        },
+                        "While expanding the reference 'hash_ptr' in:"
+                    ],
+                    "start_col": 20,
+                    "start_line": 17
+                }
+            },
+            "10": {
+                "accessible_scopes": [
+                    "starkware.cairo.common.hash",
+                    "starkware.cairo.common.hash.hash2"
+                ],
+                "flow_tracking_data": {
+                    "ap_tracking": {
+                        "group": 2,
+                        "offset": 1
+                    },
+                    "reference_ids": {
+                        "starkware.cairo.common.hash.hash2.hash_ptr": 4,
+                        "starkware.cairo.common.hash.hash2.result": 3,
+                        "starkware.cairo.common.hash.hash2.x": 0,
+                        "starkware.cairo.common.hash.hash2.y": 1
+                    }
+                },
+                "hints": [],
+                "inst": {
+                    "end_col": 33,
+                    "end_line": 16,
+                    "input_file": {
+                        "filename": "/Users/andrewmilson/cairo_venv/lib/python3.9/site-packages/starkware/cairo/common/hash.cairo"
+                    },
+                    "parent_location": [
+                        {
+                            "end_col": 26,
+                            "end_line": 18,
+                            "input_file": {
+                                "filename": "/Users/andrewmilson/cairo_venv/lib/python3.9/site-packages/starkware/cairo/common/hash.cairo"
+                            },
+                            "start_col": 20,
+                            "start_line": 18
+                        },
+                        "While expanding the reference 'result' in:"
+                    ],
+                    "start_col": 18,
+                    "start_line": 16
+                }
+            },
+            "11": {
+                "accessible_scopes": [
+                    "starkware.cairo.common.hash",
+                    "starkware.cairo.common.hash.hash2"
+                ],
+                "flow_tracking_data": {
+                    "ap_tracking": {
+                        "group": 2,
+                        "offset": 2
+                    },
+                    "reference_ids": {
+                        "starkware.cairo.common.hash.hash2.hash_ptr": 4,
+                        "starkware.cairo.common.hash.hash2.result": 3,
+                        "starkware.cairo.common.hash.hash2.x": 0,
+                        "starkware.cairo.common.hash.hash2.y": 1
+                    }
+                },
+                "hints": [],
+                "inst": {
+                    "end_col": 28,
+                    "end_line": 18,
+                    "input_file": {
+                        "filename": "/Users/andrewmilson/cairo_venv/lib/python3.9/site-packages/starkware/cairo/common/hash.cairo"
+                    },
+                    "start_col": 5,
+                    "start_line": 18
+                }
+            },
+            "12": {
+                "accessible_scopes": [
+                    "__main__",
+                    "__main__.main"
+                ],
+                "flow_tracking_data": {
+                    "ap_tracking": {
+                        "group": 3,
+                        "offset": 0
+                    },
+                    "reference_ids": {
+                        "__main__.main.output_ptr": 5,
+                        "__main__.main.pedersen_ptr": 6
+                    }
+                },
+                "hints": [],
+                "inst": {
+                    "end_col": 49,
+                    "end_line": 8,
+                    "input_file": {
+                        "filename": "example/pedersen/main.cairo"
+                    },
+                    "parent_location": [
+                        {
+                            "end_col": 44,
+                            "end_line": 11,
+                            "input_file": {
+                                "filename": "example/pedersen/main.cairo"
+                            },
+                            "start_col": 32,
+                            "start_line": 11
+                        },
+                        "While expanding the reference 'pedersen_ptr' in:"
+                    ],
+                    "start_col": 23,
+                    "start_line": 8
+                }
+            },
+            "13": {
+                "accessible_scopes": [
+                    "__main__",
+                    "__main__.main"
+                ],
+                "flow_tracking_data": {
+                    "ap_tracking": {
+                        "group": 3,
+                        "offset": 1
+                    },
+                    "reference_ids": {
+                        "__main__.main.output_ptr": 5,
+                        "__main__.main.pedersen_ptr": 6
+                    }
+                },
+                "hints": [],
+                "inst": {
+                    "end_col": 47,
+                    "end_line": 11,
+                    "input_file": {
+                        "filename": "example/pedersen/main.cairo"
+                    },
+                    "start_col": 46,
+                    "start_line": 11
+                }
+            },
+            "15": {
+                "accessible_scopes": [
+                    "__main__",
+                    "__main__.main"
+                ],
+                "flow_tracking_data": {
+                    "ap_tracking": {
+                        "group": 3,
+                        "offset": 2
+                    },
+                    "reference_ids": {
+                        "__main__.main.output_ptr": 5,
+                        "__main__.main.pedersen_ptr": 6
+                    }
+                },
+                "hints": [],
+                "inst": {
+                    "end_col": 50,
+                    "end_line": 11,
+                    "input_file": {
+                        "filename": "example/pedersen/main.cairo"
+                    },
+                    "start_col": 49,
+                    "start_line": 11
+                }
+            },
+            "17": {
+                "accessible_scopes": [
+                    "__main__",
+                    "__main__.main"
+                ],
+                "flow_tracking_data": {
+                    "ap_tracking": {
+                        "group": 3,
+                        "offset": 3
+                    },
+                    "reference_ids": {
+                        "__main__.main.output_ptr": 5,
+                        "__main__.main.pedersen_ptr": 6
+                    }
+                },
+                "hints": [],
+                "inst": {
+                    "end_col": 51,
+                    "end_line": 11,
+                    "input_file": {
+                        "filename": "example/pedersen/main.cairo"
+                    },
+                    "start_col": 17,
+                    "start_line": 11
+                }
+            },
+            "19": {
+                "accessible_scopes": [
+                    "__main__",
+                    "__main__.main"
+                ],
+                "flow_tracking_data": {
+                    "ap_tracking": {
+                        "group": 3,
+                        "offset": 7
+                    },
+                    "reference_ids": {
+                        "__main__.main.output_ptr": 5,
+                        "__main__.main.pedersen_ptr": 7,
+                        "__main__.main.res": 8
+                    }
+                },
+                "hints": [],
+                "inst": {
+                    "end_col": 31,
+                    "end_line": 12,
+                    "input_file": {
+                        "filename": "example/pedersen/main.cairo"
+                    },
+                    "start_col": 5,
+                    "start_line": 12
+                }
+            },
+            "20": {
+                "accessible_scopes": [
+                    "__main__",
+                    "__main__.main"
+                ],
+                "flow_tracking_data": {
+                    "ap_tracking": {
+                        "group": 3,
+                        "offset": 7
+                    },
+                    "reference_ids": {
+                        "__main__.main.output_ptr": 9,
+                        "__main__.main.pedersen_ptr": 7,
+                        "__main__.main.res": 8
+                    }
+                },
+                "hints": [],
+                "inst": {
+                    "end_col": 36,
+                    "end_line": 15,
+                    "input_file": {
+                        "filename": "example/pedersen/main.cairo"
+                    },
+                    "parent_location": [
+                        {
+                            "end_col": 21,
+                            "end_line": 8,
+                            "input_file": {
+                                "filename": "example/pedersen/main.cairo"
+                            },
+                            "parent_location": [
+                                {
+                                    "end_col": 15,
+                                    "end_line": 18,
+                                    "input_file": {
+                                        "filename": "example/pedersen/main.cairo"
+                                    },
+                                    "start_col": 5,
+                                    "start_line": 18
+                                },
+                                "While trying to retrieve the implicit argument 'output_ptr' in:"
+                            ],
+                            "start_col": 11,
+                            "start_line": 8
+                        },
+                        "While expanding the reference 'output_ptr' in:"
+                    ],
+                    "start_col": 22,
+                    "start_line": 15
+                }
+            },
+            "22": {
+                "accessible_scopes": [
+                    "__main__",
+                    "__main__.main"
+                ],
+                "flow_tracking_data": {
+                    "ap_tracking": {
+                        "group": 3,
+                        "offset": 8
+                    },
+                    "reference_ids": {
+                        "__main__.main.output_ptr": 9,
+                        "__main__.main.pedersen_ptr": 7,
+                        "__main__.main.res": 8
+                    }
+                },
+                "hints": [],
+                "inst": {
+                    "end_col": 44,
+                    "end_line": 11,
+                    "input_file": {
+                        "filename": "example/pedersen/main.cairo"
+                    },
+                    "parent_location": [
+                        {
+                            "end_col": 49,
+                            "end_line": 8,
+                            "input_file": {
+                                "filename": "example/pedersen/main.cairo"
+                            },
+                            "parent_location": [
+                                {
+                                    "end_col": 15,
+                                    "end_line": 18,
+                                    "input_file": {
+                                        "filename": "example/pedersen/main.cairo"
+                                    },
+                                    "start_col": 5,
+                                    "start_line": 18
+                                },
+                                "While trying to retrieve the implicit argument 'pedersen_ptr' in:"
+                            ],
+                            "start_col": 23,
+                            "start_line": 8
+                        },
+                        "While expanding the reference 'pedersen_ptr' in:"
+                    ],
+                    "start_col": 32,
+                    "start_line": 11
+                }
+            },
+            "23": {
+                "accessible_scopes": [
+                    "__main__",
+                    "__main__.main"
+                ],
+                "flow_tracking_data": {
+                    "ap_tracking": {
+                        "group": 3,
+                        "offset": 9
+                    },
+                    "reference_ids": {
+                        "__main__.main.output_ptr": 9,
+                        "__main__.main.pedersen_ptr": 7,
+                        "__main__.main.res": 8
+                    }
+                },
+                "hints": [],
+                "inst": {
+                    "end_col": 15,
+                    "end_line": 18,
+                    "input_file": {
+                        "filename": "example/pedersen/main.cairo"
+                    },
+                    "start_col": 5,
+                    "start_line": 18
+                }
+            }
+        }
+    },
+    "hints": {},
+    "identifiers": {
+        "__main__.HashBuiltin": {
+            "destination": "starkware.cairo.common.cairo_builtins.HashBuiltin",
+            "type": "alias"
+        },
+        "__main__.__end__": {
+            "pc": 4,
+            "type": "label"
+        },
+        "__main__.__start__": {
+            "pc": 0,
+            "type": "label"
+        },
+        "__main__.hash2": {
+            "destination": "starkware.cairo.common.hash.hash2",
+            "type": "alias"
+        },
+        "__main__.main": {
+            "decorators": [],
+            "pc": 12,
+            "type": "function"
+        },
+        "__main__.main.Args": {
+            "full_name": "__main__.main.Args",
+            "members": {},
+            "size": 0,
+            "type": "struct"
+        },
+        "__main__.main.ImplicitArgs": {
+            "full_name": "__main__.main.ImplicitArgs",
+            "members": {
+                "output_ptr": {
+                    "cairo_type": "felt",
+                    "offset": 0
+                },
+                "pedersen_ptr": {
+                    "cairo_type": "starkware.cairo.common.cairo_builtins.HashBuiltin*",
+                    "offset": 1
+                }
+            },
+            "size": 2,
+            "type": "struct"
+        },
+        "__main__.main.Return": {
+            "cairo_type": "()",
+            "type": "type_definition"
+        },
+        "__main__.main.SIZEOF_LOCALS": {
+            "type": "const",
+            "value": 0
+        },
+        "__main__.main.output_ptr": {
+            "cairo_type": "felt",
+            "full_name": "__main__.main.output_ptr",
+            "references": [
+                {
+                    "ap_tracking_data": {
+                        "group": 3,
+                        "offset": 0
+                    },
+                    "pc": 12,
+                    "value": "[cast(fp + (-4), felt*)]"
+                },
+                {
+                    "ap_tracking_data": {
+                        "group": 3,
+                        "offset": 7
+                    },
+                    "pc": 20,
+                    "value": "cast([fp + (-4)] + 1, felt)"
+                }
+            ],
+            "type": "reference"
+        },
+        "__main__.main.pedersen_ptr": {
+            "cairo_type": "starkware.cairo.common.cairo_builtins.HashBuiltin*",
+            "full_name": "__main__.main.pedersen_ptr",
+            "references": [
+                {
+                    "ap_tracking_data": {
+                        "group": 3,
+                        "offset": 0
+                    },
+                    "pc": 12,
+                    "value": "[cast(fp + (-3), starkware.cairo.common.cairo_builtins.HashBuiltin**)]"
+                },
+                {
+                    "ap_tracking_data": {
+                        "group": 3,
+                        "offset": 7
+                    },
+                    "pc": 19,
+                    "value": "[cast(ap + (-2), starkware.cairo.common.cairo_builtins.HashBuiltin**)]"
+                }
+            ],
+            "type": "reference"
+        },
+        "__main__.main.res": {
+            "cairo_type": "felt",
+            "full_name": "__main__.main.res",
+            "references": [
+                {
+                    "ap_tracking_data": {
+                        "group": 3,
+                        "offset": 7
+                    },
+                    "pc": 19,
+                    "value": "[cast(ap + (-1), felt*)]"
+                }
+            ],
+            "type": "reference"
+        },
+        "starkware.cairo.common.cairo_builtins.BitwiseBuiltin": {
+            "full_name": "starkware.cairo.common.cairo_builtins.BitwiseBuiltin",
+            "members": {
+                "x": {
+                    "cairo_type": "felt",
+                    "offset": 0
+                },
+                "x_and_y": {
+                    "cairo_type": "felt",
+                    "offset": 2
+                },
+                "x_or_y": {
+                    "cairo_type": "felt",
+                    "offset": 4
+                },
+                "x_xor_y": {
+                    "cairo_type": "felt",
+                    "offset": 3
+                },
+                "y": {
+                    "cairo_type": "felt",
+                    "offset": 1
+                }
+            },
+            "size": 5,
+            "type": "struct"
+        },
+        "starkware.cairo.common.cairo_builtins.EcOpBuiltin": {
+            "full_name": "starkware.cairo.common.cairo_builtins.EcOpBuiltin",
+            "members": {
+                "m": {
+                    "cairo_type": "felt",
+                    "offset": 4
+                },
+                "p": {
+                    "cairo_type": "starkware.cairo.common.ec_point.EcPoint",
+                    "offset": 0
+                },
+                "q": {
+                    "cairo_type": "starkware.cairo.common.ec_point.EcPoint",
+                    "offset": 2
+                },
+                "r": {
+                    "cairo_type": "starkware.cairo.common.ec_point.EcPoint",
+                    "offset": 5
+                }
+            },
+            "size": 7,
+            "type": "struct"
+        },
+        "starkware.cairo.common.cairo_builtins.EcPoint": {
+            "destination": "starkware.cairo.common.ec_point.EcPoint",
+            "type": "alias"
+        },
+        "starkware.cairo.common.cairo_builtins.HashBuiltin": {
+            "full_name": "starkware.cairo.common.cairo_builtins.HashBuiltin",
+            "members": {
+                "result": {
+                    "cairo_type": "felt",
+                    "offset": 2
+                },
+                "x": {
+                    "cairo_type": "felt",
+                    "offset": 0
+                },
+                "y": {
+                    "cairo_type": "felt",
+                    "offset": 1
+                }
+            },
+            "size": 3,
+            "type": "struct"
+        },
+        "starkware.cairo.common.cairo_builtins.KeccakBuiltin": {
+            "full_name": "starkware.cairo.common.cairo_builtins.KeccakBuiltin",
+            "members": {
+                "input": {
+                    "cairo_type": "starkware.cairo.common.keccak_state.KeccakBuiltinState",
+                    "offset": 0
+                },
+                "output": {
+                    "cairo_type": "starkware.cairo.common.keccak_state.KeccakBuiltinState",
+                    "offset": 8
+                }
+            },
+            "size": 16,
+            "type": "struct"
+        },
+        "starkware.cairo.common.cairo_builtins.KeccakBuiltinState": {
+            "destination": "starkware.cairo.common.keccak_state.KeccakBuiltinState",
+            "type": "alias"
+        },
+        "starkware.cairo.common.cairo_builtins.SignatureBuiltin": {
+            "full_name": "starkware.cairo.common.cairo_builtins.SignatureBuiltin",
+            "members": {
+                "message": {
+                    "cairo_type": "felt",
+                    "offset": 1
+                },
+                "pub_key": {
+                    "cairo_type": "felt",
+                    "offset": 0
+                }
+            },
+            "size": 2,
+            "type": "struct"
+        },
+        "starkware.cairo.common.ec_point.EcPoint": {
+            "full_name": "starkware.cairo.common.ec_point.EcPoint",
+            "members": {
+                "x": {
+                    "cairo_type": "felt",
+                    "offset": 0
+                },
+                "y": {
+                    "cairo_type": "felt",
+                    "offset": 1
+                }
+            },
+            "size": 2,
+            "type": "struct"
+        },
+        "starkware.cairo.common.hash.HashBuiltin": {
+            "destination": "starkware.cairo.common.cairo_builtins.HashBuiltin",
+            "type": "alias"
+        },
+        "starkware.cairo.common.hash.hash2": {
+            "decorators": [],
+            "pc": 6,
+            "type": "function"
+        },
+        "starkware.cairo.common.hash.hash2.Args": {
+            "full_name": "starkware.cairo.common.hash.hash2.Args",
+            "members": {
+                "x": {
+                    "cairo_type": "felt",
+                    "offset": 0
+                },
+                "y": {
+                    "cairo_type": "felt",
+                    "offset": 1
+                }
+            },
+            "size": 2,
+            "type": "struct"
+        },
+        "starkware.cairo.common.hash.hash2.ImplicitArgs": {
+            "full_name": "starkware.cairo.common.hash.hash2.ImplicitArgs",
+            "members": {
+                "hash_ptr": {
+                    "cairo_type": "starkware.cairo.common.cairo_builtins.HashBuiltin*",
+                    "offset": 0
+                }
+            },
+            "size": 1,
+            "type": "struct"
+        },
+        "starkware.cairo.common.hash.hash2.Return": {
+            "cairo_type": "(result: felt)",
+            "type": "type_definition"
+        },
+        "starkware.cairo.common.hash.hash2.SIZEOF_LOCALS": {
+            "type": "const",
+            "value": 0
+        },
+        "starkware.cairo.common.hash.hash2.hash_ptr": {
+            "cairo_type": "starkware.cairo.common.cairo_builtins.HashBuiltin*",
+            "full_name": "starkware.cairo.common.hash.hash2.hash_ptr",
+            "references": [
+                {
+                    "ap_tracking_data": {
+                        "group": 2,
+                        "offset": 0
+                    },
+                    "pc": 6,
+                    "value": "[cast(fp + (-5), starkware.cairo.common.cairo_builtins.HashBuiltin**)]"
+                },
+                {
+                    "ap_tracking_data": {
+                        "group": 2,
+                        "offset": 0
+                    },
+                    "pc": 8,
+                    "value": "cast([fp + (-5)] + 3, starkware.cairo.common.cairo_builtins.HashBuiltin*)"
+                }
+            ],
+            "type": "reference"
+        },
+        "starkware.cairo.common.hash.hash2.result": {
+            "cairo_type": "felt",
+            "full_name": "starkware.cairo.common.hash.hash2.result",
+            "references": [
+                {
+                    "ap_tracking_data": {
+                        "group": 2,
+                        "offset": 0
+                    },
+                    "pc": 8,
+                    "value": "[cast([fp + (-5)] + 2, felt*)]"
+                }
+            ],
+            "type": "reference"
+        },
+        "starkware.cairo.common.hash.hash2.x": {
+            "cairo_type": "felt",
+            "full_name": "starkware.cairo.common.hash.hash2.x",
+            "references": [
+                {
+                    "ap_tracking_data": {
+                        "group": 2,
+                        "offset": 0
+                    },
+                    "pc": 6,
+                    "value": "[cast(fp + (-4), felt*)]"
+                }
+            ],
+            "type": "reference"
+        },
+        "starkware.cairo.common.hash.hash2.y": {
+            "cairo_type": "felt",
+            "full_name": "starkware.cairo.common.hash.hash2.y",
+            "references": [
+                {
+                    "ap_tracking_data": {
+                        "group": 2,
+                        "offset": 0
+                    },
+                    "pc": 6,
+                    "value": "[cast(fp + (-3), felt*)]"
+                }
+            ],
+            "type": "reference"
+        },
+        "starkware.cairo.common.keccak_state.KeccakBuiltinState": {
+            "full_name": "starkware.cairo.common.keccak_state.KeccakBuiltinState",
+            "members": {
+                "s0": {
+                    "cairo_type": "felt",
+                    "offset": 0
+                },
+                "s1": {
+                    "cairo_type": "felt",
+                    "offset": 1
+                },
+                "s2": {
+                    "cairo_type": "felt",
+                    "offset": 2
+                },
+                "s3": {
+                    "cairo_type": "felt",
+                    "offset": 3
+                },
+                "s4": {
+                    "cairo_type": "felt",
+                    "offset": 4
+                },
+                "s5": {
+                    "cairo_type": "felt",
+                    "offset": 5
+                },
+                "s6": {
+                    "cairo_type": "felt",
+                    "offset": 6
+                },
+                "s7": {
+                    "cairo_type": "felt",
+                    "offset": 7
+                }
+            },
+            "size": 8,
+            "type": "struct"
+        }
+    },
+    "main_scope": "__main__",
+    "prime": "0x800000000000011000000000000000000000000000000000000000000000001",
+    "reference_manager": {
+        "references": [
+            {
+                "ap_tracking_data": {
+                    "group": 2,
+                    "offset": 0
+                },
+                "pc": 6,
+                "value": "[cast(fp + (-4), felt*)]"
+            },
+            {
+                "ap_tracking_data": {
+                    "group": 2,
+                    "offset": 0
+                },
+                "pc": 6,
+                "value": "[cast(fp + (-3), felt*)]"
+            },
+            {
+                "ap_tracking_data": {
+                    "group": 2,
+                    "offset": 0
+                },
+                "pc": 6,
+                "value": "[cast(fp + (-5), starkware.cairo.common.cairo_builtins.HashBuiltin**)]"
+            },
+            {
+                "ap_tracking_data": {
+                    "group": 2,
+                    "offset": 0
+                },
+                "pc": 8,
+                "value": "[cast([fp + (-5)] + 2, felt*)]"
+            },
+            {
+                "ap_tracking_data": {
+                    "group": 2,
+                    "offset": 0
+                },
+                "pc": 8,
+                "value": "cast([fp + (-5)] + 3, starkware.cairo.common.cairo_builtins.HashBuiltin*)"
+            },
+            {
+                "ap_tracking_data": {
+                    "group": 3,
+                    "offset": 0
+                },
+                "pc": 12,
+                "value": "[cast(fp + (-4), felt*)]"
+            },
+            {
+                "ap_tracking_data": {
+                    "group": 3,
+                    "offset": 0
+                },
+                "pc": 12,
+                "value": "[cast(fp + (-3), starkware.cairo.common.cairo_builtins.HashBuiltin**)]"
+            },
+            {
+                "ap_tracking_data": {
+                    "group": 3,
+                    "offset": 7
+                },
+                "pc": 19,
+                "value": "[cast(ap + (-2), starkware.cairo.common.cairo_builtins.HashBuiltin**)]"
+            },
+            {
+                "ap_tracking_data": {
+                    "group": 3,
+                    "offset": 7
+                },
+                "pc": 19,
+                "value": "[cast(ap + (-1), felt*)]"
+            },
+            {
+                "ap_tracking_data": {
+                    "group": 3,
+                    "offset": 7
+                },
+                "pc": 20,
+                "value": "cast([fp + (-4)] + 1, felt)"
+            }
+        ]
+    }
+}

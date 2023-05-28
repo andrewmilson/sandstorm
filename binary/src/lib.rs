@@ -10,14 +10,16 @@ use ruint::aliases::U256;
 use ruint::uint;
 use serde::Deserialize;
 use serde::Serialize;
+use std::collections::HashMap;
 use std::io::BufRead;
 use std::io::BufReader;
 use std::io::Read;
 use std::marker::PhantomData;
 use std::ops::Deref;
-use std::str::FromStr;
+use std::path::PathBuf;
+use utils::deserialize_hex_str;
+use utils::deserialize_vec_hex_str;
 
-pub mod pie;
 mod utils;
 
 // https://eprint.iacr.org/2021/1063.pdf figure 3
@@ -124,8 +126,57 @@ impl<F: Field> Deref for Memory<F> {
 }
 
 #[derive(Deserialize)]
+pub struct MemoryEntry {
+    #[serde(deserialize_with = "deserialize_hex_str")]
+    value: U256,
+    address: u32,
+}
+
+#[derive(Deserialize)]
+pub struct Segment {
+    begin_addr: u32,
+    stop_ptr: u32,
+}
+
+#[derive(Deserialize)]
+pub struct AirPublicInput {
+    pub rc_min: u32,
+    pub rc_max: u32,
+    pub n_steps: u32,
+    pub layout: String,
+    pub memory_segments: HashMap<String, Segment>,
+    // TODO: check if the addresses are all sequential
+    pub public_memory: Vec<MemoryEntry>,
+}
+
+#[derive(Deserialize, Clone, Copy)]
+struct RangeCheckInstance {
+    #[serde(deserialize_with = "deserialize_hex_str")]
+    value: U256,
+    index: u32,
+}
+
+#[derive(Deserialize, Clone, Copy)]
+pub struct PedersenInstance {
+    pub index: u32,
+    #[serde(deserialize_with = "deserialize_hex_str")]
+    pub x: U256,
+    #[serde(deserialize_with = "deserialize_hex_str")]
+    pub y: U256,
+}
+
+#[derive(Deserialize)]
+pub struct AirPrivateInput {
+    pub trace_path: PathBuf,
+    pub memory_path: PathBuf,
+    pub pedersen: Vec<PedersenInstance>,
+    // range_check: Vec<RangeCheckInstance>,
+}
+
+#[derive(Deserialize)]
 pub struct CompiledProgram {
-    pub data: Vec<String>,
+    #[serde(deserialize_with = "deserialize_vec_hex_str")]
+    pub data: Vec<U256>,
     pub prime: String,
 }
 
@@ -144,11 +195,9 @@ impl CompiledProgram {
         self.data
             .iter()
             .enumerate()
-            .map(|(i, value_str)| {
-                (
-                    i + 1, // address 0, 0 is reserved for dummy accesses
-                    Word::new(U256::from_str(value_str).expect("invalid data item")).into_felt(),
-                )
+            .map(|(i, &value)| {
+                // address 0 is reserved for dummy accesses
+                (i + 1, Word::new(value).into_felt())
             })
             .collect()
     }

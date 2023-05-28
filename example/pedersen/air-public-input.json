@@ -1,0 +1,190 @@
+{
+    "rc_max": 32770,
+    "layout_params": null,
+    "rc_min": 32763,
+    "memory_segments": {
+        "program": {
+            "begin_addr": 1,
+            "stop_ptr": 5
+        },
+        "execution": {
+            "begin_addr": 27,
+            "stop_ptr": 40
+        },
+        "output": {
+            "begin_addr": 40,
+            "stop_ptr": 41
+        },
+        "pedersen": {
+            "begin_addr": 41,
+            "stop_ptr": 44
+        },
+        "range_check": {
+            "begin_addr": 233,
+            "stop_ptr": 233
+        },
+        "ecdsa": {
+            "begin_addr": 361,
+            "stop_ptr": 361
+        }
+    },
+    "n_steps": 2048,
+    "layout": "layout6",
+    "public_memory": [
+        {
+            "address": 1,
+            "value": "0x40780017fff7fff",
+            "page": 0
+        },
+        {
+            "address": 2,
+            "value": "0x2",
+            "page": 0
+        },
+        {
+            "address": 3,
+            "value": "0x1104800180018000",
+            "page": 0
+        },
+        {
+            "address": 4,
+            "value": "0xa",
+            "page": 0
+        },
+        {
+            "address": 5,
+            "value": "0x10780017fff7fff",
+            "page": 0
+        },
+        {
+            "address": 6,
+            "value": "0x0",
+            "page": 0
+        },
+        {
+            "address": 7,
+            "value": "0x400380007ffb7ffc",
+            "page": 0
+        },
+        {
+            "address": 8,
+            "value": "0x400380017ffb7ffd",
+            "page": 0
+        },
+        {
+            "address": 9,
+            "value": "0x482680017ffb8000",
+            "page": 0
+        },
+        {
+            "address": 10,
+            "value": "0x3",
+            "page": 0
+        },
+        {
+            "address": 11,
+            "value": "0x480280027ffb8000",
+            "page": 0
+        },
+        {
+            "address": 12,
+            "value": "0x208b7fff7fff7ffe",
+            "page": 0
+        },
+        {
+            "address": 13,
+            "value": "0x480a7ffd7fff8000",
+            "page": 0
+        },
+        {
+            "address": 14,
+            "value": "0x480680017fff8000",
+            "page": 0
+        },
+        {
+            "address": 15,
+            "value": "0x1",
+            "page": 0
+        },
+        {
+            "address": 16,
+            "value": "0x480680017fff8000",
+            "page": 0
+        },
+        {
+            "address": 17,
+            "value": "0x2",
+            "page": 0
+        },
+        {
+            "address": 18,
+            "value": "0x1104800180018000",
+            "page": 0
+        },
+        {
+            "address": 19,
+            "value": "0x800000000000010fffffffffffffffffffffffffffffffffffffffffffffff6",
+            "page": 0
+        },
+        {
+            "address": 20,
+            "value": "0x400280007ffc7fff",
+            "page": 0
+        },
+        {
+            "address": 21,
+            "value": "0x482680017ffc8000",
+            "page": 0
+        },
+        {
+            "address": 22,
+            "value": "0x1",
+            "page": 0
+        },
+        {
+            "address": 23,
+            "value": "0x48127ffd7fff8000",
+            "page": 0
+        },
+        {
+            "address": 24,
+            "value": "0x208b7fff7fff7ffe",
+            "page": 0
+        },
+        {
+            "address": 25,
+            "value": "0x1b",
+            "page": 0
+        },
+        {
+            "address": 26,
+            "value": "0x0",
+            "page": 0
+        },
+        {
+            "address": 27,
+            "value": "0x28",
+            "page": 0
+        },
+        {
+            "address": 28,
+            "value": "0x29",
+            "page": 0
+        },
+        {
+            "address": 38,
+            "value": "0x29",
+            "page": 0
+        },
+        {
+            "address": 39,
+            "value": "0x2c",
+            "page": 0
+        },
+        {
+            "address": 40,
+            "value": "0x5bb9440e27889a364bcb678b1f679ecd1347acdedcbf36e83494f857cc58026",
+            "page": 0
+        }
+    ]
+}

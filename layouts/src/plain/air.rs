@@ -27,7 +27,7 @@ pub struct AirConfig<Fp, Fq>(PhantomData<(Fp, Fq)>);
 impl<Fp: GpuFftField + PrimeField, Fq: StarkExtensionOf<Fp>> ministark::air::AirConfig
     for AirConfig<Fp, Fq>
 {
-    const NUM_BASE_COLUMNS: usize = 9;
+    const NUM_BASE_COLUMNS: usize = 5;
     const NUM_EXTENSION_COLUMNS: usize = 1;
     type Fp = Fp;
     type Fq = Fq;

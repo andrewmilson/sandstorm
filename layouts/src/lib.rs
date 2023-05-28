@@ -12,6 +12,8 @@ use ark_ff::Field;
 use ark_ff::PrimeField;
 use ark_serialize::CanonicalDeserialize;
 use ark_serialize::CanonicalSerialize;
+use binary::AirPrivateInput;
+use binary::AirPublicInput;
 use binary::CompiledProgram;
 use binary::Memory;
 use binary::RegisterStates;
@@ -43,16 +45,15 @@ where
 {
 }
 
-impl<F, T: AirConfig<Fp = F, PublicInputs = ExecutionInfo<F>>> CairoAirConfig for T where
-    F: PrimeField
-{
-}
+impl<F: PrimeField, T: AirConfig<Fp = F, PublicInputs = ExecutionInfo<F>>> CairoAirConfig for T {}
 
 pub trait CairoExecutionTrace: Trace {
     fn new(
+        program: CompiledProgram,
+        air_public_input: AirPublicInput,
+        air_private_input: AirPrivateInput,
         memory: Memory<Self::Fp>,
         register_states: RegisterStates,
-        program: CompiledProgram,
     ) -> Self;
 
     fn execution_info(&self) -> ExecutionInfo<Self::Fp>;

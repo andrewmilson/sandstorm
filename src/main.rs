@@ -1,6 +1,8 @@
 use ark_ff::PrimeField;
 use ark_serialize::CanonicalDeserialize;
 use ark_serialize::CanonicalSerialize;
+use binary::AirPrivateInput;
+use binary::AirPublicInput;
 use binary::CompiledProgram;
 use binary::Memory;
 use binary::RegisterStates;
@@ -49,10 +51,6 @@ enum Layout {
 enum Command {
     Prove {
         #[structopt(long, parse(from_os_str))]
-        trace: PathBuf,
-        #[structopt(long, parse(from_os_str))]
-        memory: PathBuf,
-        #[structopt(long, parse(from_os_str))]
         output: PathBuf,
         #[structopt(long, parse(from_os_str))]
         air_private_input: PathBuf,
@@ -62,8 +60,6 @@ enum Command {
     Verify {
         #[structopt(long, parse(from_os_str))]
         proof: PathBuf,
-        #[structopt(long, parse(from_os_str))]
-        air_public_input: PathBuf,
     },
 }
 
@@ -129,10 +125,10 @@ fn execute_command<A: CairoAirConfig, T: CairoExecutionTrace<Fp = A::Fp, Fq = A:
 A::Fp: PrimeField, {
     match command {
         Command::Prove {
-            trace,
-            memory,
             output,
-        } => prove::<A, T>(options, program, &trace, &memory, &output),
+            air_private_input,
+            air_public_input,
+        } => prove::<A, T>(options, program, &air_private_input, &air_public_input, &output),
         Command::Verify { proof } => verify::<A>(options, program, &proof),
     }
 }
@@ -155,21 +151,29 @@ where
 fn prove<A: CairoAirConfig, T: CairoExecutionTrace<Fp = A::Fp, Fq = A::Fq>>(
     options: ProofOptions,
     program: CompiledProgram,
-    trace_path: &PathBuf,
-    memory_path: &PathBuf,
+    air_private_input_path: &PathBuf,
+    air_public_input_path: &PathBuf,
     output_path: &PathBuf,
 ) where
     A::Fp: PrimeField,
 {
     let now = Instant::now();
 
+    let air_private_input_file = File::open(air_private_input_path).expect("could not open the air private input file");
+    let air_private_input: AirPrivateInput = serde_json::from_reader(air_private_input_file).unwrap();
+
+    let trace_path = &air_private_input.trace_path;
     let trace_file = File::open(trace_path).expect("could not open trace file");
     let register_states = RegisterStates::from_reader(trace_file);
 
-    let memory_file = File::open(memory_path).expect("could not open memory file");
+    let memory_path = &air_private_input.memory_path;
+    let memory_file = File::open(memory_path).expect("could not open memory file {}");
     let memory = Memory::from_reader(memory_file);
 
-    let execution_trace = T::new(memory, register_states, program);
+    let air_public_input_file = File::open(air_public_input_path).expect("could not open the air public input file");
+    let air_public_input: AirPublicInput = serde_json::from_reader(air_public_input_file).unwrap();
+
+    let execution_trace = T::new(program, air_public_input, air_private_input, memory, register_states);
     println!(
         "Generated execution trace (cols={}, rows={}) in {:.0?}",
         execution_trace.base_columns().num_cols(),

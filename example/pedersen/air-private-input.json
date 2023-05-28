@@ -1,0 +1,13 @@
+{
+    "trace_path": "/Users/andrewmilson/projects/sandstorm/example/pedersen/trace.bin",
+    "memory_path": "/Users/andrewmilson/projects/sandstorm/example/pedersen/memory.bin",
+    "pedersen": [
+        {
+            "index": 0,
+            "x": "0x1",
+            "y": "0x2"
+        }
+    ],
+    "range_check": [],
+    "ecdsa": []
+}

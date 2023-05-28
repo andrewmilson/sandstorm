@@ -32,6 +32,8 @@ source ~/cairo_venv/bin/activate
 # 2. (optional) compile and run the Cairo program
 cairo-compile example/array-sum.cairo --proof_mode --output example/array-sum.json
 cairo-run --program example/array-sum.json \
+          --air_private_input example/air-private-input.json \
+          --air_public_input example/air-public-input.json \
           --trace_file example/trace.bin \
           --memory_file example/memory.bin \
           --min_steps 128 \
@@ -42,8 +44,8 @@ cairo-run --program example/array-sum.json \
 # make sure latest macOS is installed
 cargo +nightly run -r -F gpu,parallel,asm -- \
     --program example/array-sum.json \
-    prove --trace example/trace.bin \
-          --memory example/memory.bin \
+    prove --air-private-input example/air-private-input.json \
+          --air-public-input example/air-public-input.json \
           --output example/array-sum.proof
 
 # 4. verify the proof
@@ -136,3 +138,22 @@ Sandstorm implements a subset of the constraints and trace layout that's used by
 ## How Sandstorm works
 
 Those curious about the inner workings of Sandstorm can read the comments in [air.rs](layouts/src/layout6/air.rs#36). The comments expect some understanding of how STARK proofs are generated - if you need some background on this then [Anatomy of a STARK (part 4)](https://aszepieniec.github.io/stark-anatomy/) by [Alan Szepieniec](https://twitter.com/aszepieniec) is a great resource. The pseudo code in section 4.5 of the [Cairo whitepaper](https://eprint.iacr.org/2021/1063.pdf) provides a nice high level overview of how some pieces fit together.
+
+
+```
+cairo-compile example/pedersen/main.cairo --proof_mode --output example/pedersen/main_compiled.json
+cairo-run --program example/pedersen/main_compiled.json \
+          --air_private_input example/pedersen/air-private-input.json \
+          --air_public_input example/pedersen/air-public-input.json \
+          --trace_file example/pedersen/trace.bin \
+          --memory_file example/pedersen/memory.bin \
+          --layout layout6 \
+          --min_steps 128 \
+          --proof_mode
+
+cargo +nightly run -r -F parallel,asm -- \
+    --program example/pedersen/main_compiled.json \
+    prove --air-private-input example/pedersen/air-private-input.json \
+          --air-public-input example/pedersen/air-public-input.json \
+          --output example/array-sum.proof
+```

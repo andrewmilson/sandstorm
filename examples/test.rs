@@ -15,12 +15,12 @@ use num_traits::Zero;
 extern crate serde_json;
 
 fn main() {
-    const PIE: &[u8] = include_bytes!("../example/as-pie.zip");
+    // const PIE: &[u8] = include_bytes!("../example/as-pie.zip");
 
     // println!("YO: {:?}", json!(3218973821738972187381793));
 
-    let bytes = Cursor::new(&PIE);
-    let _pie = binary::pie::Pie::from_reader(bytes);
+    // let bytes = Cursor::new(&PIE);
+    // let _pie = binary::pie::Pie::from_reader(bytes);
 
     // vanishing_poly_experiments();
 

@@ -714,7 +714,7 @@ impl ministark::air::AirConfig for AirConfig {
         // ├───────────┼────────────────────┼────────────────────┤
         // │   ω^511   │         0          │         0          │
         // └───────────┴────────────────────┴────────────────────┘
-        let (pedersen_x_coeffs, pedersen_y_coeffs) = super::pedersen::points_poly();
+        let (pedersen_x_coeffs, pedersen_y_coeffs) = super::pedersen::constant_points_poly();
         let pedersen_points_x = Polynomial::new(pedersen_x_coeffs);
         let pedersen_points_y = Polynomial::new(pedersen_y_coeffs);
 

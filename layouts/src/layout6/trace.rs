@@ -9,11 +9,18 @@ use super::NUM_EXTENSION_COLUMNS;
 use super::PUBLIC_MEMORY_STEP;
 use super::RANGE_CHECK_STEP;
 use ark_ff::Zero;
+use ark_ff::Field;
+use binary::PedersenInstance;
+use num_bigint::BigUint;
+use super::pedersen;
 use ark_ff::One;
+use binary::AirPrivateInput;
+use binary::AirPublicInput;
 use crate::ExecutionInfo;
-use crate::layout6::air::Permutation;
-use crate::layout6::air::RangeCheckPermutation;
-use crate::layout6::MEMORY_STEP;
+use crate::layout6::pedersen::pedersen_hash;
+use super::air::Permutation;
+use super::air::RangeCheckPermutation;
+use super::MEMORY_STEP;
 use crate::utils::get_ordered_memory_accesses;
 use crate::utils::ordered_range_check_values;
 use crate::CairoExecutionTrace;
@@ -25,6 +32,7 @@ use binary::Memory;
 use binary::RegisterState;
 use binary::RegisterStates;
 use core::iter::zip;
+use std::iter::repeat;
 use ministark::challenges::Challenges;
 use ministark::utils::GpuAllocator;
 use ministark::utils::GpuVec;
@@ -56,7 +64,13 @@ pub struct ExecutionTrace {
 }
 
 impl CairoExecutionTrace for ExecutionTrace {
-    fn new(mem: Memory<Fp>, register_states: RegisterStates, program: CompiledProgram) -> Self {
+    fn new(
+        program: CompiledProgram,
+        air_public_input: AirPublicInput,
+        air_private_input: AirPrivateInput,
+        mem: Memory<Fp>,
+        register_states: RegisterStates,
+    ) -> Self {
         let num_cycles = register_states.len();
         assert!(num_cycles.is_power_of_two());
         let trace_len = num_cycles * CYCLE_HEIGHT;
@@ -186,6 +200,65 @@ impl CairoExecutionTrace for ExecutionTrace {
         assert!(ordered_rc_padding_vals.next().is_none());
         assert!(ordered_rc_vals.next().is_none());
 
+        // Generate trace for pedersen hash
+        let mut pedersen_partial_xs_column = Vec::new_in(GpuAllocator);
+        pedersen_partial_xs_column.resize(trace_len, Fp::zero());
+        let mut pedersen_partial_ys_column = Vec::new_in(GpuAllocator);
+        pedersen_partial_ys_column.resize(trace_len, Fp::zero());
+        let mut pedersen_suffixes_column = Vec::new_in(GpuAllocator);
+        pedersen_suffixes_column.resize(trace_len, Fp::zero());
+        let mut pedersen_slopes_column = Vec::new_in(GpuAllocator);
+        pedersen_slopes_column.resize(trace_len, Fp::zero());
+
+        let (pedersen_partial_xs_steps, _) = pedersen_partial_xs_column.as_chunks_mut::<512>();
+        let (pedersen_partial_ys_steps, _) = pedersen_partial_ys_column.as_chunks_mut::<512>();
+        let (pedersen_suffixes_steps, _) = pedersen_suffixes_column.as_chunks_mut::<512>();
+        let (pedersen_slopes_steps, _) = pedersen_slopes_column.as_chunks_mut::<512>();
+
+        let zero_instance = (Fp::ZERO, Fp::ZERO, pedersen_hash(Fp::ZERO, Fp::ZERO));
+        let pedersen_instances = air_private_input
+            .pedersen
+            .into_iter()
+            .map(|v| {
+                let into_fp = |v| Fp::from(BigUint::from(v));
+                // TODO: use consistent naming
+                let a = into_fp(v.x);
+                let b = into_fp(v.y);
+                let output = pedersen_hash(a, b);
+                (a, b, output)
+            })
+            .chain(repeat(zero_instance));
+
+        ark_std::cfg_iter_mut!(pedersen_partial_xs_steps)
+            .zip(pedersen_partial_ys_steps)
+            .zip(pedersen_suffixes_steps)
+            .zip(pedersen_slopes_steps)
+            .zip(pedersen_instances)
+            .enumerate()
+            .for_each(
+                |(i, ((((partial_xs, partial_ys), suffixes), slopes), instance))| {
+                    let (a, b, output) = instance;
+                    let instance_trace = pedersen::InstanceTrace::new(a, b);
+                    let partial_steps =
+                        vec![instance_trace.a_steps, instance_trace.b_steps].concat();
+
+                    // check the last step is as expected
+                    assert_eq!(partial_steps.last().unwrap().point.x, output);
+
+                    for ((((suffix, partial_x), partial_y), slope), step) in
+                        zip(suffixes, partial_xs)
+                            .zip(partial_ys)
+                            .zip(slopes)
+                            .zip(partial_steps)
+                    {
+                        *suffix = step.suffix;
+                        *partial_x = step.point.x;
+                        *partial_y = step.point.y;
+                        *slope = step.slope;
+                    }
+                },
+            );
+
         // generate the memory column by ordering memory accesses
         let memory_accesses: Vec<(Fp, Fp)> = npc_column
             .array_chunks()
@@ -201,10 +274,10 @@ impl CairoExecutionTrace for ExecutionTrace {
 
         let base_trace = Matrix::new(vec![
             flags_column.to_vec_in(GpuAllocator),
-            zeros_column.to_vec_in(GpuAllocator),
-            zeros_column.to_vec_in(GpuAllocator),
-            zeros_column.to_vec_in(GpuAllocator),
-            zeros_column.to_vec_in(GpuAllocator),
+            pedersen_partial_xs_column.to_vec_in(GpuAllocator),
+            pedersen_partial_ys_column.to_vec_in(GpuAllocator),
+            pedersen_suffixes_column.to_vec_in(GpuAllocator),
+            pedersen_slopes_column.to_vec_in(GpuAllocator),
             npc_column.to_vec_in(GpuAllocator),
             memory_column.to_vec_in(GpuAllocator),
             range_check_column.to_vec_in(GpuAllocator),

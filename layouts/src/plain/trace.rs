@@ -20,6 +20,8 @@ use alloc::vec::Vec;
 use ark_ff::batch_inversion;
 use ark_ff::FftField;
 use ark_ff::PrimeField;
+use binary::AirPrivateInput;
+use binary::AirPublicInput;
 use binary::CompiledProgram;
 use binary::Memory;
 use binary::RegisterState;
@@ -39,6 +41,7 @@ use std::marker::PhantomData;
 use strum::IntoEnumIterator;
 
 pub struct ExecutionTrace<Fp, Fq> {
+    pub air_public_input: AirPublicInput,
     pub public_memory_padding_address: usize,
     pub public_memory_padding_value: Fp,
     pub range_check_min: usize,
@@ -61,7 +64,13 @@ pub struct ExecutionTrace<Fp, Fq> {
 impl<Fp: GpuFftField + PrimeField, Fq: StarkExtensionOf<Fp>> CairoExecutionTrace
     for ExecutionTrace<Fp, Fq>
 {
-    fn new(mem: Memory<Fp>, register_states: RegisterStates, program: CompiledProgram) -> Self {
+    fn new(
+        program: CompiledProgram,
+        air_public_input: AirPublicInput,
+        _air_private_input: AirPrivateInput,
+        mem: Memory<Fp>,
+        register_states: RegisterStates,
+    ) -> Self {
         let num_cycles = register_states.len();
         assert!(num_cycles.is_power_of_two());
         let trace_len = num_cycles * CYCLE_HEIGHT;
@@ -223,6 +232,7 @@ impl<Fp: GpuFftField + PrimeField, Fq: StarkExtensionOf<Fp>> CairoExecutionTrace
         let final_registers = *register_states.last().unwrap();
 
         ExecutionTrace {
+            air_public_input,
             public_memory_padding_address,
             public_memory_padding_value,
             range_check_min,

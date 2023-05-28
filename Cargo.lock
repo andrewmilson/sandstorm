@@ -981,6 +981,7 @@ version = "0.1.0"
 dependencies = [
  "ark-ff",
  "bincode",
+ "ministark-gpu",
  "num-bigint",
  "ruint",
  "serde",
@@ -994,13 +995,14 @@ version = "0.1.0"
 dependencies = [
  "ark-ec",
  "ark-ff",
- "ark-poly 0.4.0",
+ "ark-poly 0.4.2",
  "ark-serialize",
  "ark-std",
  "ministark",
  "ministark-gpu",
  "num-bigint",
  "num-traits",
+ "ruint",
  "sandstorm-binary",
  "strum 0.24.1",
  "strum_macros 0.24.3",

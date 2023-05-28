@@ -13,5 +13,5 @@ pub const PUBLIC_MEMORY_STEP: usize = 8;
 pub const MEMORY_STEP: usize = 2;
 pub const RANGE_CHECK_STEP: usize = 4;
 
-pub const NUM_BASE_COLUMNS: usize = 9;
+pub const NUM_BASE_COLUMNS: usize = 5;
 pub const NUM_EXTENSION_COLUMNS: usize = 1;

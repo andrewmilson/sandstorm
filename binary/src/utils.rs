@@ -1,9 +1,37 @@
 use alloc::vec::Vec;
+use ark_ff::Field;
+use ark_ff::PrimeField;
+use num_bigint::BigUint;
 use ruint::aliases::U256;
 use serde::de;
 use serde::Deserialize;
 use serde::Deserializer;
 use serde_json::value::Number;
+
+// /// Deserialises a hex string into a field element
+// pub fn deserialize_hex_str_as_field<'de, D: Deserializer<'de>, T: Field>(
+//     deserializer: D,
+// ) -> Result<T, D::Error> {
+//     let num = deserialize_hex_str(deserializer)?;
+//     let base_field = T::BasePrimeField::from(BigUint::from(num));
+//     Ok(T::from_base_prime_field(base_field))
+// }
+
+/// Deserialises a hex string into a big integer
+pub fn deserialize_hex_str<'de, D: Deserializer<'de>>(deserializer: D) -> Result<U256, D::Error> {
+    let hex_str = String::deserialize(deserializer)?;
+    hex_str.parse::<U256>().map_err(de::Error::custom)
+}
+
+/// Deserialises a list of hex strings into a list of big integers
+pub fn deserialize_vec_hex_str<'de, D: Deserializer<'de>>(
+    deserializer: D,
+) -> Result<Vec<U256>, D::Error> {
+    #[derive(Deserialize)]
+    struct Wrapper(#[serde(deserialize_with = "deserialize_hex_str")] U256);
+    let v = Vec::deserialize(deserializer)?;
+    Ok(v.into_iter().map(|Wrapper(a)| a).collect())
+}
 
 /// Deserialises a JSON big integer
 /// This deserializer uses serde_json's arbitrary precision features to convert

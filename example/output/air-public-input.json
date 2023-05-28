@@ -1,0 +1,120 @@
+{
+    "rc_max": 32769,
+    "layout_params": null,
+    "memory_segments": {
+        "program": {
+            "stop_ptr": 5,
+            "begin_addr": 1
+        },
+        "execution": {
+            "stop_ptr": 20,
+            "begin_addr": 15
+        },
+        "output": {
+            "stop_ptr": 21,
+            "begin_addr": 20
+        },
+        "pedersen": {
+            "stop_ptr": 21,
+            "begin_addr": 21
+        },
+        "range_check": {
+            "stop_ptr": 213,
+            "begin_addr": 213
+        },
+        "ecdsa": {
+            "stop_ptr": 341,
+            "begin_addr": 341
+        }
+    },
+    "n_steps": 2048,
+    "layout": "layout6",
+    "rc_min": 32765,
+    "public_memory": [
+        {
+            "value": "0x40780017fff7fff",
+            "page": 0,
+            "address": 1
+        },
+        {
+            "value": "0x1",
+            "page": 0,
+            "address": 2
+        },
+        {
+            "value": "0x1104800180018000",
+            "page": 0,
+            "address": 3
+        },
+        {
+            "value": "0x4",
+            "page": 0,
+            "address": 4
+        },
+        {
+            "value": "0x10780017fff7fff",
+            "page": 0,
+            "address": 5
+        },
+        {
+            "value": "0x0",
+            "page": 0,
+            "address": 6
+        },
+        {
+            "value": "0x480680017fff8000",
+            "page": 0,
+            "address": 7
+        },
+        {
+            "value": "0x9",
+            "page": 0,
+            "address": 8
+        },
+        {
+            "value": "0x400280007ffd7fff",
+            "page": 0,
+            "address": 9
+        },
+        {
+            "value": "0x482680017ffd8000",
+            "page": 0,
+            "address": 10
+        },
+        {
+            "value": "0x1",
+            "page": 0,
+            "address": 11
+        },
+        {
+            "value": "0x208b7fff7fff7ffe",
+            "page": 0,
+            "address": 12
+        },
+        {
+            "value": "0xf",
+            "page": 0,
+            "address": 13
+        },
+        {
+            "value": "0x0",
+            "page": 0,
+            "address": 14
+        },
+        {
+            "value": "0x14",
+            "page": 0,
+            "address": 15
+        },
+        {
+            "value": "0x15",
+            "page": 0,
+            "address": 19
+        },
+        {
+            "value": "0x9",
+            "page": 0,
+            "address": 20
+        }
+    ]
+}
