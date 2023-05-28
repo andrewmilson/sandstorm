@@ -75,16 +75,24 @@ impl ministark::air::AirConfig for AirConfig {
             RangeCheck::Ordered.next() - RangeCheck::Ordered.curr();
 
         // TODO: builtins
-        let pedersen_hash0_ec_subset_sum_b0 = Pedersen::Suffix.curr() - (Pedersen::Suffix.next() + Pedersen::Suffix.next());
+        let pedersen_hash0_ec_subset_sum_b0 =
+            Pedersen::Suffix.curr() - (Pedersen::Suffix.next() + Pedersen::Suffix.next());
         let pedersen_hash0_ec_subset_sum_b0_negate = &one - &pedersen_hash0_ec_subset_sum_b0;
         let rc_builtin_value0_0 = RangeCheckBuiltin::Rc16Component.offset(0);
-        let rc_builtin_value1_0 = &rc_builtin_value0_0 * &offset_size + RangeCheckBuiltin::Rc16Component.offset(1);
-        let rc_builtin_value2_0 = &rc_builtin_value1_0 * &offset_size + RangeCheckBuiltin::Rc16Component.offset(2);
-        let rc_builtin_value3_0 = &rc_builtin_value2_0 * &offset_size + RangeCheckBuiltin::Rc16Component.offset(3);
-        let rc_builtin_value4_0 = &rc_builtin_value3_0 * &offset_size + RangeCheckBuiltin::Rc16Component.offset(4);
-        let rc_builtin_value5_0 = &rc_builtin_value4_0 * &offset_size + RangeCheckBuiltin::Rc16Component.offset(5);
-        let rc_builtin_value6_0 = &rc_builtin_value5_0 * &offset_size + RangeCheckBuiltin::Rc16Component.offset(6);
-        let rc_builtin_value7_0 = &rc_builtin_value6_0 * &offset_size + RangeCheckBuiltin::Rc16Component.offset(7);
+        let rc_builtin_value1_0 =
+            &rc_builtin_value0_0 * &offset_size + RangeCheckBuiltin::Rc16Component.offset(1);
+        let rc_builtin_value2_0 =
+            &rc_builtin_value1_0 * &offset_size + RangeCheckBuiltin::Rc16Component.offset(2);
+        let rc_builtin_value3_0 =
+            &rc_builtin_value2_0 * &offset_size + RangeCheckBuiltin::Rc16Component.offset(3);
+        let rc_builtin_value4_0 =
+            &rc_builtin_value3_0 * &offset_size + RangeCheckBuiltin::Rc16Component.offset(4);
+        let rc_builtin_value5_0 =
+            &rc_builtin_value4_0 * &offset_size + RangeCheckBuiltin::Rc16Component.offset(5);
+        let rc_builtin_value6_0 =
+            &rc_builtin_value5_0 * &offset_size + RangeCheckBuiltin::Rc16Component.offset(6);
+        let rc_builtin_value7_0 =
+            &rc_builtin_value6_0 * &offset_size + RangeCheckBuiltin::Rc16Component.offset(7);
         let _ecdsa_sig0_doubling_key_x_squared: Expr<AlgebraicItem<FieldVariant<Fp, Fp>>> =
             Trace(8, 4) * Trace(8, 4);
         let ecdsa_sig0_exponentiate_generator_b0 =
@@ -762,7 +770,7 @@ impl ministark::air::AirConfig for AirConfig {
         // TODO: check all zerofiers are being multiplied or divided correctly
         let every_512_row_zerofier = (X.pow(n / 512)
             - Constant(FieldVariant::Fp(g.pow([n as u64 / 2]))))
-            / every_256_row_zerofier;
+            / &every_256_row_zerofier;
 
         // A single pedersen hash `H(a, b)` is computed every 512 cycles.
         // The constraints for each hash is split in two consecutive 256 row groups.
@@ -824,9 +832,25 @@ impl ministark::air::AirConfig for AirConfig {
             - (Npc::PedersenInput1Addr.curr() + &one))
             / &every_512_row_zerofier;
 
-        // Range check builtin
+        // 128bit Range check builtin
         // ===================
-        let rc_builtin_value = rc_builtin_value7_0 - Npc::RangeCheck128Val.curr()
+
+        // TODO: fix naming
+        let zerofier_256th_last_row =
+            X - Constant(FieldVariant::Fp(g.pow([256 * (n as u64 / 256 - 1)])));
+        let every_256_rows_except_last_zerofier =
+            &zerofier_256th_last_row / &every_256_row_zerofier;
+
+        // Hook up range check with the memory pool
+        let rc_builtin_value =
+            (rc_builtin_value7_0 - Npc::RangeCheck128Val.curr()) / &every_256_row_zerofier;
+        let rc_builtin_addr_step = (Npc::RangeCheck128Addr.next()
+            - (Npc::RangeCheck128Addr.curr() + &one))
+            * &every_256_rows_except_last_zerofier;
+
+        let rc_builtin_init_addr = (Npc::RangeCheck128Addr.curr()
+            - PublicInputHint::InitialRcAddr.hint())
+            / &first_row_zerofier;
 
         // X^(n/512) - ω^(n/2)    = (x-ω^255)(x-ω^511)
         // (x-ω^255)(x-ω^511) / (X^n-1) = 1/(x-ω^0)..(x-ω^254)(x-ω^256)..(x-ω^510)
@@ -910,6 +934,9 @@ impl ministark::air::AirConfig for AirConfig {
             pedersen_input1_addr,
             pedersen_output_value0,
             pedersen_output_addr,
+            rc_builtin_value,
+            rc_builtin_addr_step,
+            rc_builtin_init_addr,
         ]
         .into_iter()
         .map(Constraint::new)
@@ -956,7 +983,10 @@ impl ministark::air::AirConfig for AirConfig {
             (RangeCheckProduct.index(), Fp::ONE),
             (RangeCheckMin.index(), (*range_check_min as u64).into()),
             (RangeCheckMax.index(), (*range_check_max as u64).into()),
+            // TODO: Use proper initial
             (InitialPedersenAddr.index(), Fp::ONE),
+            // TODO: Use proper initial
+            (InitialRcAddr.index(), Fp::ONE),
         ])
     }
 }
@@ -1037,6 +1067,7 @@ impl ExecutionTraceColumn for Flag {
     }
 }
 
+#[derive(Clone, Copy)]
 pub enum RangeCheckBuiltin {
     Rc16Component = 12,
 }
@@ -1056,6 +1087,7 @@ impl ExecutionTraceColumn for RangeCheckBuiltin {
     }
 }
 
+#[derive(Clone, Copy)]
 pub enum Pedersen {
     PartialSumX,
     PartialSumY,
@@ -1135,8 +1167,9 @@ impl ExecutionTraceColumn for Npc {
             | Self::PedersenInput1Val
             | Self::PedersenOutputAddr
             | Self::PedersenOutputVal => CYCLE_HEIGHT * PEDERSEN_BUILTIN_RATIO,
-            Self::RangeCheck128Addr
-            |Self::RangeCheck128Val => CYCLE_HEIGHT * RANGE_CHECK_BUILTIN_RATIO,
+            Self::RangeCheck128Addr | Self::RangeCheck128Val => {
+                CYCLE_HEIGHT * RANGE_CHECK_BUILTIN_RATIO
+            }
             Self::Pc
             | Self::Instruction
             | Self::MemOp0Addr
@@ -1184,11 +1217,11 @@ pub enum RangeCheck {
     Op0MulOp1 = 7, // =op0*op1
     OffOp0 = 8,
     // Ordered = 10 - trace step is 4
-    Fp = 11,     // Frame pointer (fp)
+    Fp = 11, // Frame pointer (fp)
     // This cell alternates cycle to cycle between:
     // - Being used for the 128 bit range checks builtin - even cycles
     // - Filled with padding to fill any gaps - odd cycles
-    Unused = 12, 
+    Unused = 12,
     // Ordered = 14 - trace step is 4
     Res = 15,
 }
@@ -1262,6 +1295,7 @@ pub enum PublicInputHint {
     RangeCheckMin,
     RangeCheckMax,
     InitialPedersenAddr,
+    InitialRcAddr,
 }
 
 impl Hint for PublicInputHint {

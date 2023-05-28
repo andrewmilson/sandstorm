@@ -52,6 +52,37 @@ cargo +nightly run -r -F parallel,asm -- \
     verify --proof example/array-sum.proof
 ```
 
+## Demo - SHARP compatible proof
+
+```bash
+# 1. (optional) install Cairo and activate the venv
+# https://www.cairo-lang.org/docs/quickstart.html
+source ~/cairo_venv/bin/activate
+
+# 2. (optional) compile and run the Cairo program
+cairo-compile example/array-sum.cairo --proof_mode --output example/array-sum.json
+cairo-run --program example/array-sum.json \
+          --trace_file example/trace.bin \
+          --memory_file example/memory.bin \
+          --layout layout6 \
+          --print_info \
+          --cairo_pie_output example/as-pie.bin
+
+# 3. generate the proof
+# use `-F parallel,asm` if not using an M1 Mac
+# make sure latest macOS is installed
+cargo +nightly run -r -F gpu,parallel,asm -- \
+    --program example/array-sum.json \
+    prove --trace example/trace.bin \
+          --memory example/memory.bin \
+          --output example/array-sum.proof
+
+# 4. verify the proof
+cargo +nightly run -r -F parallel,asm -- \
+    --program example/array-sum.json \
+    verify --proof example/array-sum.proof
+```
+
 ## Proving Cairo programs with Goldilocks field
 
 The goldilocks field is a magical 64-bit prime field that has very fast arithmetic. This field was discovered after StarkWare built their Solidity verifier for Cairo programs. As a result Cairo uses a much larger 252-bit prime field by default. Arithmetic in this 252-bit field is slow and it can be hard to practically utilize the storage provided by each field element. 

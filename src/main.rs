@@ -54,10 +54,16 @@ enum Command {
         memory: PathBuf,
         #[structopt(long, parse(from_os_str))]
         output: PathBuf,
+        #[structopt(long, parse(from_os_str))]
+        air_private_input: PathBuf,
+        #[structopt(long, parse(from_os_str))]
+        air_public_input: PathBuf,
     },
     Verify {
         #[structopt(long, parse(from_os_str))]
         proof: PathBuf,
+        #[structopt(long, parse(from_os_str))]
+        air_public_input: PathBuf,
     },
 }
 

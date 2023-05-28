@@ -17,6 +17,9 @@ use std::marker::PhantomData;
 use std::ops::Deref;
 use std::str::FromStr;
 
+pub mod pie;
+mod utils;
+
 // https://eprint.iacr.org/2021/1063.pdf figure 3
 /// Word offset of `off_DST`
 pub const OFF_DST_BIT_OFFSET: usize = 0;

@@ -8,10 +8,21 @@ use ark_poly::univariate::DensePolynomial;
 use ark_poly::Polynomial;
 use ministark_gpu::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481::ark::Fp;
 use num_bigint::BigUint;
+use std::io::Cursor;
 use num_traits::Zero;
 
+#[macro_use]
+extern crate serde_json;
+
 fn main() {
-    vanishing_poly_experiments();
+    const PIE: &[u8] = include_bytes!("../example/as-pie.zip");
+
+    // println!("YO: {:?}", json!(3218973821738972187381793));
+
+    let bytes = Cursor::new(&PIE);
+    let _pie = binary::pie::Pie::from_reader(bytes);
+
+    // vanishing_poly_experiments();
 
     // let poly =
     // DensePolynomial::from_coefficients_slice(&LEFT_X_COEFFICIENTS);
