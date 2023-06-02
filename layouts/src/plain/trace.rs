@@ -12,7 +12,7 @@ use super::NUM_EXTENSION_COLUMNS;
 use super::PUBLIC_MEMORY_STEP;
 use super::RANGE_CHECK_STEP;
 use crate::utils::get_ordered_memory_accesses;
-use crate::utils::ordered_range_check_values;
+use crate::utils::RangeCheckPool;
 use crate::CairoExecutionTrace;
 use crate::ExecutionInfo;
 use alloc::vec;
@@ -42,11 +42,11 @@ use strum::IntoEnumIterator;
 
 pub struct ExecutionTrace<Fp, Fq> {
     pub air_public_input: AirPublicInput,
-    pub public_memory_padding_address: usize,
+    pub public_memory_padding_address: u32,
     pub public_memory_padding_value: Fp,
-    pub range_check_min: usize,
-    pub range_check_max: usize,
-    pub public_memory: Vec<(usize, Fp)>,
+    pub range_check_min: u16,
+    pub range_check_max: u16,
+    pub public_memory: Vec<(u32, Fp)>,
     pub initial_registers: RegisterState,
     pub final_registers: RegisterState,
     _register_states: RegisterStates,
@@ -98,10 +98,18 @@ impl<Fp: GpuFftField + PrimeField, Fq: StarkExtensionOf<Fp>> CairoExecutionTrace
             }
         }
 
-        let (ordered_rc_vals, ordered_rc_padding_vals) =
-            ordered_range_check_values(num_cycles, &mem, &register_states);
-        let range_check_min = *ordered_rc_vals.first().unwrap();
-        let range_check_max = *ordered_rc_vals.last().unwrap();
+        // add offsets to the range check pool
+        let mut rc_pool = RangeCheckPool::new();
+        for &RegisterState { pc, .. } in register_states.iter() {
+            let word = mem[pc].unwrap();
+            rc_pool.push(word.get_off_dst());
+            rc_pool.push(word.get_off_op0());
+            rc_pool.push(word.get_off_op1());
+        }
+
+        let (ordered_rc_vals, ordered_rc_padding_vals) = rc_pool.get_ordered_values_with_padding();
+        let range_check_min = rc_pool.min().unwrap();
+        let range_check_max = rc_pool.max().unwrap();
         let range_check_padding_value = Fp::from(range_check_max as u64);
         let mut ordered_rc_vals = ordered_rc_vals.into_iter();
         let mut ordered_rc_padding_vals = ordered_rc_padding_vals.into_iter();
@@ -266,6 +274,9 @@ impl<Fp: GpuFftField + PrimeField, Fq: StarkExtensionOf<Fp>> CairoExecutionTrace
             range_check_max: self.range_check_max,
             public_memory_padding_address: self.public_memory_padding_address,
             public_memory_padding_value: self.public_memory_padding_value,
+            initial_pedersen_address: None,
+            initial_rc_address: None,
+            initial_ecdsa_address: None,
         }
     }
 }

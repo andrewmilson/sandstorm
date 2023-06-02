@@ -10,6 +10,12 @@ use ark_ff::MontBackend;
 use ark_ff::MontFp as Fp;
 use ark_ff::MontConfig;
 use ark_ff::PrimeField;
+use binary::PedersenInstance;
+use constants::P0;
+use constants::P1;
+use constants::P2;
+use constants::P3;
+use constants::P4;
 use ministark::utils::FieldVariant;
 use ministark_gpu::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481::ark::Fp;
 use num_bigint::BigUint;
@@ -18,7 +24,7 @@ use ruint::uint;
 
 use crate::utils::gen_periodic_table;
 
-pub mod params;
+pub mod constants;
 
 #[derive(MontConfig)]
 #[modulus = "3618502788666131213697322783095070105526743751716087489154079457884512865583"]
@@ -56,11 +62,9 @@ impl SWCurveConfig for PedersenCurveConfig {
 /// generated from the digits of pi.
 /// Based on StarkWare's Python reference implementation: <https://github.com/starkware-libs/starkex-for-spot-trading/blob/master/src/starkware/crypto/starkware/crypto/signature/pedersen_params.json>
 pub fn pedersen_hash(a: Fp, b: Fp) -> Fp {
-    (params::PEDERSEN_SHIFT_POINT
-        + process_element(a, params::PEDERSEN_P1.into(), params::PEDERSEN_P2.into())
-        + process_element(b, params::PEDERSEN_P3.into(), params::PEDERSEN_P4.into()))
-    .into_affine()
-    .x
+    let processed_a = process_element(a, P1.into(), P2.into());
+    let processed_b = process_element(b, P3.into(), P4.into());
+    (P0 + processed_a + processed_b).into_affine().x
 }
 
 fn process_element(
@@ -87,25 +91,40 @@ pub struct ElementPartialStep {
 
 #[derive(Clone, Debug)]
 pub struct InstanceTrace {
+    pub instance: PedersenInstance,
+    pub output: Fp,
     pub a_steps: Vec<ElementPartialStep>,
     pub b_steps: Vec<ElementPartialStep>,
 }
 
 impl InstanceTrace {
-    pub fn new(a: Fp, b: Fp) -> Self {
-        let a_p0 = params::PEDERSEN_SHIFT_POINT;
-        let a_p1 = params::PEDERSEN_P1;
-        let a_p2 = params::PEDERSEN_P2;
+    pub fn new(instance: PedersenInstance) -> Self {
+        let PedersenInstance { a, b, .. } = instance;
+        let a = Fp::from(BigUint::from(a));
+        let b = Fp::from(BigUint::from(b));
+
+        let a_p0 = P0;
+        let a_p1 = P1;
+        let a_p2 = P2;
         let a_steps = Self::gen_element_steps(a, a_p0, a_p1, a_p2);
 
-        let b_p0 = Affine::from(a_p0 + process_element(a, a_p1.into(), a_p2.into()));
-        let b_p1 = params::PEDERSEN_P1;
-        let b_p2 = params::PEDERSEN_P2;
+        let b_p0 = (a_p0 + process_element(a, a_p1.into(), a_p2.into())).into();
+        let b_p1 = P3;
+        let b_p2 = P4;
         // check out initial value for the second input is correct
         assert_eq!(a_steps.last().unwrap().point, b_p0);
         let b_steps = Self::gen_element_steps(b, b_p0, b_p1, b_p2);
 
-        Self { a_steps, b_steps }
+        // check the expected output matches
+        let output = pedersen_hash(a, b);
+        assert_eq!(output, b_steps.last().unwrap().point.x);
+
+        Self {
+            instance,
+            output,
+            a_steps,
+            b_steps,
+        }
     }
 
     fn gen_element_steps(
@@ -165,14 +184,14 @@ impl InstanceTrace {
 pub fn constant_points_poly() -> (Vec<FieldVariant<Fp, Fp>>, Vec<FieldVariant<Fp, Fp>>) {
     let mut evals = Vec::new();
 
-    let mut acc = Projective::from(params::PEDERSEN_P1);
+    let mut acc = Projective::from(P1);
     for _ in 0..Fp::MODULUS_BIT_SIZE - 4 {
         let p = acc.into_affine();
         evals.push((p.x, p.y));
         acc += acc;
     }
 
-    let mut acc = Projective::from(params::PEDERSEN_P2);
+    let mut acc = Projective::from(P2);
     for _ in 0..4 {
         let p = acc.into_affine();
         evals.push((p.x, p.y));
@@ -182,14 +201,14 @@ pub fn constant_points_poly() -> (Vec<FieldVariant<Fp, Fp>>, Vec<FieldVariant<Fp
     assert_eq!(evals.len(), 252);
     evals.resize(256, (Fp::ZERO, Fp::ZERO));
 
-    let mut acc = Projective::from(params::PEDERSEN_P3);
+    let mut acc = Projective::from(P3);
     for _ in 0..Fp::MODULUS_BIT_SIZE - 4 {
         let p = acc.into_affine();
         evals.push((p.x, p.y));
         acc += acc;
     }
 
-    let mut acc = Projective::from(params::PEDERSEN_P4);
+    let mut acc = Projective::from(P4);
     for _ in 0..4 {
         let p = acc.into_affine();
         evals.push((p.x, p.y));

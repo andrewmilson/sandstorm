@@ -1,7 +1,4 @@
 use alloc::vec::Vec;
-use ark_ff::Field;
-use ark_ff::PrimeField;
-use num_bigint::BigUint;
 use ruint::aliases::U256;
 use serde::de;
 use serde::Deserialize;

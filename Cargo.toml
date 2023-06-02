@@ -6,7 +6,7 @@ version = "0.1.0"
 edition = "2021"
 
 [workspace]
-members = ["layouts", "binary"]
+members = ["layouts", "binary", "builtins"]
 
 [features]
 default = [ ]
@@ -17,9 +17,9 @@ parallel = [ "dep:rayon", "ministark/parallel" ]
 [dependencies]
 layouts = { path = "./layouts", package = "sandstorm-layouts" }
 binary = { path = "./binary", package = "sandstorm-binary" }
-ministark-gpu = { version = "0.1", git = "https://github.com/andrewmilson/ministark" }
-ministark = { git = "https://github.com/andrewmilson/ministark" }
-ark-poly = { git = "https://github.com/andrewmilson/algebra", branch = "vec-allocator" }
+ministark-gpu = { version = "0.1", path = "../playground/ministark/gpu" }
+ministark = { path = "../playground/ministark" }
+ark-poly = "0.4"
 ark-std = "0.4"
 ark-ff = "0.4"
 ark-serialize = "0.4"

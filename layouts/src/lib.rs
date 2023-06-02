@@ -32,11 +32,14 @@ pub struct ExecutionInfo<Fp: Field> {
     pub initial_pc: Fp,
     pub final_ap: Fp,
     pub final_pc: Fp,
-    pub range_check_min: usize,
-    pub range_check_max: usize,
-    pub public_memory: Vec<(usize, Fp)>,
-    pub public_memory_padding_address: usize,
+    pub range_check_min: u16,
+    pub range_check_max: u16,
+    pub public_memory: Vec<(u32, Fp)>,
+    pub public_memory_padding_address: u32,
     pub public_memory_padding_value: Fp,
+    pub initial_pedersen_address: Option<u32>,
+    pub initial_rc_address: Option<u32>,
+    pub initial_ecdsa_address: Option<u32>,
 }
 
 pub trait CairoAirConfig: AirConfig<PublicInputs = ExecutionInfo<<Self as AirConfig>::Fp>>

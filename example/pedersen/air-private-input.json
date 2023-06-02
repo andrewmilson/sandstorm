@@ -6,8 +6,28 @@
             "index": 0,
             "x": "0x1",
             "y": "0x2"
+        },
+        {
+            "index": 1,
+            "x": "0x10e1",
+            "y": "0x0"
         }
     ],
-    "range_check": [],
-    "ecdsa": []
+    "range_check": [
+        {
+            "index": 0,
+            "value": "0x7d007d007d007d007d007d007d007d00"
+        }
+    ],
+    "ecdsa": [
+        {
+            "index": 0,
+            "pubkey": "0x399ab58e2d17603eeccae95933c81d504ce475eb1bd0080d2316b84232e133c",
+            "msg": "0x4be8d5e6a89581244171bb35108b89ccb781dd31284e5eb37855eddea4b1581",
+            "signature_input": {
+                "r": "0x2b5a729dad1940dcd89abe05e6755a92dc322758cf962eff13c943f9a9b056c",
+                "w": "0x776622a379f0c039ed8ba1b6be959eb24e6f8172782e5b300ef43c90d05ddb4"
+            }
+        }
+    ]
 }

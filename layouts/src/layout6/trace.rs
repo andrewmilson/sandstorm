@@ -9,20 +9,26 @@ use super::NUM_EXTENSION_COLUMNS;
 use super::PUBLIC_MEMORY_STEP;
 use super::RANGE_CHECK_STEP;
 use ark_ff::Zero;
-use ark_ff::Field;
+use binary::EcdsaInstance;
 use binary::PedersenInstance;
-use num_bigint::BigUint;
-use super::pedersen;
+use binary::RangeCheckInstance;
+use builtins::ecdsa;
+use builtins::pedersen;
 use ark_ff::One;
 use binary::AirPrivateInput;
 use binary::AirPublicInput;
+use builtins::range_check;
+use num_bigint::BigUint;
+use ruint::aliases::U256;
 use crate::ExecutionInfo;
-use crate::layout6::pedersen::pedersen_hash;
+use crate::layout6::RANGE_CHECK_BUILTIN_PARTS;
+use crate::layout6::RANGE_CHECK_BUILTIN_RATIO;
+use crate::layout6::air::RangeCheckBuiltin;
+use crate::utils::RangeCheckPool;
 use super::air::Permutation;
 use super::air::RangeCheckPermutation;
 use super::MEMORY_STEP;
 use crate::utils::get_ordered_memory_accesses;
-use crate::utils::ordered_range_check_values;
 use crate::CairoExecutionTrace;
 use alloc::vec;
 use alloc::vec::Vec;
@@ -32,7 +38,6 @@ use binary::Memory;
 use binary::RegisterState;
 use binary::RegisterStates;
 use core::iter::zip;
-use std::iter::repeat;
 use ministark::challenges::Challenges;
 use ministark::utils::GpuAllocator;
 use ministark::utils::GpuVec;
@@ -45,13 +50,16 @@ use ministark_gpu::fields::p3618502788666131213697322783095070105623107215331596
 use strum::IntoEnumIterator;
 
 pub struct ExecutionTrace {
-    pub public_memory_padding_address: usize,
+    pub public_memory_padding_address: u32,
     pub public_memory_padding_value: Fp,
-    pub range_check_min: usize,
-    pub range_check_max: usize,
-    pub public_memory: Vec<(usize, Fp)>,
+    pub range_check_min: u16,
+    pub range_check_max: u16,
+    pub public_memory: Vec<(u32, Fp)>,
     pub initial_registers: RegisterState,
     pub final_registers: RegisterState,
+    pub initial_pedersen_address: u32,
+    pub initial_rc_address: u32,
+    pub initial_ecdsa_address: u32,
     _register_states: RegisterStates,
     _program: CompiledProgram,
     _mem: Memory<Fp>,
@@ -77,11 +85,11 @@ impl CairoExecutionTrace for ExecutionTrace {
         assert!(trace_len >= TraceInfo::MIN_TRACE_LENGTH);
         let public_memory = program.get_public_memory();
 
+        println!("Num cycles: {}", num_cycles);
+        println!("Trace len: {}", trace_len);
+
         let mut flags_column = Vec::new_in(GpuAllocator);
         flags_column.resize(trace_len, Fp::zero());
-
-        let mut zeros_column = Vec::new_in(GpuAllocator);
-        zeros_column.resize(trace_len, Fp::zero());
 
         // set `padding_address == padding_value` to make filling the column easy
         // let public_memory_padding_address = public_memory_padding_address(&mem,
@@ -91,13 +99,36 @@ impl CairoExecutionTrace for ExecutionTrace {
         let mut npc_column = Vec::new_in(GpuAllocator);
         npc_column.resize(trace_len, public_memory_padding_value);
 
-        let (ordered_rc_vals, ordered_rc_padding_vals) =
-            ordered_range_check_values(num_cycles, &mem, &register_states);
-        let range_check_min = *ordered_rc_vals.first().unwrap();
-        let range_check_max = *ordered_rc_vals.last().unwrap();
-        let range_check_padding_value = Fp::from(range_check_max as u64);
-        let mut ordered_rc_vals = ordered_rc_vals.into_iter();
+        // Keep trace of all 16-bit range check values
+        let mut rc_pool = RangeCheckPool::new();
+
+        // add offsets to the range check pool
+        for &RegisterState { pc, .. } in register_states.iter() {
+            let word = mem[pc].unwrap();
+            rc_pool.push(word.get_off_dst());
+            rc_pool.push(word.get_off_op0());
+            rc_pool.push(word.get_off_op1());
+        }
+
+        // add 128-bit range check builtin parts to the range check pool
+        let rc128_instances = air_private_input.range_check;
+        let rc128_traces = rc128_instances
+            .into_iter()
+            .map(range_check::InstanceTrace::<RANGE_CHECK_BUILTIN_PARTS>::new)
+            .collect::<Vec<_>>();
+        for rc128_trace in &rc128_traces {
+            for part in rc128_trace.parts {
+                rc_pool.push(part);
+            }
+        }
+
+        let (ordered_rc_vals, ordered_rc_padding_vals) = rc_pool.get_ordered_values_with_padding();
+        let range_check_min = rc_pool.min().unwrap();
+        let range_check_max = rc_pool.max().unwrap();
+        let range_check_padding_value = Fp::from(range_check_max);
         let mut ordered_rc_padding_vals = ordered_rc_padding_vals.into_iter();
+        println!("original len: {}", ordered_rc_padding_vals.len());
+        let mut ordered_rc_vals = ordered_rc_vals.into_iter();
         let mut range_check_column = Vec::new_in(GpuAllocator);
         range_check_column.resize(trace_len, range_check_padding_value);
 
@@ -172,20 +203,40 @@ impl CairoExecutionTrace for ExecutionTrace {
                 },
             );
 
-        for cycle_offset in (0..trace_len).step_by(CYCLE_HEIGHT) {
+        // create dummy 128-bit range check values that are filled with 16-bit range
+        // check padding values
+        let rc128_dummy_traces = (rc128_traces.len()..num_cycles / RANGE_CHECK_BUILTIN_RATIO)
+            .map(|index| {
+                let mut value = U256::ZERO;
+                for _ in 0..RANGE_CHECK_BUILTIN_PARTS {
+                    let part = ordered_rc_padding_vals.next().unwrap_or(range_check_max);
+                    value = (value << 16) + U256::from(part)
+                }
+
+                range_check::InstanceTrace::<RANGE_CHECK_BUILTIN_PARTS>::new(RangeCheckInstance {
+                    index: index as u32,
+                    value,
+                })
+            })
+            .collect::<Vec<_>>();
+
+        for cycle in 0..num_cycles {
+            let cycle_offset = CYCLE_HEIGHT * cycle;
             let rc_virtual_row = &mut range_check_column[cycle_offset..cycle_offset + CYCLE_HEIGHT];
 
             // overwrite the range check padding cell with remaining padding values
-            // TODO: this might not be enough
-            rc_virtual_row[RangeCheck::Unused as usize] =
-                if let Some(val) = ordered_rc_padding_vals.next() {
-                    // Last range check is currently unused so stuff in the padding values there
-                    (val as u64).into()
-                } else {
-                    range_check_padding_value
-                };
+            // odd cycles only (even cycles are used for 128 bit range check)
+            if cycle % 2 == 1 {
+                rc_virtual_row[RangeCheck::Unused as usize] =
+                    if let Some(val) = ordered_rc_padding_vals.next() {
+                        // Last range check is currently unused so stuff in the padding values there
+                        val.into()
+                    } else {
+                        range_check_padding_value
+                    };
+            }
 
-            // add remaining ordered range check values
+            // add ordered range check values
             for offset in (0..CYCLE_HEIGHT).step_by(RANGE_CHECK_STEP) {
                 rc_virtual_row[offset + RangeCheck::Ordered as usize] =
                     if let Some(val) = ordered_rc_vals.next() {
@@ -201,6 +252,7 @@ impl CairoExecutionTrace for ExecutionTrace {
         assert!(ordered_rc_vals.next().is_none());
 
         // Generate trace for pedersen hash
+        // ================================
         let mut pedersen_partial_xs_column = Vec::new_in(GpuAllocator);
         pedersen_partial_xs_column.resize(trace_len, Fp::zero());
         let mut pedersen_partial_ys_column = Vec::new_in(GpuAllocator);
@@ -210,40 +262,40 @@ impl CairoExecutionTrace for ExecutionTrace {
         let mut pedersen_slopes_column = Vec::new_in(GpuAllocator);
         pedersen_slopes_column.resize(trace_len, Fp::zero());
 
+        // The trace for each hash spans 512 rows
         let (pedersen_partial_xs_steps, _) = pedersen_partial_xs_column.as_chunks_mut::<512>();
         let (pedersen_partial_ys_steps, _) = pedersen_partial_ys_column.as_chunks_mut::<512>();
         let (pedersen_suffixes_steps, _) = pedersen_suffixes_column.as_chunks_mut::<512>();
         let (pedersen_slopes_steps, _) = pedersen_slopes_column.as_chunks_mut::<512>();
+        let (pedersen_npc_steps, _) = npc_column.as_chunks_mut::<512>();
 
-        let zero_instance = (Fp::ZERO, Fp::ZERO, pedersen_hash(Fp::ZERO, Fp::ZERO));
-        let pedersen_instances = air_private_input
-            .pedersen
+        // Create dummy instances if there are cells that need to be filled
+        let pedersen_instances = air_private_input.pedersen;
+        let num_pedersen_instances = pedersen_instances.len() as u32;
+        let empty_pedersen_instances = (num_pedersen_instances..).map(PedersenInstance::new_empty);
+        let pedersen_traces = pedersen_instances
             .into_iter()
-            .map(|v| {
-                let into_fp = |v| Fp::from(BigUint::from(v));
-                // TODO: use consistent naming
-                let a = into_fp(v.x);
-                let b = into_fp(v.y);
-                let output = pedersen_hash(a, b);
-                (a, b, output)
-            })
-            .chain(repeat(zero_instance));
+            .chain(empty_pedersen_instances)
+            .map(pedersen::InstanceTrace::new);
 
+        let pedersen_memory_segment = air_public_input
+            .memory_segments
+            .pedersen
+            .expect("layout6 requires a pedersen memory segment");
+        let initial_pedersen_address = pedersen_memory_segment.begin_addr;
+
+        // Load individual hash traces into the global execution trace
         ark_std::cfg_iter_mut!(pedersen_partial_xs_steps)
             .zip(pedersen_partial_ys_steps)
             .zip(pedersen_suffixes_steps)
             .zip(pedersen_slopes_steps)
-            .zip(pedersen_instances)
-            .enumerate()
+            .zip(pedersen_npc_steps)
+            .zip(pedersen_traces)
             .for_each(
-                |(i, ((((partial_xs, partial_ys), suffixes), slopes), instance))| {
-                    let (a, b, output) = instance;
-                    let instance_trace = pedersen::InstanceTrace::new(a, b);
-                    let partial_steps =
-                        vec![instance_trace.a_steps, instance_trace.b_steps].concat();
-
-                    // check the last step is as expected
-                    assert_eq!(partial_steps.last().unwrap().point.x, output);
+                |(((((partial_xs, partial_ys), suffixes), slopes), npc), pedersen_trace)| {
+                    let a_steps = pedersen_trace.a_steps;
+                    let b_steps = pedersen_trace.b_steps;
+                    let partial_steps = vec![a_steps, b_steps].concat();
 
                     for ((((suffix, partial_x), partial_y), slope), step) in
                         zip(suffixes, partial_xs)
@@ -256,8 +308,94 @@ impl CairoExecutionTrace for ExecutionTrace {
                         *partial_y = step.point.y;
                         *slope = step.slope;
                     }
+
+                    // add the hash to the memory pool
+                    let instance = pedersen_trace.instance;
+                    let (a_addr, b_addr, output_addr) = instance.mem_addr(initial_pedersen_address);
+                    npc[Npc::PedersenInput0Addr as usize] = a_addr.into();
+                    npc[Npc::PedersenInput0Val as usize] = Fp::from(BigUint::from(instance.a));
+                    npc[Npc::PedersenInput1Addr as usize] = b_addr.into();
+                    npc[Npc::PedersenInput1Val as usize] = Fp::from(BigUint::from(instance.b));
+                    npc[Npc::PedersenOutputAddr as usize] = output_addr.into();
+                    npc[Npc::PedersenOutputVal as usize] = pedersen_trace.output;
                 },
             );
+
+        // Generate trace for range check builtin
+        // ======================================
+        let (rc_range_check_steps, _) = range_check_column.as_chunks_mut::<256>();
+        let (rc_npc_steps, _) = npc_column.as_chunks_mut::<256>();
+
+        let rc_memory_segment = air_public_input
+            .memory_segments
+            .range_check
+            .expect("layout6 requires a range check memory segment");
+        let initial_rc_address = rc_memory_segment.begin_addr;
+
+        let rc_offset = RangeCheckBuiltin::Rc16Component as usize;
+        let rc_step = RANGE_CHECK_BUILTIN_RATIO * CYCLE_HEIGHT / RANGE_CHECK_BUILTIN_PARTS;
+
+        ark_std::cfg_iter_mut!(rc_range_check_steps)
+            .zip(rc_npc_steps)
+            .zip(rc128_traces.into_iter().chain(rc128_dummy_traces))
+            .for_each(|((range_check, npc), rc_trace)| {
+                // add the 128-bit range check to the 16-bit range check pool
+                let parts = rc_trace.parts;
+                range_check[rc_offset] = parts[0].into();
+                range_check[rc_offset + rc_step] = parts[1].into();
+                range_check[rc_offset + rc_step * 2] = parts[2].into();
+                range_check[rc_offset + rc_step * 3] = parts[3].into();
+                range_check[rc_offset + rc_step * 4] = parts[4].into();
+                range_check[rc_offset + rc_step * 5] = parts[5].into();
+                range_check[rc_offset + rc_step * 6] = parts[6].into();
+                range_check[rc_offset + rc_step * 7] = parts[7].into();
+
+                // add the range check to the memory pool
+                let instance = rc_trace.instance;
+                let addr = instance.mem_addr(initial_rc_address);
+                npc[Npc::RangeCheck128Addr as usize] = addr.into();
+                npc[Npc::RangeCheck128Val as usize] = Fp::from(BigUint::from(instance.value));
+            });
+
+        // Generate trace for ECDSA builtin
+        // ================================
+        let ecdsa_memory_segment = air_public_input
+            .memory_segments
+            .ecdsa
+            .expect("layout6 requires an ECDSA memory segment");
+        let initial_ecdsa_address = ecdsa_memory_segment.begin_addr;
+
+        // Create dummy instances if there are cells that need to be filled
+        let ecdsa_instances = air_private_input.ecdsa;
+        let num_ecdsa_instances = ecdsa_instances.len() as u32;
+        let empty_ecdsa_instances = (num_ecdsa_instances..).map(EcdsaInstance::new_empty);
+        let ecdsa_traces = ecdsa_instances
+            .into_iter()
+            .chain(empty_ecdsa_instances)
+            .map(ecdsa::InstanceTrace::new);
+
+        let (ecdsa_npc_steps, _) = npc_column.as_chunks_mut::<32768>();
+        let (ecdsa_auxiliary_steps, _) = auxiliary_column.as_chunks_mut::<32768>();
+
+        ark_std::cfg_iter_mut!(ecdsa_npc_steps)
+            .zip(ecdsa_auxiliary_steps)
+            .zip(ecdsa_traces)
+            .for_each(|((npc, aux), ecdsa_trace)| {
+                let instance = ecdsa_trace.instance;
+                let pubkey = Fp::from(BigUint::from(instance.pubkey));
+                let message = Fp::from(BigUint::from(instance.message));
+
+                // TODO: tmp solution
+                aux[Auxiliary::EcdsaPubKey as usize] = pubkey;
+                aux[Auxiliary::EcdsaMessage as usize] = message;
+
+                // add the instance to the memory pool
+                let (pubkey_addr, message_addr) = instance.mem_addr(initial_ecdsa_address);
+                npc[Npc::EcdsaPubKeyAddr as usize] = pubkey_addr.into();
+                npc[Npc::EcdsaPubKeyVal as usize] = pubkey;
+                npc[Npc::EcdsaMessageAddr as usize] = message_addr.into();
+                npc[Npc::EcdsaMessageVal as usize] = message;
+            });
 
         // generate the memory column by ordering memory accesses
         let memory_accesses: Vec<(Fp, Fp)> = npc_column
@@ -299,6 +437,9 @@ impl CairoExecutionTrace for ExecutionTrace {
             memory_column,
             range_check_column,
             base_trace,
+            initial_pedersen_address,
+            initial_rc_address,
+            initial_ecdsa_address,
             _flags_column: flags_column,
             _auxiliary_column: auxiliary_column,
             _mem: mem,
@@ -320,6 +461,9 @@ impl CairoExecutionTrace for ExecutionTrace {
             range_check_max: self.range_check_max,
             public_memory_padding_address: self.public_memory_padding_address,
             public_memory_padding_value: self.public_memory_padding_value,
+            initial_pedersen_address: Some(self.initial_pedersen_address),
+            initial_rc_address: Some(self.initial_rc_address),
+            initial_ecdsa_address: Some(self.initial_ecdsa_address),
         }
     }
 }

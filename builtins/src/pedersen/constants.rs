@@ -3,27 +3,27 @@ use ark_ec::short_weierstrass::Affine;
 use ark_ff::MontFp as Fp;
 
 /// P0
-pub const PEDERSEN_SHIFT_POINT: Affine<PedersenCurveConfig> = Affine::new_unchecked(
+pub const P0: Affine<PedersenCurveConfig> = Affine::new_unchecked(
     Fp!("2089986280348253421170679821480865132823066470938446095505822317253594081284"),
     Fp!("1713931329540660377023406109199410414810705867260802078187082345529207694986"),
 );
 
-pub const PEDERSEN_P1: Affine<PedersenCurveConfig> = Affine::new_unchecked(
+pub const P1: Affine<PedersenCurveConfig> = Affine::new_unchecked(
     Fp!("996781205833008774514500082376783249102396023663454813447423147977397232763"),
     Fp!("1668503676786377725805489344771023921079126552019160156920634619255970485781"),
 );
 
-pub const PEDERSEN_P2: Affine<PedersenCurveConfig> = Affine::new_unchecked(
+pub const P2: Affine<PedersenCurveConfig> = Affine::new_unchecked(
     Fp!("2251563274489750535117886426533222435294046428347329203627021249169616184184"),
     Fp!("1798716007562728905295480679789526322175868328062420237419143593021674992973"),
 );
 
-pub const PEDERSEN_P3: Affine<PedersenCurveConfig> = Affine::new_unchecked(
+pub const P3: Affine<PedersenCurveConfig> = Affine::new_unchecked(
     Fp!("2138414695194151160943305727036575959195309218611738193261179310511854807447"),
     Fp!("113410276730064486255102093846540133784865286929052426931474106396135072156"),
 );
 
-pub const PEDERSEN_P4: Affine<PedersenCurveConfig> = Affine::new_unchecked(
+pub const P4: Affine<PedersenCurveConfig> = Affine::new_unchecked(
     Fp!("2379962749567351885752724891227938183011949129833673362440656643086021394946"),
     Fp!("776496453633298175483985398648758586525933812536653089401905292063708816422"),
 );
@@ -2057,35 +2057,35 @@ pub const CONSTANT_POINTS: [Affine<PedersenCurveConfig>; 506] = [
 
 #[cfg(test)]
 mod tests {
-    use crate::layout6::pedersen::params::CONSTANT_POINTS;
+    use super::CONSTANT_POINTS;
     use ark_ec::short_weierstrass::Projective;
     use ark_ec::CurveGroup;
 
     #[test]
     fn constant_points() {
         // check P1 points
-        let mut acc = Projective::from(super::PEDERSEN_P1);
+        let mut acc = Projective::from(super::P1);
         for (i, &p) in CONSTANT_POINTS[2..][0..248].iter().enumerate() {
             assert_eq!(p, acc.into_affine(), "P1 constants mismatch at {i}");
             acc += acc;
         }
 
         // check P2 points
-        let mut acc = Projective::from(super::PEDERSEN_P2);
+        let mut acc = Projective::from(super::P2);
         for (i, &p) in CONSTANT_POINTS[250..][0..4].iter().enumerate() {
             assert_eq!(p, acc.into_affine(), "P2 constants mismatch at {i}");
             acc += acc;
         }
 
         // check P3 points
-        let mut acc = Projective::from(super::PEDERSEN_P3);
+        let mut acc = Projective::from(super::P3);
         for (i, &p) in CONSTANT_POINTS[254..][0..248].iter().enumerate() {
             assert_eq!(p, acc.into_affine(), "P3 constants mismatch at {i}");
             acc += acc;
         }
 
         // check P4 points
-        let mut acc = Projective::from(super::PEDERSEN_P4);
+        let mut acc = Projective::from(super::P4);
         for (i, &p) in CONSTANT_POINTS[502..][0..4].iter().enumerate() {
             assert_eq!(p, acc.into_affine(), "P4 constants mismatch at {i}");
             acc += acc;

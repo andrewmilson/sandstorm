@@ -109,39 +109,39 @@ impl<Fp: GpuFftField + PrimeField, Fq: StarkExtensionOf<Fp>> ministark::air::Air
 
         // force constraint to apply every 16 trace rows (every cairo cycle)
         // e.g. (x - ω_0)(x - ω_16)(x - ω_32)(x - ω_48) for n=64
-        let all_cycles_zerofier = X.pow(n / CYCLE_HEIGHT) - &one;
+        let all_cycles_zerofier_inv = &one / (X.pow(n / CYCLE_HEIGHT) - &one);
         let cpu_decode_opcode_rc_input = (Npc::Instruction.curr()
             - (((&whole_flag_prefix * &offset_size + RangeCheck::OffOp1.curr()) * &offset_size
                 + RangeCheck::OffOp0.curr())
                 * &offset_size
                 + RangeCheck::OffDst.curr()))
-            / &all_cycles_zerofier;
+            * &all_cycles_zerofier_inv;
 
         // constraint for the Op1Src flag group - forces vals 000, 100, 010 or 001
         let cpu_decode_flag_op1_base_op0_bit = (&cpu_decode_flag_op1_base_op0_0
             * &cpu_decode_flag_op1_base_op0_0
             - &cpu_decode_flag_op1_base_op0_0)
-            / &all_cycles_zerofier;
+            * &all_cycles_zerofier_inv;
 
         // forces only one or none of ResAdd, ResMul or PcJnz to be 1
         // TODO: Why the F is PcJnz in here? Res flag group is only bit 5 and 6
         // NOTE: looks like it's a handy optimization to calculate next_fp and next_ap
         let cpu_decode_flag_res_op1_bit = (&cpu_decode_flag_res_op1_0 * &cpu_decode_flag_res_op1_0
             - &cpu_decode_flag_res_op1_0)
-            / &all_cycles_zerofier;
+            * &all_cycles_zerofier_inv;
 
         // constraint forces PcUpdate flag to be 000, 100, 010 or 001
         let cpu_decode_flag_pc_update_regular_bit = (&cpu_decode_flag_pc_update_regular_0
             * &cpu_decode_flag_pc_update_regular_0
             - &cpu_decode_flag_pc_update_regular_0)
-            / &all_cycles_zerofier;
+            * &all_cycles_zerofier_inv;
 
         // forces max only OpcodeRet or OpcodeAssertEq to be 1
         // TODO: why OpcodeCall not included? that would make whole flag group
         let cpu_decode_fp_update_regular_bit = (&cpu_decode_fp_update_regular_0
             * &cpu_decode_fp_update_regular_0
             - &cpu_decode_fp_update_regular_0)
-            / &all_cycles_zerofier;
+            * &all_cycles_zerofier_inv;
 
         // cpu/operands/mem_dst_addr
         // NOTE: Pseudo code from cairo whitepaper
@@ -156,7 +156,7 @@ impl<Fp: GpuFftField + PrimeField, Fq: StarkExtensionOf<Fp>> ministark::air::Air
             - (Flag::DstReg.curr() * RangeCheck::Fp.curr()
                 + (&one - Flag::DstReg.curr()) * RangeCheck::Ap.curr()
                 + RangeCheck::OffDst.curr()))
-            / &all_cycles_zerofier;
+            * &all_cycles_zerofier_inv;
 
         // whitepaper pseudocode
         // ```
@@ -171,7 +171,7 @@ impl<Fp: GpuFftField + PrimeField, Fq: StarkExtensionOf<Fp>> ministark::air::Air
             - (Flag::Op0Reg.curr() * RangeCheck::Fp.curr()
                 + (&one - Flag::Op0Reg.curr()) * RangeCheck::Ap.curr()
                 + RangeCheck::OffOp0.curr()))
-            / &all_cycles_zerofier;
+            * &all_cycles_zerofier_inv;
 
         // NOTE: StarkEx contracts as: cpu_operands_mem1_addr
         let cpu_operands_mem_op1_addr = (Npc::MemOp1Addr.curr() + &half_offset_size
@@ -180,13 +180,13 @@ impl<Fp: GpuFftField + PrimeField, Fq: StarkExtensionOf<Fp>> ministark::air::Air
                 + Flag::Op1Fp.curr() * RangeCheck::Fp.curr()
                 + &cpu_decode_flag_op1_base_op0_0 * Npc::MemOp0.curr()
                 + RangeCheck::OffOp1.curr()))
-            / &all_cycles_zerofier;
+            * &all_cycles_zerofier_inv;
 
         // op1 * op0
         // NOTE: starkex cpu/operands/ops_mul
         let cpu_operands_ops_mul = (RangeCheck::Op0MulOp1.curr()
             - Npc::MemOp0.curr() * Npc::MemOp1.curr())
-            / &all_cycles_zerofier;
+            * &all_cycles_zerofier_inv;
 
         // From cairo whitepaper
         // ```
@@ -216,17 +216,17 @@ impl<Fp: GpuFftField + PrimeField, Fq: StarkExtensionOf<Fp>> ministark::air::Air
             - (Flag::ResAdd.curr() * (Npc::MemOp0.curr() + Npc::MemOp1.curr())
                 + Flag::ResMul.curr() * RangeCheck::Op0MulOp1.curr()
                 + &cpu_decode_flag_res_op1_0 * Npc::MemOp1.curr()))
-            / &all_cycles_zerofier;
+            * &all_cycles_zerofier_inv;
 
         // example for trace length n=64
         // =============================
         // all_cycles_zerofier              = (x - ω_0)(x - ω_16)(x - ω_32)(x - ω_48)
-        // X - ω^(16*(n/16 - 1))           = x - ω^n/w^16 = x - 1/w_16 = x - w_48
+        // X - ω^(16*(n/16 - 1))            = x - ω^n/w^16 = x - 1/w_16 = x - w_48
         // (X - w_48) / all_cycles_zerofier = (x - ω_0)(x - ω_16)(x - ω_32)
         let last_cycle_zerofier = X - Constant(FieldVariant::Fp(
             g.pow([(CYCLE_HEIGHT * (n / CYCLE_HEIGHT - 1)) as u64]),
         ));
-        let all_cycles_except_last_zerofier = &last_cycle_zerofier / &all_cycles_zerofier;
+        let all_cycles_except_last_zerofier_inv = &last_cycle_zerofier * &all_cycles_zerofier_inv;
 
         // Updating the program counter
         // ============================
@@ -236,7 +236,7 @@ impl<Fp: GpuFftField + PrimeField, Fq: StarkExtensionOf<Fp>> ministark::air::Air
         // from whitepaper `t0 = fPC_JNZ * dst`
         let cpu_update_registers_update_pc_tmp0 = (Auxiliary::Tmp0.curr()
             - Flag::PcJnz.curr() * Npc::MemDst.curr())
-            * &all_cycles_except_last_zerofier;
+            * &all_cycles_except_last_zerofier_inv;
 
         // From the whitepaper "To verify that we make a regular update if dst = 0, we
         // need an auxiliary variable, v (to fill the trace in the case dst != 0, set v
@@ -246,7 +246,7 @@ impl<Fp: GpuFftField + PrimeField, Fq: StarkExtensionOf<Fp>> ministark::air::Air
         // NOTE: `t1 = t0 * v`
         let cpu_update_registers_update_pc_tmp1 = (Auxiliary::Tmp1.curr()
             - Auxiliary::Tmp0.curr() * RangeCheck::Res.curr())
-            * &all_cycles_except_last_zerofier;
+            * &all_cycles_except_last_zerofier_inv;
 
         // There are two constraints here bundled in one. The first is `t0 * (next_pc −
         // (pc + op1)) = 0` (ensures if dst != 0 a relative jump is made) and the second
@@ -263,12 +263,12 @@ impl<Fp: GpuFftField + PrimeField, Fq: StarkExtensionOf<Fp>> ministark::air::Air
             - (&cpu_decode_flag_pc_update_regular_0 * &npc_reg_0
                 + Flag::PcJumpAbs.curr() * RangeCheck::Res.curr()
                 + Flag::PcJumpRel.curr() * (Npc::Pc.curr() + RangeCheck::Res.curr())))
-            * &all_cycles_except_last_zerofier;
+            * &all_cycles_except_last_zerofier_inv;
 
         // ensure `if dst == 0: pc + instruction_size == next_pc`
         let cpu_update_registers_update_pc_pc_cond_positive =
             ((Auxiliary::Tmp1.curr() - Flag::PcJnz.curr()) * (Npc::Pc.next() - npc_reg_0))
-                * &all_cycles_except_last_zerofier;
+                * &all_cycles_except_last_zerofier_inv;
 
         // Updating the allocation pointer
         // ===============================
@@ -281,7 +281,7 @@ impl<Fp: GpuFftField + PrimeField, Fq: StarkExtensionOf<Fp>> ministark::air::Air
                 + Flag::ApAdd.curr() * RangeCheck::Res.curr()
                 + Flag::ApAdd1.curr()
                 + Flag::OpcodeCall.curr() * &two))
-            * &all_cycles_except_last_zerofier;
+            * &all_cycles_except_last_zerofier_inv;
 
         // Updating the frame pointer
         // ==========================
@@ -292,17 +292,17 @@ impl<Fp: GpuFftField + PrimeField, Fq: StarkExtensionOf<Fp>> ministark::air::Air
             - (&cpu_decode_fp_update_regular_0 * RangeCheck::Fp.curr()
                 + Flag::OpcodeRet.curr() * Npc::MemDst.curr()
                 + Flag::OpcodeCall.curr() * (RangeCheck::Ap.curr() + &two)))
-            * &all_cycles_except_last_zerofier;
+            * &all_cycles_except_last_zerofier_inv;
 
         // push registers to memory (see section 8.4 in the whitepaper).
         // These are essentially the assertions for assert `op0 == pc +
         // instruction_size` and `assert dst == fp`.
         let cpu_opcodes_call_push_fp = (Flag::OpcodeCall.curr()
             * (Npc::MemDst.curr() - RangeCheck::Fp.curr()))
-            / &all_cycles_zerofier;
+            * &all_cycles_zerofier_inv;
         let cpu_opcodes_call_push_pc = (Flag::OpcodeCall.curr()
             * (Npc::MemOp0.curr() - (Npc::Pc.curr() + Flag::Op1Imm.curr() + &one)))
-            / &all_cycles_zerofier;
+            * &all_cycles_zerofier_inv;
 
         // make sure all offsets are valid for the call opcode
         // ===================================================
@@ -312,29 +312,29 @@ impl<Fp: GpuFftField + PrimeField, Fq: StarkExtensionOf<Fp>> ministark::air::Air
         // biased representation
         let cpu_opcodes_call_off0 = (Flag::OpcodeCall.curr()
             * (RangeCheck::OffDst.curr() - &half_offset_size))
-            / &all_cycles_zerofier;
+            * &all_cycles_zerofier_inv;
         // checks `if opcode == OpcodeCall: assert off_op0 = 2^15 + 1`
         // TODO: why +1?
         let cpu_opcodes_call_off1 = (Flag::OpcodeCall.curr()
             * (RangeCheck::OffOp0.curr() - (&half_offset_size + &one)))
-            / &all_cycles_zerofier;
+            * &all_cycles_zerofier_inv;
         // TODO: I don't understand this one - Flag::OpcodeCall.curr() is 0 or 1. Why
         // not just replace `Flag::OpcodeCall.curr() + Flag::OpcodeCall.curr() +
         // &one + &one` with `4`
         let cpu_opcodes_call_flags = (Flag::OpcodeCall.curr()
             * (Flag::OpcodeCall.curr() + Flag::OpcodeCall.curr() + &one + &one
                 - (Flag::DstReg.curr() + Flag::Op0Reg.curr() + &four)))
-            / &all_cycles_zerofier;
+            * &all_cycles_zerofier_inv;
         // checks `if opcode == OpcodeRet: assert off_dst = 2^15 - 2`
         // TODO: why -2 🤯? Instruction size?
         let cpu_opcodes_ret_off0 = (Flag::OpcodeRet.curr()
             * (RangeCheck::OffDst.curr() + &two - &half_offset_size))
-            / &all_cycles_zerofier;
+            * &all_cycles_zerofier_inv;
         // checks `if opcode == OpcodeRet: assert off_op1 = 2^15 - 1`
         // TODO: why -1?
         let cpu_opcodes_ret_off2 = (Flag::OpcodeRet.curr()
             * (RangeCheck::OffOp1.curr() + &one - &half_offset_size))
-            / &all_cycles_zerofier;
+            * &all_cycles_zerofier_inv;
         // checks `if OpcodeRet: assert PcJumpAbs=1, DstReg=1, Op1Fp=1, ResLogic=0`
         let cpu_opcodes_ret_flags = (Flag::OpcodeRet.curr()
             * (Flag::PcJumpAbs.curr()
@@ -342,19 +342,19 @@ impl<Fp: GpuFftField + PrimeField, Fq: StarkExtensionOf<Fp>> ministark::air::Air
                 + Flag::Op1Fp.curr()
                 + &cpu_decode_flag_res_op1_0
                 - &four))
-            / &all_cycles_zerofier;
+            * &all_cycles_zerofier_inv;
         // handles the "assert equal" instruction. Represents this pseudo code from the
         // whitepaper `assert res = dst`.
         let cpu_opcodes_assert_eq_assert_eq = (Flag::OpcodeAssertEq.curr()
             * (Npc::MemDst.curr() - RangeCheck::Res.curr()))
-            / &all_cycles_zerofier;
+            * &all_cycles_zerofier_inv;
 
-        let first_row_zerofier = &x - &one;
+        let first_row_zerofier_inv = &x - &one;
 
         // boundary constraint expression for initial registers
-        let initial_ap = (RangeCheck::Ap.curr() - InitialAp.hint()) / &first_row_zerofier;
-        let initial_fp = (RangeCheck::Fp.curr() - InitialAp.hint()) / &first_row_zerofier;
-        let initial_pc = (Npc::Pc.curr() - InitialPc.hint()) / &first_row_zerofier;
+        let initial_ap = (RangeCheck::Ap.curr() - InitialAp.hint()) * &first_row_zerofier_inv;
+        let initial_fp = (RangeCheck::Fp.curr() - InitialAp.hint()) * &first_row_zerofier_inv;
+        let initial_pc = (Npc::Pc.curr() - InitialPc.hint()) * &first_row_zerofier_inv;
 
         // boundary constraint expression for final registers
         let final_ap = (RangeCheck::Ap.curr() - FinalAp.hint()) / &last_cycle_zerofier;
@@ -366,11 +366,12 @@ impl<Fp: GpuFftField + PrimeField, Fq: StarkExtensionOf<Fp>> ministark::air::Air
         // x^(n/2) - 1             = (x - ω_0)(x - ω_2)(x - ω_4)(x - ω_6)
         // x - ω^(2*(n/2 - 1))     = x - ω^n/w^2 = x - 1/w_2 = x - w_6
         // (x - w_6) / x^(n/2) - 1 = (x - ω_0)(x - ω_2)(x - ω_4)
-        let every_second_row_zerofier = X.pow(n / 2) - &one;
+        let every_second_row_zerofier = &one / (X.pow(n / 2) - &one);
         let second_last_row_zerofier =
             X - Constant(FieldVariant::Fp(g.pow([2 * (n as u64 / 2 - 1)])));
-        let every_second_row_except_last_zerofier =
-            &second_last_row_zerofier / &every_second_row_zerofier;
+        let second_last_row_zerofier_inv = &one / &second_last_row_zerofier;
+        let every_second_row_except_last_zerofier_inv =
+            &second_last_row_zerofier * &every_second_row_zerofier;
 
         // Memory access constraints
         // =========================
@@ -384,7 +385,7 @@ impl<Fp: GpuFftField + PrimeField, Fq: StarkExtensionOf<Fp>> ministark::air::Air
             + Npc::Pc.curr()
             + MemoryPermutation::A.challenge() * Npc::Instruction.curr()
             - MemoryPermutation::Z.challenge())
-            / &first_row_zerofier;
+            * &first_row_zerofier_inv;
         // memory permutation transition constraint
         // NOTE: memory entries are stacked in the trace like so:
         // ┌─────┬───────────┬─────┐
@@ -407,27 +408,27 @@ impl<Fp: GpuFftField + PrimeField, Fq: StarkExtensionOf<Fp>> ministark::air::Air
                 - (Npc::PubMemAddr.curr()
                     + MemoryPermutation::A.challenge() * Npc::PubMemVal.curr()))
                 * Permutation::Memory.curr())
-            * &every_second_row_except_last_zerofier;
+            * &every_second_row_except_last_zerofier_inv;
         // Check the last permutation value to verify public memory
         let memory_multi_column_perm_perm_last =
-            (Permutation::Memory.curr() - MemoryProduct.hint()) / &second_last_row_zerofier;
+            (Permutation::Memory.curr() - MemoryProduct.hint()) * &second_last_row_zerofier_inv;
         // Constraint expression for memory/diff_is_bit
         // checks the address doesn't change or increases by 1
         // "Continuity" constraint in cairo whitepaper 9.7.2
         let memory_diff_is_bit = (&memory_address_diff_0 * &memory_address_diff_0
             - &memory_address_diff_0)
-            * &every_second_row_except_last_zerofier;
+            * &every_second_row_except_last_zerofier_inv;
         // if the address stays the same then the value stays the same
         // "Single-valued" constraint in cairo whitepaper 9.7.2.
         // cairo uses nondeterministic read-only memory so if the address is the same
         // the value should also stay the same.
         let memory_is_func = ((&memory_address_diff_0 - &one)
             * (Mem::Value.curr() - Mem::Value.next()))
-            * &every_second_row_except_last_zerofier;
+            * &every_second_row_except_last_zerofier_inv;
         // boundary condition stating the first memory address == 1
-        let memory_initial_addr = (Mem::Address.curr() - &one) / &first_row_zerofier;
+        let memory_initial_addr = (Mem::Address.curr() - &one) * &first_row_zerofier_inv;
         // applies every 8 rows
-        let every_eighth_row_zerofier = X.pow(n / 8) - &one;
+        let every_eighth_row_zerofier_inv = &one / (X.pow(n / 8) - &one);
         // Read cairo whitepaper section 9.8 as to why the public memory cells are 0.
         // The high level is that the way public memory works is that the prover is
         // forced (with these constraints) to exclude the public memory from one of
@@ -435,19 +436,20 @@ impl<Fp: GpuFftField + PrimeField, Fq: StarkExtensionOf<Fp>> ministark::air::Air
         // terminates with more-or-less the permutation of just the public input. The
         // verifier can relatively cheaply calculate this terminal. The constraint for
         // this terminal is `memory_multi_column_perm_perm_last`.
-        let public_memory_addr_zero = Npc::PubMemAddr.curr() / &every_eighth_row_zerofier;
-        let public_memory_value_zero = Npc::PubMemVal.curr() / &every_eighth_row_zerofier;
+        let public_memory_addr_zero = Npc::PubMemAddr.curr() * &every_eighth_row_zerofier_inv;
+        let public_memory_value_zero = Npc::PubMemVal.curr() * &every_eighth_row_zerofier_inv;
 
         // examples for trace length n=16
         // =====================================
         // x^(n/4) - 1              = (x - ω_0)(x - ω_4)(x - ω_8)(x - ω_12)
         // x - ω^(4*(n/4 - 1))      = x - ω^n/w^4 = x - 1/w_4 = x - w_12
         // (x - w_12) / x^(n/4) - 1 = (x - ω_0)(x - ω_4)(x - ω_8)
-        let every_fourth_row_zerofier = X.pow(n / 4) - &one;
+        let every_fourth_row_zerofier_inv = &one / (X.pow(n / 4) - &one);
         let fourth_last_row_zerofier =
             X - Constant(FieldVariant::Fp(g.pow([4 * (n as u64 / 4 - 1)])));
+        let fourth_last_row_zerofier_inv = &one / &fourth_last_row_zerofier;
         let every_fourth_row_except_last_zerofier =
-            &fourth_last_row_zerofier / &every_fourth_row_zerofier;
+            &fourth_last_row_zerofier * &every_fourth_row_zerofier_inv;
 
         // Range check constraints
         // =======================
@@ -457,23 +459,23 @@ impl<Fp: GpuFftField + PrimeField, Fq: StarkExtensionOf<Fp>> ministark::air::Air
             * Permutation::RangeCheck.curr()
             + RangeCheck::OffDst.curr()
             - RangeCheckPermutation::Z.challenge())
-            / &first_row_zerofier;
+            * &first_row_zerofier_inv;
         let rc16_perm_step0 = ((RangeCheckPermutation::Z.challenge() - RangeCheck::Ordered.next())
             * Permutation::RangeCheck.next()
             - (RangeCheckPermutation::Z.challenge() - RangeCheck::OffOp1.curr())
                 * Permutation::RangeCheck.curr())
             * &every_fourth_row_except_last_zerofier;
-        let rc16_perm_last =
-            (Permutation::RangeCheck.curr() - RangeCheckProduct.hint()) / &fourth_last_row_zerofier;
+        let rc16_perm_last = (Permutation::RangeCheck.curr() - RangeCheckProduct.hint())
+            * &fourth_last_row_zerofier_inv;
         // Check the value increases by 0 or 1
         let rc16_diff_is_bit =
             (&rc16_diff_0 * &rc16_diff_0 - &rc16_diff_0) * &every_fourth_row_except_last_zerofier;
         // Prover sends the minimim and maximum as a public input.
         // Verifier checks the RC min and max fall within [0, 2^16).
         let rc16_minimum =
-            (RangeCheck::Ordered.curr() - RangeCheckMin.hint()) / &first_row_zerofier;
+            (RangeCheck::Ordered.curr() - RangeCheckMin.hint()) * &first_row_zerofier_inv;
         let rc16_maximum =
-            (RangeCheck::Ordered.curr() - RangeCheckMax.hint()) / &fourth_last_row_zerofier;
+            (RangeCheck::Ordered.curr() - RangeCheckMax.hint()) * &fourth_last_row_zerofier_inv;
 
         // NOTE: for composition OODs only seem to involve one random per constraint
         vec![
@@ -546,6 +548,9 @@ impl<Fp: GpuFftField + PrimeField, Fq: StarkExtensionOf<Fp>> ministark::air::Air
             public_memory,
             public_memory_padding_address,
             public_memory_padding_value,
+            initial_pedersen_address: _,
+            initial_rc_address: _,
+            initial_ecdsa_address: _,
         } = execution_info;
 
         let memory_product = utils::compute_public_memory_quotient(
@@ -558,7 +563,6 @@ impl<Fp: GpuFftField + PrimeField, Fq: StarkExtensionOf<Fp>> ministark::air::Air
         );
 
         assert!(range_check_min <= range_check_max);
-        assert!(*range_check_max < 2usize.pow(16));
 
         Hints::new(vec![
             (InitialAp.index(), (*initial_ap).into()),

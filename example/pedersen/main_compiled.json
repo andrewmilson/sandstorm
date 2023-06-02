@@ -2,14 +2,16 @@
     "attributes": [],
     "builtins": [
         "output",
-        "pedersen"
+        "pedersen",
+        "range_check",
+        "ecdsa"
     ],
     "compiler_version": "0.10.2",
     "data": [
         "0x40780017fff7fff",
-        "0x2",
+        "0x4",
         "0x1104800180018000",
-        "0xa",
+        "0xf",
         "0x10780017fff7fff",
         "0x0",
         "0x400380007ffb7ffc",
@@ -18,17 +20,45 @@
         "0x3",
         "0x480280027ffb8000",
         "0x208b7fff7fff7ffe",
-        "0x480a7ffd7fff8000",
+        "0x400380017ff97ffa",
+        "0x400380007ff97ffb",
+        "0x482680017ff98000",
+        "0x2",
+        "0x208b7fff7fff7ffe",
+        "0x480a7ffb7fff8000",
         "0x480680017fff8000",
         "0x1",
         "0x480680017fff8000",
         "0x2",
         "0x1104800180018000",
-        "0x800000000000010fffffffffffffffffffffffffffffffffffffffffffffff6",
+        "0x800000000000010fffffffffffffffffffffffffffffffffffffffffffffff1",
+        "0x400280007ffa7fff",
+        "0x480680017fff8000",
+        "0x7d007d007d007d007d007d007d007d00",
         "0x400280007ffc7fff",
+        "0x48127ffd7fff8000",
+        "0x480680017fff8000",
+        "0x10e1",
+        "0x480680017fff8000",
+        "0x0",
+        "0x1104800180018000",
+        "0x800000000000010ffffffffffffffffffffffffffffffffffffffffffffffe6",
+        "0x480a7ffd7fff8000",
+        "0x48127ffe7fff8000",
+        "0x480680017fff8000",
+        "0x399ab58e2d17603eeccae95933c81d504ce475eb1bd0080d2316b84232e133c",
+        "0x480680017fff8000",
+        "0x2b5a729dad1940dcd89abe05e6755a92dc322758cf962eff13c943f9a9b056c",
+        "0x480680017fff8000",
+        "0x7e3dfe8113341ad16dfbb9e5e4d425cee0685adcd4697d4364c746107077d63",
+        "0x1104800180018000",
+        "0x800000000000010ffffffffffffffffffffffffffffffffffffffffffffffe2",
+        "0x482680017ffa8000",
+        "0x1",
+        "0x48127ff57fff8000",
         "0x482680017ffc8000",
         "0x1",
-        "0x48127ffd7fff8000",
+        "0x48127ffc7fff8000",
         "0x208b7fff7fff7ffe"
     ],
     "debug_info": {
@@ -65,7 +95,7 @@
                 "flow_tracking_data": {
                     "ap_tracking": {
                         "group": 0,
-                        "offset": 2
+                        "offset": 4
                     },
                     "reference_ids": {}
                 },
@@ -278,8 +308,8 @@
             },
             "12": {
                 "accessible_scopes": [
-                    "__main__",
-                    "__main__.main"
+                    "starkware.cairo.common.signature",
+                    "starkware.cairo.common.signature.verify_ecdsa_signature"
                 ],
                 "flow_tracking_data": {
                     "ap_tracking": {
@@ -287,37 +317,123 @@
                         "offset": 0
                     },
                     "reference_ids": {
-                        "__main__.main.output_ptr": 5,
-                        "__main__.main.pedersen_ptr": 6
+                        "starkware.cairo.common.signature.verify_ecdsa_signature.ecdsa_ptr": 9,
+                        "starkware.cairo.common.signature.verify_ecdsa_signature.message": 5,
+                        "starkware.cairo.common.signature.verify_ecdsa_signature.public_key": 6,
+                        "starkware.cairo.common.signature.verify_ecdsa_signature.signature_r": 7,
+                        "starkware.cairo.common.signature.verify_ecdsa_signature.signature_s": 8
                     }
                 },
-                "hints": [],
-                "inst": {
-                    "end_col": 49,
-                    "end_line": 8,
-                    "input_file": {
-                        "filename": "example/pedersen/main.cairo"
-                    },
-                    "parent_location": [
-                        {
-                            "end_col": 44,
-                            "end_line": 11,
+                "hints": [
+                    {
+                        "location": {
+                            "end_col": 98,
+                            "end_line": 13,
                             "input_file": {
-                                "filename": "example/pedersen/main.cairo"
+                                "filename": "/Users/andrewmilson/cairo_venv/lib/python3.9/site-packages/starkware/cairo/common/signature.cairo"
                             },
-                            "start_col": 32,
-                            "start_line": 11
+                            "start_col": 5,
+                            "start_line": 13
                         },
-                        "While expanding the reference 'pedersen_ptr' in:"
-                    ],
-                    "start_col": 23,
-                    "start_line": 8
+                        "n_prefix_newlines": 0
+                    }
+                ],
+                "inst": {
+                    "end_col": 40,
+                    "end_line": 14,
+                    "input_file": {
+                        "filename": "/Users/andrewmilson/cairo_venv/lib/python3.9/site-packages/starkware/cairo/common/signature.cairo"
+                    },
+                    "start_col": 5,
+                    "start_line": 14
                 }
             },
             "13": {
                 "accessible_scopes": [
-                    "__main__",
-                    "__main__.main"
+                    "starkware.cairo.common.signature",
+                    "starkware.cairo.common.signature.verify_ecdsa_signature"
+                ],
+                "flow_tracking_data": {
+                    "ap_tracking": {
+                        "group": 3,
+                        "offset": 0
+                    },
+                    "reference_ids": {
+                        "starkware.cairo.common.signature.verify_ecdsa_signature.ecdsa_ptr": 9,
+                        "starkware.cairo.common.signature.verify_ecdsa_signature.message": 5,
+                        "starkware.cairo.common.signature.verify_ecdsa_signature.public_key": 6,
+                        "starkware.cairo.common.signature.verify_ecdsa_signature.signature_r": 7,
+                        "starkware.cairo.common.signature.verify_ecdsa_signature.signature_s": 8
+                    }
+                },
+                "hints": [],
+                "inst": {
+                    "end_col": 43,
+                    "end_line": 15,
+                    "input_file": {
+                        "filename": "/Users/andrewmilson/cairo_venv/lib/python3.9/site-packages/starkware/cairo/common/signature.cairo"
+                    },
+                    "start_col": 5,
+                    "start_line": 15
+                }
+            },
+            "14": {
+                "accessible_scopes": [
+                    "starkware.cairo.common.signature",
+                    "starkware.cairo.common.signature.verify_ecdsa_signature"
+                ],
+                "flow_tracking_data": {
+                    "ap_tracking": {
+                        "group": 3,
+                        "offset": 0
+                    },
+                    "reference_ids": {
+                        "starkware.cairo.common.signature.verify_ecdsa_signature.ecdsa_ptr": 10,
+                        "starkware.cairo.common.signature.verify_ecdsa_signature.message": 5,
+                        "starkware.cairo.common.signature.verify_ecdsa_signature.public_key": 6,
+                        "starkware.cairo.common.signature.verify_ecdsa_signature.signature_r": 7,
+                        "starkware.cairo.common.signature.verify_ecdsa_signature.signature_s": 8
+                    }
+                },
+                "hints": [],
+                "inst": {
+                    "end_col": 54,
+                    "end_line": 17,
+                    "input_file": {
+                        "filename": "/Users/andrewmilson/cairo_venv/lib/python3.9/site-packages/starkware/cairo/common/signature.cairo"
+                    },
+                    "parent_location": [
+                        {
+                            "end_col": 57,
+                            "end_line": 10,
+                            "input_file": {
+                                "filename": "/Users/andrewmilson/cairo_venv/lib/python3.9/site-packages/starkware/cairo/common/signature.cairo"
+                            },
+                            "parent_location": [
+                                {
+                                    "end_col": 15,
+                                    "end_line": 18,
+                                    "input_file": {
+                                        "filename": "/Users/andrewmilson/cairo_venv/lib/python3.9/site-packages/starkware/cairo/common/signature.cairo"
+                                    },
+                                    "start_col": 5,
+                                    "start_line": 18
+                                },
+                                "While trying to retrieve the implicit argument 'ecdsa_ptr' in:"
+                            ],
+                            "start_col": 29,
+                            "start_line": 10
+                        },
+                        "While expanding the reference 'ecdsa_ptr' in:"
+                    ],
+                    "start_col": 21,
+                    "start_line": 17
+                }
+            },
+            "16": {
+                "accessible_scopes": [
+                    "starkware.cairo.common.signature",
+                    "starkware.cairo.common.signature.verify_ecdsa_signature"
                 ],
                 "flow_tracking_data": {
                     "ap_tracking": {
@@ -325,45 +441,22 @@
                         "offset": 1
                     },
                     "reference_ids": {
-                        "__main__.main.output_ptr": 5,
-                        "__main__.main.pedersen_ptr": 6
+                        "starkware.cairo.common.signature.verify_ecdsa_signature.ecdsa_ptr": 10,
+                        "starkware.cairo.common.signature.verify_ecdsa_signature.message": 5,
+                        "starkware.cairo.common.signature.verify_ecdsa_signature.public_key": 6,
+                        "starkware.cairo.common.signature.verify_ecdsa_signature.signature_r": 7,
+                        "starkware.cairo.common.signature.verify_ecdsa_signature.signature_s": 8
                     }
                 },
                 "hints": [],
                 "inst": {
-                    "end_col": 47,
-                    "end_line": 11,
+                    "end_col": 15,
+                    "end_line": 18,
                     "input_file": {
-                        "filename": "example/pedersen/main.cairo"
+                        "filename": "/Users/andrewmilson/cairo_venv/lib/python3.9/site-packages/starkware/cairo/common/signature.cairo"
                     },
-                    "start_col": 46,
-                    "start_line": 11
-                }
-            },
-            "15": {
-                "accessible_scopes": [
-                    "__main__",
-                    "__main__.main"
-                ],
-                "flow_tracking_data": {
-                    "ap_tracking": {
-                        "group": 3,
-                        "offset": 2
-                    },
-                    "reference_ids": {
-                        "__main__.main.output_ptr": 5,
-                        "__main__.main.pedersen_ptr": 6
-                    }
-                },
-                "hints": [],
-                "inst": {
-                    "end_col": 50,
-                    "end_line": 11,
-                    "input_file": {
-                        "filename": "example/pedersen/main.cairo"
-                    },
-                    "start_col": 49,
-                    "start_line": 11
+                    "start_col": 5,
+                    "start_line": 18
                 }
             },
             "17": {
@@ -373,50 +466,65 @@
                 ],
                 "flow_tracking_data": {
                     "ap_tracking": {
-                        "group": 3,
-                        "offset": 3
+                        "group": 4,
+                        "offset": 0
                     },
                     "reference_ids": {
-                        "__main__.main.output_ptr": 5,
-                        "__main__.main.pedersen_ptr": 6
+                        "__main__.main.ecdsa_ptr": 14,
+                        "__main__.main.output_ptr": 11,
+                        "__main__.main.pedersen_ptr": 12,
+                        "__main__.main.range_check_ptr": 13
                     }
                 },
                 "hints": [],
                 "inst": {
-                    "end_col": 51,
+                    "end_col": 49,
                     "end_line": 11,
                     "input_file": {
                         "filename": "example/pedersen/main.cairo"
                     },
-                    "start_col": 17,
+                    "parent_location": [
+                        {
+                            "end_col": 44,
+                            "end_line": 14,
+                            "input_file": {
+                                "filename": "example/pedersen/main.cairo"
+                            },
+                            "start_col": 32,
+                            "start_line": 14
+                        },
+                        "While expanding the reference 'pedersen_ptr' in:"
+                    ],
+                    "start_col": 23,
                     "start_line": 11
                 }
             },
-            "19": {
+            "18": {
                 "accessible_scopes": [
                     "__main__",
                     "__main__.main"
                 ],
                 "flow_tracking_data": {
                     "ap_tracking": {
-                        "group": 3,
-                        "offset": 7
+                        "group": 4,
+                        "offset": 1
                     },
                     "reference_ids": {
-                        "__main__.main.output_ptr": 5,
-                        "__main__.main.pedersen_ptr": 7,
-                        "__main__.main.res": 8
+                        "__main__.main.ecdsa_ptr": 14,
+                        "__main__.main.output_ptr": 11,
+                        "__main__.main.pedersen_ptr": 12,
+                        "__main__.main.range_check_ptr": 13
                     }
                 },
                 "hints": [],
                 "inst": {
-                    "end_col": 31,
-                    "end_line": 12,
+                    "end_col": 47,
+                    "end_line": 14,
                     "input_file": {
                         "filename": "example/pedersen/main.cairo"
                     },
-                    "start_col": 5,
-                    "start_line": 12
+                    "start_col": 46,
+                    "start_line": 14
                 }
             },
             "20": {
@@ -426,48 +534,25 @@
                 ],
                 "flow_tracking_data": {
                     "ap_tracking": {
-                        "group": 3,
-                        "offset": 7
+                        "group": 4,
+                        "offset": 2
                     },
                     "reference_ids": {
-                        "__main__.main.output_ptr": 9,
-                        "__main__.main.pedersen_ptr": 7,
-                        "__main__.main.res": 8
+                        "__main__.main.ecdsa_ptr": 14,
+                        "__main__.main.output_ptr": 11,
+                        "__main__.main.pedersen_ptr": 12,
+                        "__main__.main.range_check_ptr": 13
                     }
                 },
                 "hints": [],
                 "inst": {
-                    "end_col": 36,
-                    "end_line": 15,
+                    "end_col": 50,
+                    "end_line": 14,
                     "input_file": {
                         "filename": "example/pedersen/main.cairo"
                     },
-                    "parent_location": [
-                        {
-                            "end_col": 21,
-                            "end_line": 8,
-                            "input_file": {
-                                "filename": "example/pedersen/main.cairo"
-                            },
-                            "parent_location": [
-                                {
-                                    "end_col": 15,
-                                    "end_line": 18,
-                                    "input_file": {
-                                        "filename": "example/pedersen/main.cairo"
-                                    },
-                                    "start_col": 5,
-                                    "start_line": 18
-                                },
-                                "While trying to retrieve the implicit argument 'output_ptr' in:"
-                            ],
-                            "start_col": 11,
-                            "start_line": 8
-                        },
-                        "While expanding the reference 'output_ptr' in:"
-                    ],
-                    "start_col": 22,
-                    "start_line": 15
+                    "start_col": 49,
+                    "start_line": 14
                 }
             },
             "22": {
@@ -477,83 +562,834 @@
                 ],
                 "flow_tracking_data": {
                     "ap_tracking": {
-                        "group": 3,
-                        "offset": 8
+                        "group": 4,
+                        "offset": 3
                     },
                     "reference_ids": {
-                        "__main__.main.output_ptr": 9,
-                        "__main__.main.pedersen_ptr": 7,
-                        "__main__.main.res": 8
+                        "__main__.main.ecdsa_ptr": 14,
+                        "__main__.main.output_ptr": 11,
+                        "__main__.main.pedersen_ptr": 12,
+                        "__main__.main.range_check_ptr": 13
                     }
                 },
                 "hints": [],
                 "inst": {
-                    "end_col": 44,
-                    "end_line": 11,
+                    "end_col": 51,
+                    "end_line": 14,
                     "input_file": {
                         "filename": "example/pedersen/main.cairo"
                     },
-                    "parent_location": [
-                        {
-                            "end_col": 49,
-                            "end_line": 8,
-                            "input_file": {
-                                "filename": "example/pedersen/main.cairo"
-                            },
-                            "parent_location": [
-                                {
-                                    "end_col": 15,
-                                    "end_line": 18,
-                                    "input_file": {
-                                        "filename": "example/pedersen/main.cairo"
-                                    },
-                                    "start_col": 5,
-                                    "start_line": 18
-                                },
-                                "While trying to retrieve the implicit argument 'pedersen_ptr' in:"
-                            ],
-                            "start_col": 23,
-                            "start_line": 8
-                        },
-                        "While expanding the reference 'pedersen_ptr' in:"
-                    ],
-                    "start_col": 32,
-                    "start_line": 11
+                    "start_col": 17,
+                    "start_line": 14
                 }
             },
-            "23": {
+            "24": {
                 "accessible_scopes": [
                     "__main__",
                     "__main__.main"
                 ],
                 "flow_tracking_data": {
                     "ap_tracking": {
-                        "group": 3,
+                        "group": 4,
+                        "offset": 7
+                    },
+                    "reference_ids": {
+                        "__main__.main.ecdsa_ptr": 14,
+                        "__main__.main.output_ptr": 11,
+                        "__main__.main.pedersen_ptr": 15,
+                        "__main__.main.range_check_ptr": 13,
+                        "__main__.main.res": 16
+                    }
+                },
+                "hints": [],
+                "inst": {
+                    "end_col": 31,
+                    "end_line": 15,
+                    "input_file": {
+                        "filename": "example/pedersen/main.cairo"
+                    },
+                    "start_col": 5,
+                    "start_line": 15
+                }
+            },
+            "25": {
+                "accessible_scopes": [
+                    "__main__",
+                    "__main__.main"
+                ],
+                "flow_tracking_data": {
+                    "ap_tracking": {
+                        "group": 4,
+                        "offset": 7
+                    },
+                    "reference_ids": {
+                        "__main__.main.ecdsa_ptr": 14,
+                        "__main__.main.output_ptr": 17,
+                        "__main__.main.pedersen_ptr": 15,
+                        "__main__.main.range_check_ptr": 13,
+                        "__main__.main.res": 16
+                    }
+                },
+                "hints": [],
+                "inst": {
+                    "end_col": 71,
+                    "end_line": 23,
+                    "input_file": {
+                        "filename": "example/pedersen/main.cairo"
+                    },
+                    "start_col": 32,
+                    "start_line": 23
+                }
+            },
+            "27": {
+                "accessible_scopes": [
+                    "__main__",
+                    "__main__.main"
+                ],
+                "flow_tracking_data": {
+                    "ap_tracking": {
+                        "group": 4,
+                        "offset": 8
+                    },
+                    "reference_ids": {
+                        "__main__.main.__temp0": 18,
+                        "__main__.main.ecdsa_ptr": 14,
+                        "__main__.main.output_ptr": 17,
+                        "__main__.main.pedersen_ptr": 15,
+                        "__main__.main.range_check_ptr": 13,
+                        "__main__.main.res": 16
+                    }
+                },
+                "hints": [],
+                "inst": {
+                    "end_col": 72,
+                    "end_line": 23,
+                    "input_file": {
+                        "filename": "example/pedersen/main.cairo"
+                    },
+                    "start_col": 5,
+                    "start_line": 23
+                }
+            },
+            "28": {
+                "accessible_scopes": [
+                    "__main__",
+                    "__main__.main"
+                ],
+                "flow_tracking_data": {
+                    "ap_tracking": {
+                        "group": 4,
+                        "offset": 8
+                    },
+                    "reference_ids": {
+                        "__main__.main.__temp0": 18,
+                        "__main__.main.amount": 21,
+                        "__main__.main.ecdsa_ptr": 14,
+                        "__main__.main.output_ptr": 17,
+                        "__main__.main.pedersen_ptr": 15,
+                        "__main__.main.range_check_ptr": 19,
+                        "__main__.main.res": 16,
+                        "__main__.main.sig": 22,
+                        "__main__.main.user": 20
+                    }
+                },
+                "hints": [],
+                "inst": {
+                    "end_col": 44,
+                    "end_line": 14,
+                    "input_file": {
+                        "filename": "example/pedersen/main.cairo"
+                    },
+                    "parent_location": [
+                        {
+                            "end_col": 52,
+                            "end_line": 29,
+                            "input_file": {
+                                "filename": "example/pedersen/main.cairo"
+                            },
+                            "start_col": 40,
+                            "start_line": 29
+                        },
+                        "While expanding the reference 'pedersen_ptr' in:"
+                    ],
+                    "start_col": 32,
+                    "start_line": 14
+                }
+            },
+            "29": {
+                "accessible_scopes": [
+                    "__main__",
+                    "__main__.main"
+                ],
+                "flow_tracking_data": {
+                    "ap_tracking": {
+                        "group": 4,
                         "offset": 9
                     },
                     "reference_ids": {
-                        "__main__.main.output_ptr": 9,
-                        "__main__.main.pedersen_ptr": 7,
-                        "__main__.main.res": 8
+                        "__main__.main.__temp0": 18,
+                        "__main__.main.amount": 21,
+                        "__main__.main.ecdsa_ptr": 14,
+                        "__main__.main.output_ptr": 17,
+                        "__main__.main.pedersen_ptr": 15,
+                        "__main__.main.range_check_ptr": 19,
+                        "__main__.main.res": 16,
+                        "__main__.main.sig": 22,
+                        "__main__.main.user": 20
+                    }
+                },
+                "hints": [],
+                "inst": {
+                    "end_col": 22,
+                    "end_line": 27,
+                    "input_file": {
+                        "filename": "example/pedersen/main.cairo"
+                    },
+                    "parent_location": [
+                        {
+                            "end_col": 60,
+                            "end_line": 29,
+                            "input_file": {
+                                "filename": "example/pedersen/main.cairo"
+                            },
+                            "start_col": 54,
+                            "start_line": 29
+                        },
+                        "While expanding the reference 'amount' in:"
+                    ],
+                    "start_col": 18,
+                    "start_line": 27
+                }
+            },
+            "31": {
+                "accessible_scopes": [
+                    "__main__",
+                    "__main__.main"
+                ],
+                "flow_tracking_data": {
+                    "ap_tracking": {
+                        "group": 4,
+                        "offset": 10
+                    },
+                    "reference_ids": {
+                        "__main__.main.__temp0": 18,
+                        "__main__.main.amount": 21,
+                        "__main__.main.ecdsa_ptr": 14,
+                        "__main__.main.output_ptr": 17,
+                        "__main__.main.pedersen_ptr": 15,
+                        "__main__.main.range_check_ptr": 19,
+                        "__main__.main.res": 16,
+                        "__main__.main.sig": 22,
+                        "__main__.main.user": 20
+                    }
+                },
+                "hints": [],
+                "inst": {
+                    "end_col": 63,
+                    "end_line": 29,
+                    "input_file": {
+                        "filename": "example/pedersen/main.cairo"
+                    },
+                    "start_col": 62,
+                    "start_line": 29
+                }
+            },
+            "33": {
+                "accessible_scopes": [
+                    "__main__",
+                    "__main__.main"
+                ],
+                "flow_tracking_data": {
+                    "ap_tracking": {
+                        "group": 4,
+                        "offset": 11
+                    },
+                    "reference_ids": {
+                        "__main__.main.__temp0": 18,
+                        "__main__.main.amount": 21,
+                        "__main__.main.ecdsa_ptr": 14,
+                        "__main__.main.output_ptr": 17,
+                        "__main__.main.pedersen_ptr": 15,
+                        "__main__.main.range_check_ptr": 19,
+                        "__main__.main.res": 16,
+                        "__main__.main.sig": 22,
+                        "__main__.main.user": 20
+                    }
+                },
+                "hints": [],
+                "inst": {
+                    "end_col": 64,
+                    "end_line": 29,
+                    "input_file": {
+                        "filename": "example/pedersen/main.cairo"
+                    },
+                    "start_col": 25,
+                    "start_line": 29
+                }
+            },
+            "35": {
+                "accessible_scopes": [
+                    "__main__",
+                    "__main__.main"
+                ],
+                "flow_tracking_data": {
+                    "ap_tracking": {
+                        "group": 4,
+                        "offset": 15
+                    },
+                    "reference_ids": {
+                        "__main__.main.__temp0": 18,
+                        "__main__.main.amount": 21,
+                        "__main__.main.amount_hash": 24,
+                        "__main__.main.ecdsa_ptr": 14,
+                        "__main__.main.output_ptr": 17,
+                        "__main__.main.pedersen_ptr": 23,
+                        "__main__.main.range_check_ptr": 19,
+                        "__main__.main.res": 16,
+                        "__main__.main.sig": 22,
+                        "__main__.main.user": 20
+                    }
+                },
+                "hints": [],
+                "inst": {
+                    "end_col": 96,
+                    "end_line": 11,
+                    "input_file": {
+                        "filename": "example/pedersen/main.cairo"
+                    },
+                    "parent_location": [
+                        {
+                            "end_col": 57,
+                            "end_line": 10,
+                            "input_file": {
+                                "filename": "/Users/andrewmilson/cairo_venv/lib/python3.9/site-packages/starkware/cairo/common/signature.cairo"
+                            },
+                            "parent_location": [
+                                {
+                                    "end_col": 6,
+                                    "end_line": 36,
+                                    "input_file": {
+                                        "filename": "example/pedersen/main.cairo"
+                                    },
+                                    "start_col": 5,
+                                    "start_line": 31
+                                },
+                                "While trying to retrieve the implicit argument 'ecdsa_ptr' in:"
+                            ],
+                            "start_col": 29,
+                            "start_line": 10
+                        },
+                        "While expanding the reference 'ecdsa_ptr' in:"
+                    ],
+                    "start_col": 68,
+                    "start_line": 11
+                }
+            },
+            "36": {
+                "accessible_scopes": [
+                    "__main__",
+                    "__main__.main"
+                ],
+                "flow_tracking_data": {
+                    "ap_tracking": {
+                        "group": 4,
+                        "offset": 16
+                    },
+                    "reference_ids": {
+                        "__main__.main.__temp0": 18,
+                        "__main__.main.amount": 21,
+                        "__main__.main.amount_hash": 24,
+                        "__main__.main.ecdsa_ptr": 14,
+                        "__main__.main.output_ptr": 17,
+                        "__main__.main.pedersen_ptr": 23,
+                        "__main__.main.range_check_ptr": 19,
+                        "__main__.main.res": 16,
+                        "__main__.main.sig": 22,
+                        "__main__.main.user": 20
+                    }
+                },
+                "hints": [],
+                "inst": {
+                    "end_col": 21,
+                    "end_line": 29,
+                    "input_file": {
+                        "filename": "example/pedersen/main.cairo"
+                    },
+                    "parent_location": [
+                        {
+                            "end_col": 28,
+                            "end_line": 32,
+                            "input_file": {
+                                "filename": "example/pedersen/main.cairo"
+                            },
+                            "start_col": 17,
+                            "start_line": 32
+                        },
+                        "While expanding the reference 'amount_hash' in:"
+                    ],
+                    "start_col": 10,
+                    "start_line": 29
+                }
+            },
+            "37": {
+                "accessible_scopes": [
+                    "__main__",
+                    "__main__.main"
+                ],
+                "flow_tracking_data": {
+                    "ap_tracking": {
+                        "group": 4,
+                        "offset": 17
+                    },
+                    "reference_ids": {
+                        "__main__.main.__temp0": 18,
+                        "__main__.main.amount": 21,
+                        "__main__.main.amount_hash": 24,
+                        "__main__.main.ecdsa_ptr": 14,
+                        "__main__.main.output_ptr": 17,
+                        "__main__.main.pedersen_ptr": 23,
+                        "__main__.main.range_check_ptr": 19,
+                        "__main__.main.res": 16,
+                        "__main__.main.sig": 22,
+                        "__main__.main.user": 20
+                    }
+                },
+                "hints": [],
+                "inst": {
+                    "end_col": 92,
+                    "end_line": 26,
+                    "input_file": {
+                        "filename": "example/pedersen/main.cairo"
+                    },
+                    "parent_location": [
+                        {
+                            "end_col": 24,
+                            "end_line": 33,
+                            "input_file": {
+                                "filename": "example/pedersen/main.cairo"
+                            },
+                            "start_col": 20,
+                            "start_line": 33
+                        },
+                        "While expanding the reference 'user' in:"
+                    ],
+                    "start_col": 16,
+                    "start_line": 26
+                }
+            },
+            "39": {
+                "accessible_scopes": [
+                    "__main__",
+                    "__main__.main"
+                ],
+                "flow_tracking_data": {
+                    "ap_tracking": {
+                        "group": 4,
+                        "offset": 18
+                    },
+                    "reference_ids": {
+                        "__main__.main.__temp0": 18,
+                        "__main__.main.amount": 21,
+                        "__main__.main.amount_hash": 24,
+                        "__main__.main.ecdsa_ptr": 14,
+                        "__main__.main.output_ptr": 17,
+                        "__main__.main.pedersen_ptr": 23,
+                        "__main__.main.range_check_ptr": 19,
+                        "__main__.main.res": 16,
+                        "__main__.main.sig": 22,
+                        "__main__.main.user": 20
+                    }
+                },
+                "hints": [],
+                "inst": {
+                    "end_col": 27,
+                    "end_line": 34,
+                    "input_file": {
+                        "filename": "example/pedersen/main.cairo"
+                    },
+                    "start_col": 21,
+                    "start_line": 34
+                }
+            },
+            "41": {
+                "accessible_scopes": [
+                    "__main__",
+                    "__main__.main"
+                ],
+                "flow_tracking_data": {
+                    "ap_tracking": {
+                        "group": 4,
+                        "offset": 19
+                    },
+                    "reference_ids": {
+                        "__main__.main.__temp0": 18,
+                        "__main__.main.amount": 21,
+                        "__main__.main.amount_hash": 24,
+                        "__main__.main.ecdsa_ptr": 14,
+                        "__main__.main.output_ptr": 17,
+                        "__main__.main.pedersen_ptr": 23,
+                        "__main__.main.range_check_ptr": 19,
+                        "__main__.main.res": 16,
+                        "__main__.main.sig": 22,
+                        "__main__.main.user": 20
+                    }
+                },
+                "hints": [],
+                "inst": {
+                    "end_col": 27,
+                    "end_line": 35,
+                    "input_file": {
+                        "filename": "example/pedersen/main.cairo"
+                    },
+                    "start_col": 21,
+                    "start_line": 35
+                }
+            },
+            "43": {
+                "accessible_scopes": [
+                    "__main__",
+                    "__main__.main"
+                ],
+                "flow_tracking_data": {
+                    "ap_tracking": {
+                        "group": 4,
+                        "offset": 20
+                    },
+                    "reference_ids": {
+                        "__main__.main.__temp0": 18,
+                        "__main__.main.amount": 21,
+                        "__main__.main.amount_hash": 24,
+                        "__main__.main.ecdsa_ptr": 14,
+                        "__main__.main.output_ptr": 17,
+                        "__main__.main.pedersen_ptr": 23,
+                        "__main__.main.range_check_ptr": 19,
+                        "__main__.main.res": 16,
+                        "__main__.main.sig": 22,
+                        "__main__.main.user": 20
+                    }
+                },
+                "hints": [],
+                "inst": {
+                    "end_col": 6,
+                    "end_line": 36,
+                    "input_file": {
+                        "filename": "example/pedersen/main.cairo"
+                    },
+                    "start_col": 5,
+                    "start_line": 31
+                }
+            },
+            "45": {
+                "accessible_scopes": [
+                    "__main__",
+                    "__main__.main"
+                ],
+                "flow_tracking_data": {
+                    "ap_tracking": {
+                        "group": 4,
+                        "offset": 23
+                    },
+                    "reference_ids": {
+                        "__main__.main.__temp0": 18,
+                        "__main__.main.amount": 21,
+                        "__main__.main.amount_hash": 24,
+                        "__main__.main.ecdsa_ptr": 25,
+                        "__main__.main.output_ptr": 17,
+                        "__main__.main.pedersen_ptr": 23,
+                        "__main__.main.range_check_ptr": 19,
+                        "__main__.main.res": 16,
+                        "__main__.main.sig": 22,
+                        "__main__.main.user": 20
+                    }
+                },
+                "hints": [],
+                "inst": {
+                    "end_col": 36,
+                    "end_line": 18,
+                    "input_file": {
+                        "filename": "example/pedersen/main.cairo"
+                    },
+                    "parent_location": [
+                        {
+                            "end_col": 21,
+                            "end_line": 11,
+                            "input_file": {
+                                "filename": "example/pedersen/main.cairo"
+                            },
+                            "parent_location": [
+                                {
+                                    "end_col": 15,
+                                    "end_line": 39,
+                                    "input_file": {
+                                        "filename": "example/pedersen/main.cairo"
+                                    },
+                                    "start_col": 5,
+                                    "start_line": 39
+                                },
+                                "While trying to retrieve the implicit argument 'output_ptr' in:"
+                            ],
+                            "start_col": 11,
+                            "start_line": 11
+                        },
+                        "While expanding the reference 'output_ptr' in:"
+                    ],
+                    "start_col": 22,
+                    "start_line": 18
+                }
+            },
+            "47": {
+                "accessible_scopes": [
+                    "__main__",
+                    "__main__.main"
+                ],
+                "flow_tracking_data": {
+                    "ap_tracking": {
+                        "group": 4,
+                        "offset": 24
+                    },
+                    "reference_ids": {
+                        "__main__.main.__temp0": 18,
+                        "__main__.main.amount": 21,
+                        "__main__.main.amount_hash": 24,
+                        "__main__.main.ecdsa_ptr": 25,
+                        "__main__.main.output_ptr": 17,
+                        "__main__.main.pedersen_ptr": 23,
+                        "__main__.main.range_check_ptr": 19,
+                        "__main__.main.res": 16,
+                        "__main__.main.sig": 22,
+                        "__main__.main.user": 20
+                    }
+                },
+                "hints": [],
+                "inst": {
+                    "end_col": 52,
+                    "end_line": 29,
+                    "input_file": {
+                        "filename": "example/pedersen/main.cairo"
+                    },
+                    "parent_location": [
+                        {
+                            "end_col": 49,
+                            "end_line": 11,
+                            "input_file": {
+                                "filename": "example/pedersen/main.cairo"
+                            },
+                            "parent_location": [
+                                {
+                                    "end_col": 15,
+                                    "end_line": 39,
+                                    "input_file": {
+                                        "filename": "example/pedersen/main.cairo"
+                                    },
+                                    "start_col": 5,
+                                    "start_line": 39
+                                },
+                                "While trying to retrieve the implicit argument 'pedersen_ptr' in:"
+                            ],
+                            "start_col": 23,
+                            "start_line": 11
+                        },
+                        "While expanding the reference 'pedersen_ptr' in:"
+                    ],
+                    "start_col": 40,
+                    "start_line": 29
+                }
+            },
+            "48": {
+                "accessible_scopes": [
+                    "__main__",
+                    "__main__.main"
+                ],
+                "flow_tracking_data": {
+                    "ap_tracking": {
+                        "group": 4,
+                        "offset": 25
+                    },
+                    "reference_ids": {
+                        "__main__.main.__temp0": 18,
+                        "__main__.main.amount": 21,
+                        "__main__.main.amount_hash": 24,
+                        "__main__.main.ecdsa_ptr": 25,
+                        "__main__.main.output_ptr": 17,
+                        "__main__.main.pedersen_ptr": 23,
+                        "__main__.main.range_check_ptr": 19,
+                        "__main__.main.res": 16,
+                        "__main__.main.sig": 22,
+                        "__main__.main.user": 20
+                    }
+                },
+                "hints": [],
+                "inst": {
+                    "end_col": 46,
+                    "end_line": 24,
+                    "input_file": {
+                        "filename": "example/pedersen/main.cairo"
+                    },
+                    "parent_location": [
+                        {
+                            "end_col": 66,
+                            "end_line": 11,
+                            "input_file": {
+                                "filename": "example/pedersen/main.cairo"
+                            },
+                            "parent_location": [
+                                {
+                                    "end_col": 15,
+                                    "end_line": 39,
+                                    "input_file": {
+                                        "filename": "example/pedersen/main.cairo"
+                                    },
+                                    "start_col": 5,
+                                    "start_line": 39
+                                },
+                                "While trying to retrieve the implicit argument 'range_check_ptr' in:"
+                            ],
+                            "start_col": 51,
+                            "start_line": 11
+                        },
+                        "While expanding the reference 'range_check_ptr' in:"
+                    ],
+                    "start_col": 27,
+                    "start_line": 24
+                }
+            },
+            "50": {
+                "accessible_scopes": [
+                    "__main__",
+                    "__main__.main"
+                ],
+                "flow_tracking_data": {
+                    "ap_tracking": {
+                        "group": 4,
+                        "offset": 26
+                    },
+                    "reference_ids": {
+                        "__main__.main.__temp0": 18,
+                        "__main__.main.amount": 21,
+                        "__main__.main.amount_hash": 24,
+                        "__main__.main.ecdsa_ptr": 25,
+                        "__main__.main.output_ptr": 17,
+                        "__main__.main.pedersen_ptr": 23,
+                        "__main__.main.range_check_ptr": 19,
+                        "__main__.main.res": 16,
+                        "__main__.main.sig": 22,
+                        "__main__.main.user": 20
+                    }
+                },
+                "hints": [],
+                "inst": {
+                    "end_col": 57,
+                    "end_line": 10,
+                    "input_file": {
+                        "filename": "/Users/andrewmilson/cairo_venv/lib/python3.9/site-packages/starkware/cairo/common/signature.cairo"
+                    },
+                    "parent_location": [
+                        {
+                            "end_col": 6,
+                            "end_line": 36,
+                            "input_file": {
+                                "filename": "example/pedersen/main.cairo"
+                            },
+                            "parent_location": [
+                                {
+                                    "end_col": 96,
+                                    "end_line": 11,
+                                    "input_file": {
+                                        "filename": "example/pedersen/main.cairo"
+                                    },
+                                    "parent_location": [
+                                        {
+                                            "end_col": 15,
+                                            "end_line": 39,
+                                            "input_file": {
+                                                "filename": "example/pedersen/main.cairo"
+                                            },
+                                            "start_col": 5,
+                                            "start_line": 39
+                                        },
+                                        "While trying to retrieve the implicit argument 'ecdsa_ptr' in:"
+                                    ],
+                                    "start_col": 68,
+                                    "start_line": 11
+                                },
+                                "While expanding the reference 'ecdsa_ptr' in:"
+                            ],
+                            "start_col": 5,
+                            "start_line": 31
+                        },
+                        "While trying to update the implicit return value 'ecdsa_ptr' in:"
+                    ],
+                    "start_col": 29,
+                    "start_line": 10
+                }
+            },
+            "51": {
+                "accessible_scopes": [
+                    "__main__",
+                    "__main__.main"
+                ],
+                "flow_tracking_data": {
+                    "ap_tracking": {
+                        "group": 4,
+                        "offset": 27
+                    },
+                    "reference_ids": {
+                        "__main__.main.__temp0": 18,
+                        "__main__.main.amount": 21,
+                        "__main__.main.amount_hash": 24,
+                        "__main__.main.ecdsa_ptr": 25,
+                        "__main__.main.output_ptr": 17,
+                        "__main__.main.pedersen_ptr": 23,
+                        "__main__.main.range_check_ptr": 19,
+                        "__main__.main.res": 16,
+                        "__main__.main.sig": 22,
+                        "__main__.main.user": 20
                     }
                 },
                 "hints": [],
                 "inst": {
                     "end_col": 15,
-                    "end_line": 18,
+                    "end_line": 39,
                     "input_file": {
                         "filename": "example/pedersen/main.cairo"
                     },
                     "start_col": 5,
-                    "start_line": 18
+                    "start_line": 39
                 }
             }
         }
     },
-    "hints": {},
+    "hints": {
+        "12": [
+            {
+                "accessible_scopes": [
+                    "starkware.cairo.common.signature",
+                    "starkware.cairo.common.signature.verify_ecdsa_signature"
+                ],
+                "code": "ecdsa_builtin.add_signature(ids.ecdsa_ptr.address_, (ids.signature_r, ids.signature_s))",
+                "flow_tracking_data": {
+                    "ap_tracking": {
+                        "group": 3,
+                        "offset": 0
+                    },
+                    "reference_ids": {
+                        "starkware.cairo.common.signature.verify_ecdsa_signature.ecdsa_ptr": 9,
+                        "starkware.cairo.common.signature.verify_ecdsa_signature.message": 5,
+                        "starkware.cairo.common.signature.verify_ecdsa_signature.public_key": 6,
+                        "starkware.cairo.common.signature.verify_ecdsa_signature.signature_r": 7,
+                        "starkware.cairo.common.signature.verify_ecdsa_signature.signature_s": 8
+                    }
+                }
+            }
+        ]
+    },
     "identifiers": {
         "__main__.HashBuiltin": {
             "destination": "starkware.cairo.common.cairo_builtins.HashBuiltin",
+            "type": "alias"
+        },
+        "__main__.SignatureBuiltin": {
+            "destination": "starkware.cairo.common.cairo_builtins.SignatureBuiltin",
             "type": "alias"
         },
         "__main__.__end__": {
@@ -570,7 +1406,7 @@
         },
         "__main__.main": {
             "decorators": [],
-            "pc": 12,
+            "pc": 17,
             "type": "function"
         },
         "__main__.main.Args": {
@@ -582,6 +1418,10 @@
         "__main__.main.ImplicitArgs": {
             "full_name": "__main__.main.ImplicitArgs",
             "members": {
+                "ecdsa_ptr": {
+                    "cairo_type": "starkware.cairo.common.cairo_builtins.SignatureBuiltin*",
+                    "offset": 3
+                },
                 "output_ptr": {
                     "cairo_type": "felt",
                     "offset": 0
@@ -589,9 +1429,13 @@
                 "pedersen_ptr": {
                     "cairo_type": "starkware.cairo.common.cairo_builtins.HashBuiltin*",
                     "offset": 1
+                },
+                "range_check_ptr": {
+                    "cairo_type": "felt",
+                    "offset": 2
                 }
             },
-            "size": 2,
+            "size": 4,
             "type": "struct"
         },
         "__main__.main.Return": {
@@ -602,25 +1446,93 @@
             "type": "const",
             "value": 0
         },
+        "__main__.main.__temp0": {
+            "cairo_type": "felt",
+            "full_name": "__main__.main.__temp0",
+            "references": [
+                {
+                    "ap_tracking_data": {
+                        "group": 4,
+                        "offset": 8
+                    },
+                    "pc": 27,
+                    "value": "[cast(ap + (-1), felt*)]"
+                }
+            ],
+            "type": "reference"
+        },
+        "__main__.main.amount": {
+            "cairo_type": "felt",
+            "full_name": "__main__.main.amount",
+            "references": [
+                {
+                    "ap_tracking_data": {
+                        "group": 4,
+                        "offset": 8
+                    },
+                    "pc": 28,
+                    "value": "cast(4321, felt)"
+                }
+            ],
+            "type": "reference"
+        },
+        "__main__.main.amount_hash": {
+            "cairo_type": "felt",
+            "full_name": "__main__.main.amount_hash",
+            "references": [
+                {
+                    "ap_tracking_data": {
+                        "group": 4,
+                        "offset": 15
+                    },
+                    "pc": 35,
+                    "value": "[cast(ap + (-1), felt*)]"
+                }
+            ],
+            "type": "reference"
+        },
+        "__main__.main.ecdsa_ptr": {
+            "cairo_type": "starkware.cairo.common.cairo_builtins.SignatureBuiltin*",
+            "full_name": "__main__.main.ecdsa_ptr",
+            "references": [
+                {
+                    "ap_tracking_data": {
+                        "group": 4,
+                        "offset": 0
+                    },
+                    "pc": 17,
+                    "value": "[cast(fp + (-3), starkware.cairo.common.cairo_builtins.SignatureBuiltin**)]"
+                },
+                {
+                    "ap_tracking_data": {
+                        "group": 4,
+                        "offset": 23
+                    },
+                    "pc": 45,
+                    "value": "[cast(ap + (-1), starkware.cairo.common.cairo_builtins.SignatureBuiltin**)]"
+                }
+            ],
+            "type": "reference"
+        },
         "__main__.main.output_ptr": {
             "cairo_type": "felt",
             "full_name": "__main__.main.output_ptr",
             "references": [
                 {
                     "ap_tracking_data": {
-                        "group": 3,
+                        "group": 4,
                         "offset": 0
                     },
-                    "pc": 12,
-                    "value": "[cast(fp + (-4), felt*)]"
+                    "pc": 17,
+                    "value": "[cast(fp + (-6), felt*)]"
                 },
                 {
                     "ap_tracking_data": {
-                        "group": 3,
+                        "group": 4,
                         "offset": 7
                     },
-                    "pc": 20,
-                    "value": "cast([fp + (-4)] + 1, felt)"
+                    "pc": 25,
+                    "value": "cast([fp + (-6)] + 1, felt)"
                 }
             ],
             "type": "reference"
@@ -631,19 +1543,50 @@
             "references": [
                 {
                     "ap_tracking_data": {
-                        "group": 3,
+                        "group": 4,
                         "offset": 0
                     },
-                    "pc": 12,
-                    "value": "[cast(fp + (-3), starkware.cairo.common.cairo_builtins.HashBuiltin**)]"
+                    "pc": 17,
+                    "value": "[cast(fp + (-5), starkware.cairo.common.cairo_builtins.HashBuiltin**)]"
                 },
                 {
                     "ap_tracking_data": {
-                        "group": 3,
+                        "group": 4,
                         "offset": 7
                     },
-                    "pc": 19,
+                    "pc": 24,
                     "value": "[cast(ap + (-2), starkware.cairo.common.cairo_builtins.HashBuiltin**)]"
+                },
+                {
+                    "ap_tracking_data": {
+                        "group": 4,
+                        "offset": 15
+                    },
+                    "pc": 35,
+                    "value": "[cast(ap + (-2), starkware.cairo.common.cairo_builtins.HashBuiltin**)]"
+                }
+            ],
+            "type": "reference"
+        },
+        "__main__.main.range_check_ptr": {
+            "cairo_type": "felt",
+            "full_name": "__main__.main.range_check_ptr",
+            "references": [
+                {
+                    "ap_tracking_data": {
+                        "group": 4,
+                        "offset": 0
+                    },
+                    "pc": 17,
+                    "value": "[cast(fp + (-4), felt*)]"
+                },
+                {
+                    "ap_tracking_data": {
+                        "group": 4,
+                        "offset": 8
+                    },
+                    "pc": 28,
+                    "value": "cast([fp + (-4)] + 1, felt)"
                 }
             ],
             "type": "reference"
@@ -654,14 +1597,56 @@
             "references": [
                 {
                     "ap_tracking_data": {
-                        "group": 3,
+                        "group": 4,
                         "offset": 7
                     },
-                    "pc": 19,
+                    "pc": 24,
                     "value": "[cast(ap + (-1), felt*)]"
                 }
             ],
             "type": "reference"
+        },
+        "__main__.main.sig": {
+            "cairo_type": "(felt, felt)",
+            "full_name": "__main__.main.sig",
+            "references": [
+                {
+                    "ap_tracking_data": {
+                        "group": 4,
+                        "offset": 8
+                    },
+                    "pc": 28,
+                    "value": "cast((1225578735933442828068102633747590437426782890965066746429241472187377583468, -49693218924217498651952425176944679865992295065018488161465798232750195358), (felt, felt))"
+                }
+            ],
+            "type": "reference"
+        },
+        "__main__.main.user": {
+            "cairo_type": "felt",
+            "full_name": "__main__.main.user",
+            "references": [
+                {
+                    "ap_tracking_data": {
+                        "group": 4,
+                        "offset": 8
+                    },
+                    "pc": 28,
+                    "value": "cast(1628448741648245036800002906075225705100596136133912895015035902954123957052, felt)"
+                }
+            ],
+            "type": "reference"
+        },
+        "__main__.verify_ecdsa_signature": {
+            "destination": "starkware.cairo.common.signature.verify_ecdsa_signature",
+            "type": "alias"
+        },
+        "starkware.cairo.common.bool.FALSE": {
+            "type": "const",
+            "value": 0
+        },
+        "starkware.cairo.common.bool.TRUE": {
+            "type": "const",
+            "value": 1
         },
         "starkware.cairo.common.cairo_builtins.BitwiseBuiltin": {
             "full_name": "starkware.cairo.common.cairo_builtins.BitwiseBuiltin",
@@ -769,6 +1754,61 @@
             },
             "size": 2,
             "type": "struct"
+        },
+        "starkware.cairo.common.ec.EcOpBuiltin": {
+            "destination": "starkware.cairo.common.cairo_builtins.EcOpBuiltin",
+            "type": "alias"
+        },
+        "starkware.cairo.common.ec.EcPoint": {
+            "destination": "starkware.cairo.common.ec_point.EcPoint",
+            "type": "alias"
+        },
+        "starkware.cairo.common.ec.StarkCurve": {
+            "type": "namespace"
+        },
+        "starkware.cairo.common.ec.StarkCurve.ALPHA": {
+            "type": "const",
+            "value": 1
+        },
+        "starkware.cairo.common.ec.StarkCurve.Args": {
+            "full_name": "starkware.cairo.common.ec.StarkCurve.Args",
+            "members": {},
+            "size": 0,
+            "type": "struct"
+        },
+        "starkware.cairo.common.ec.StarkCurve.BETA": {
+            "type": "const",
+            "value": -476910135076337975234679399815567221425937815956490878998147463828055613816
+        },
+        "starkware.cairo.common.ec.StarkCurve.GEN_X": {
+            "type": "const",
+            "value": 874739451078007766457464989774322083649278607533249481151382481072868806602
+        },
+        "starkware.cairo.common.ec.StarkCurve.GEN_Y": {
+            "type": "const",
+            "value": 152666792071518830868575557812948353041420400780739481342941381225525861407
+        },
+        "starkware.cairo.common.ec.StarkCurve.ImplicitArgs": {
+            "full_name": "starkware.cairo.common.ec.StarkCurve.ImplicitArgs",
+            "members": {},
+            "size": 0,
+            "type": "struct"
+        },
+        "starkware.cairo.common.ec.StarkCurve.ORDER": {
+            "type": "const",
+            "value": -96363463615509210819012598251359154898
+        },
+        "starkware.cairo.common.ec.StarkCurve.Return": {
+            "cairo_type": "()",
+            "type": "type_definition"
+        },
+        "starkware.cairo.common.ec.StarkCurve.SIZEOF_LOCALS": {
+            "type": "const",
+            "value": 0
+        },
+        "starkware.cairo.common.ec.is_quad_residue": {
+            "destination": "starkware.cairo.common.math.is_quad_residue",
+            "type": "alias"
         },
         "starkware.cairo.common.ec_point.EcPoint": {
             "full_name": "starkware.cairo.common.ec_point.EcPoint",
@@ -934,6 +1974,188 @@
             },
             "size": 8,
             "type": "struct"
+        },
+        "starkware.cairo.common.math.FALSE": {
+            "destination": "starkware.cairo.common.bool.FALSE",
+            "type": "alias"
+        },
+        "starkware.cairo.common.math.TRUE": {
+            "destination": "starkware.cairo.common.bool.TRUE",
+            "type": "alias"
+        },
+        "starkware.cairo.common.signature.EcOpBuiltin": {
+            "destination": "starkware.cairo.common.cairo_builtins.EcOpBuiltin",
+            "type": "alias"
+        },
+        "starkware.cairo.common.signature.EcPoint": {
+            "destination": "starkware.cairo.common.ec_point.EcPoint",
+            "type": "alias"
+        },
+        "starkware.cairo.common.signature.FALSE": {
+            "destination": "starkware.cairo.common.bool.FALSE",
+            "type": "alias"
+        },
+        "starkware.cairo.common.signature.SignatureBuiltin": {
+            "destination": "starkware.cairo.common.cairo_builtins.SignatureBuiltin",
+            "type": "alias"
+        },
+        "starkware.cairo.common.signature.StarkCurve": {
+            "destination": "starkware.cairo.common.ec.StarkCurve",
+            "type": "alias"
+        },
+        "starkware.cairo.common.signature.TRUE": {
+            "destination": "starkware.cairo.common.bool.TRUE",
+            "type": "alias"
+        },
+        "starkware.cairo.common.signature.ec_add": {
+            "destination": "starkware.cairo.common.ec.ec_add",
+            "type": "alias"
+        },
+        "starkware.cairo.common.signature.ec_mul": {
+            "destination": "starkware.cairo.common.ec.ec_mul",
+            "type": "alias"
+        },
+        "starkware.cairo.common.signature.ec_sub": {
+            "destination": "starkware.cairo.common.ec.ec_sub",
+            "type": "alias"
+        },
+        "starkware.cairo.common.signature.is_x_on_curve": {
+            "destination": "starkware.cairo.common.ec.is_x_on_curve",
+            "type": "alias"
+        },
+        "starkware.cairo.common.signature.recover_y": {
+            "destination": "starkware.cairo.common.ec.recover_y",
+            "type": "alias"
+        },
+        "starkware.cairo.common.signature.verify_ecdsa_signature": {
+            "decorators": [],
+            "pc": 12,
+            "type": "function"
+        },
+        "starkware.cairo.common.signature.verify_ecdsa_signature.Args": {
+            "full_name": "starkware.cairo.common.signature.verify_ecdsa_signature.Args",
+            "members": {
+                "message": {
+                    "cairo_type": "felt",
+                    "offset": 0
+                },
+                "public_key": {
+                    "cairo_type": "felt",
+                    "offset": 1
+                },
+                "signature_r": {
+                    "cairo_type": "felt",
+                    "offset": 2
+                },
+                "signature_s": {
+                    "cairo_type": "felt",
+                    "offset": 3
+                }
+            },
+            "size": 4,
+            "type": "struct"
+        },
+        "starkware.cairo.common.signature.verify_ecdsa_signature.ImplicitArgs": {
+            "full_name": "starkware.cairo.common.signature.verify_ecdsa_signature.ImplicitArgs",
+            "members": {
+                "ecdsa_ptr": {
+                    "cairo_type": "starkware.cairo.common.cairo_builtins.SignatureBuiltin*",
+                    "offset": 0
+                }
+            },
+            "size": 1,
+            "type": "struct"
+        },
+        "starkware.cairo.common.signature.verify_ecdsa_signature.Return": {
+            "cairo_type": "()",
+            "type": "type_definition"
+        },
+        "starkware.cairo.common.signature.verify_ecdsa_signature.SIZEOF_LOCALS": {
+            "type": "const",
+            "value": 0
+        },
+        "starkware.cairo.common.signature.verify_ecdsa_signature.ecdsa_ptr": {
+            "cairo_type": "starkware.cairo.common.cairo_builtins.SignatureBuiltin*",
+            "full_name": "starkware.cairo.common.signature.verify_ecdsa_signature.ecdsa_ptr",
+            "references": [
+                {
+                    "ap_tracking_data": {
+                        "group": 3,
+                        "offset": 0
+                    },
+                    "pc": 12,
+                    "value": "[cast(fp + (-7), starkware.cairo.common.cairo_builtins.SignatureBuiltin**)]"
+                },
+                {
+                    "ap_tracking_data": {
+                        "group": 3,
+                        "offset": 0
+                    },
+                    "pc": 14,
+                    "value": "cast([fp + (-7)] + 2, starkware.cairo.common.cairo_builtins.SignatureBuiltin*)"
+                }
+            ],
+            "type": "reference"
+        },
+        "starkware.cairo.common.signature.verify_ecdsa_signature.message": {
+            "cairo_type": "felt",
+            "full_name": "starkware.cairo.common.signature.verify_ecdsa_signature.message",
+            "references": [
+                {
+                    "ap_tracking_data": {
+                        "group": 3,
+                        "offset": 0
+                    },
+                    "pc": 12,
+                    "value": "[cast(fp + (-6), felt*)]"
+                }
+            ],
+            "type": "reference"
+        },
+        "starkware.cairo.common.signature.verify_ecdsa_signature.public_key": {
+            "cairo_type": "felt",
+            "full_name": "starkware.cairo.common.signature.verify_ecdsa_signature.public_key",
+            "references": [
+                {
+                    "ap_tracking_data": {
+                        "group": 3,
+                        "offset": 0
+                    },
+                    "pc": 12,
+                    "value": "[cast(fp + (-5), felt*)]"
+                }
+            ],
+            "type": "reference"
+        },
+        "starkware.cairo.common.signature.verify_ecdsa_signature.signature_r": {
+            "cairo_type": "felt",
+            "full_name": "starkware.cairo.common.signature.verify_ecdsa_signature.signature_r",
+            "references": [
+                {
+                    "ap_tracking_data": {
+                        "group": 3,
+                        "offset": 0
+                    },
+                    "pc": 12,
+                    "value": "[cast(fp + (-4), felt*)]"
+                }
+            ],
+            "type": "reference"
+        },
+        "starkware.cairo.common.signature.verify_ecdsa_signature.signature_s": {
+            "cairo_type": "felt",
+            "full_name": "starkware.cairo.common.signature.verify_ecdsa_signature.signature_s",
+            "references": [
+                {
+                    "ap_tracking_data": {
+                        "group": 3,
+                        "offset": 0
+                    },
+                    "pc": 12,
+                    "value": "[cast(fp + (-3), felt*)]"
+                }
+            ],
+            "type": "reference"
         }
     },
     "main_scope": "__main__",
@@ -986,6 +2208,22 @@
                     "offset": 0
                 },
                 "pc": 12,
+                "value": "[cast(fp + (-6), felt*)]"
+            },
+            {
+                "ap_tracking_data": {
+                    "group": 3,
+                    "offset": 0
+                },
+                "pc": 12,
+                "value": "[cast(fp + (-5), felt*)]"
+            },
+            {
+                "ap_tracking_data": {
+                    "group": 3,
+                    "offset": 0
+                },
+                "pc": 12,
                 "value": "[cast(fp + (-4), felt*)]"
             },
             {
@@ -994,31 +2232,143 @@
                     "offset": 0
                 },
                 "pc": 12,
-                "value": "[cast(fp + (-3), starkware.cairo.common.cairo_builtins.HashBuiltin**)]"
+                "value": "[cast(fp + (-3), felt*)]"
             },
             {
                 "ap_tracking_data": {
                     "group": 3,
+                    "offset": 0
+                },
+                "pc": 12,
+                "value": "[cast(fp + (-7), starkware.cairo.common.cairo_builtins.SignatureBuiltin**)]"
+            },
+            {
+                "ap_tracking_data": {
+                    "group": 3,
+                    "offset": 0
+                },
+                "pc": 14,
+                "value": "cast([fp + (-7)] + 2, starkware.cairo.common.cairo_builtins.SignatureBuiltin*)"
+            },
+            {
+                "ap_tracking_data": {
+                    "group": 4,
+                    "offset": 0
+                },
+                "pc": 17,
+                "value": "[cast(fp + (-6), felt*)]"
+            },
+            {
+                "ap_tracking_data": {
+                    "group": 4,
+                    "offset": 0
+                },
+                "pc": 17,
+                "value": "[cast(fp + (-5), starkware.cairo.common.cairo_builtins.HashBuiltin**)]"
+            },
+            {
+                "ap_tracking_data": {
+                    "group": 4,
+                    "offset": 0
+                },
+                "pc": 17,
+                "value": "[cast(fp + (-4), felt*)]"
+            },
+            {
+                "ap_tracking_data": {
+                    "group": 4,
+                    "offset": 0
+                },
+                "pc": 17,
+                "value": "[cast(fp + (-3), starkware.cairo.common.cairo_builtins.SignatureBuiltin**)]"
+            },
+            {
+                "ap_tracking_data": {
+                    "group": 4,
                     "offset": 7
                 },
-                "pc": 19,
+                "pc": 24,
                 "value": "[cast(ap + (-2), starkware.cairo.common.cairo_builtins.HashBuiltin**)]"
             },
             {
                 "ap_tracking_data": {
-                    "group": 3,
+                    "group": 4,
                     "offset": 7
                 },
-                "pc": 19,
+                "pc": 24,
                 "value": "[cast(ap + (-1), felt*)]"
             },
             {
                 "ap_tracking_data": {
-                    "group": 3,
+                    "group": 4,
                     "offset": 7
                 },
-                "pc": 20,
+                "pc": 25,
+                "value": "cast([fp + (-6)] + 1, felt)"
+            },
+            {
+                "ap_tracking_data": {
+                    "group": 4,
+                    "offset": 8
+                },
+                "pc": 27,
+                "value": "[cast(ap + (-1), felt*)]"
+            },
+            {
+                "ap_tracking_data": {
+                    "group": 4,
+                    "offset": 8
+                },
+                "pc": 28,
                 "value": "cast([fp + (-4)] + 1, felt)"
+            },
+            {
+                "ap_tracking_data": {
+                    "group": 4,
+                    "offset": 8
+                },
+                "pc": 28,
+                "value": "cast(1628448741648245036800002906075225705100596136133912895015035902954123957052, felt)"
+            },
+            {
+                "ap_tracking_data": {
+                    "group": 4,
+                    "offset": 8
+                },
+                "pc": 28,
+                "value": "cast(4321, felt)"
+            },
+            {
+                "ap_tracking_data": {
+                    "group": 4,
+                    "offset": 8
+                },
+                "pc": 28,
+                "value": "cast((1225578735933442828068102633747590437426782890965066746429241472187377583468, -49693218924217498651952425176944679865992295065018488161465798232750195358), (felt, felt))"
+            },
+            {
+                "ap_tracking_data": {
+                    "group": 4,
+                    "offset": 15
+                },
+                "pc": 35,
+                "value": "[cast(ap + (-2), starkware.cairo.common.cairo_builtins.HashBuiltin**)]"
+            },
+            {
+                "ap_tracking_data": {
+                    "group": 4,
+                    "offset": 15
+                },
+                "pc": 35,
+                "value": "[cast(ap + (-1), felt*)]"
+            },
+            {
+                "ap_tracking_data": {
+                    "group": 4,
+                    "offset": 23
+                },
+                "pc": 45,
+                "value": "[cast(ap + (-1), starkware.cairo.common.cairo_builtins.SignatureBuiltin**)]"
             }
         ]
     }

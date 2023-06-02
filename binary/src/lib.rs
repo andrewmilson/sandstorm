@@ -10,7 +10,6 @@ use ruint::aliases::U256;
 use ruint::uint;
 use serde::Deserialize;
 use serde::Serialize;
-use std::collections::HashMap;
 use std::io::BufRead;
 use std::io::BufReader;
 use std::io::Read;
@@ -125,44 +124,117 @@ impl<F: Field> Deref for Memory<F> {
     }
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone, Copy, Debug)]
 pub struct MemoryEntry {
     #[serde(deserialize_with = "deserialize_hex_str")]
-    value: U256,
-    address: u32,
+    pub value: U256,
+    pub address: u32,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone, Copy, Debug)]
 pub struct Segment {
-    begin_addr: u32,
-    stop_ptr: u32,
+    pub begin_addr: u32,
+    pub stop_ptr: u32,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone, Copy, Debug)]
+pub struct MemorySegments {
+    pub program: Segment,
+    pub execution: Segment,
+    pub output: Option<Segment>,
+    pub pedersen: Option<Segment>,
+    pub range_check: Option<Segment>,
+    pub ecdsa: Option<Segment>,
+}
+
+#[derive(Deserialize, Clone, Debug)]
 pub struct AirPublicInput {
     pub rc_min: u32,
     pub rc_max: u32,
     pub n_steps: u32,
     pub layout: String,
-    pub memory_segments: HashMap<String, Segment>,
+    pub memory_segments: MemorySegments,
     // TODO: check if the addresses are all sequential
     pub public_memory: Vec<MemoryEntry>,
 }
 
-#[derive(Deserialize, Clone, Copy)]
-struct RangeCheckInstance {
+#[derive(Deserialize, Clone, Copy, Debug)]
+pub struct Signature {
     #[serde(deserialize_with = "deserialize_hex_str")]
-    value: U256,
-    index: u32,
+    pub r: U256,
+    #[serde(deserialize_with = "deserialize_hex_str")]
+    pub w: U256,
 }
 
-#[derive(Deserialize, Clone, Copy)]
-pub struct PedersenInstance {
+#[derive(Deserialize, Clone, Copy, Debug)]
+pub struct EcdsaInstance {
     pub index: u32,
     #[serde(deserialize_with = "deserialize_hex_str")]
-    pub x: U256,
+    pub pubkey: U256,
+    #[serde(rename = "msg", deserialize_with = "deserialize_hex_str")]
+    pub message: U256,
+    #[serde(rename = "signature_input")]
+    pub signature: Signature,
+}
+
+impl EcdsaInstance {
+    pub fn new_empty(_index: u32) -> Self {
+        todo!()
+    }
+
+    /// Get the memory address for this instance
+    /// Output is of the form (pubkey_addr, msg_addr)
+    pub fn mem_addr(&self, ecdsa_segment_addr: u32) -> (u32, u32) {
+        let instance_offset = ecdsa_segment_addr + self.index * 2;
+        (instance_offset, instance_offset + 1)
+    }
+}
+
+#[derive(Deserialize, Clone, Copy, Debug)]
+pub struct PedersenInstance {
+    pub index: u32,
+    #[serde(rename = "x", deserialize_with = "deserialize_hex_str")]
+    pub a: U256,
+    #[serde(rename = "y", deserialize_with = "deserialize_hex_str")]
+    pub b: U256,
+}
+
+impl PedersenInstance {
+    pub fn new_empty(index: u32) -> Self {
+        Self {
+            index,
+            a: U256::ZERO,
+            b: U256::ZERO,
+        }
+    }
+
+    /// Get the memory address for this instance
+    /// Output is of the form (a_addr, b_addr, output_addr)
+    pub fn mem_addr(&self, pedersen_segment_addr: u32) -> (u32, u32, u32) {
+        let instance_offset = pedersen_segment_addr + self.index * 3;
+        (instance_offset, instance_offset + 1, instance_offset + 2)
+    }
+}
+
+#[derive(Deserialize, Clone, Copy, Debug)]
+pub struct RangeCheckInstance {
+    pub index: u32,
     #[serde(deserialize_with = "deserialize_hex_str")]
-    pub y: U256,
+    pub value: U256,
+}
+
+impl RangeCheckInstance {
+    pub fn new_empty(index: u32) -> Self {
+        Self {
+            index,
+            value: U256::ZERO,
+        }
+    }
+
+    /// Get the memory address for this instance
+    pub fn mem_addr(&self, range_check_segment_addr: u32) -> u32 {
+        range_check_segment_addr + self.index
+    }
 }
 
 #[derive(Deserialize)]
@@ -170,7 +242,8 @@ pub struct AirPrivateInput {
     pub trace_path: PathBuf,
     pub memory_path: PathBuf,
     pub pedersen: Vec<PedersenInstance>,
-    // range_check: Vec<RangeCheckInstance>,
+    pub ecdsa: Vec<EcdsaInstance>,
+    pub range_check: Vec<RangeCheckInstance>,
 }
 
 #[derive(Deserialize)]
@@ -190,22 +263,22 @@ impl CompiledProgram {
         assert_eq!(format!("{:#x}", modulus), self.prime.to_lowercase());
     }
 
-    pub fn get_public_memory<F: PrimeField>(&self) -> Vec<(usize, F)> {
+    pub fn get_public_memory<F: PrimeField>(&self) -> Vec<(u32, F)> {
         self.validate::<F>();
         self.data
             .iter()
             .enumerate()
             .map(|(i, &value)| {
                 // address 0 is reserved for dummy accesses
-                (i + 1, Word::new(value).into_felt())
+                (i as u32 + 1, Word::new(value).into_felt())
             })
             .collect()
     }
 
-    pub fn get_padding_address_and_value<F: Field>(&self) -> (usize, F) {
+    pub fn get_padding_address_and_value<F: Field>(&self) -> (u32, F) {
         // TODO: make more concrete. By convention seems to be next after public memory
         let address = self.data.len() + 1;
-        (address, (address as u64).into())
+        (address as u32, (address as u64).into())
     }
 }
 
@@ -230,30 +303,32 @@ impl<F> Word<F> {
 
     pub fn get_op0_addr(&self, ap: usize, fp: usize) -> usize {
         // TODO: put the if statement first good for rust quiz
-        self.get_off_op0() + if self.get_flag(Flag::Op0Reg) { fp } else { ap } - HALF_OFFSET
+        self.get_off_op0() as usize + if self.get_flag(Flag::Op0Reg) { fp } else { ap }
+            - HALF_OFFSET
     }
 
     pub fn get_dst_addr(&self, ap: usize, fp: usize) -> usize {
-        self.get_off_dst() + if self.get_flag(Flag::DstReg) { fp } else { ap } - HALF_OFFSET
+        self.get_off_dst() as usize + if self.get_flag(Flag::DstReg) { fp } else { ap }
+            - HALF_OFFSET
     }
 
     pub fn get_flag(&self, flag: Flag) -> bool {
         self.0.bit(FLAGS_BIT_OFFSET + flag as usize)
     }
 
-    pub fn get_off_dst(&self) -> usize {
+    pub fn get_off_dst(&self) -> u16 {
         let prefix = self.0 >> OFF_DST_BIT_OFFSET;
         let mask = U256::from(OFF_MASK);
         (prefix & mask).try_into().unwrap()
     }
 
-    pub fn get_off_op0(&self) -> usize {
+    pub fn get_off_op0(&self) -> u16 {
         let prefix = self.0 >> OFF_OP0_BIT_OFFSET;
         let mask = U256::from(OFF_MASK);
         (prefix & mask).try_into().unwrap()
     }
 
-    pub fn get_off_op1(&self) -> usize {
+    pub fn get_off_op1(&self) -> u16 {
         let prefix = self.0 >> OFF_OP1_BIT_OFFSET;
         let mask = U256::from(OFF_MASK);
         (prefix & mask).try_into().unwrap()
@@ -304,7 +379,7 @@ impl<F: PrimeField> Word<F> {
     }
 
     pub fn get_op1_addr(&self, pc: usize, ap: usize, fp: usize, mem: &Memory<F>) -> usize {
-        self.get_off_op1()
+        self.get_off_op1() as usize
             + match self.get_flag_group(FlagGroup::Op1Src) {
                 0 => usize::try_from(mem[self.get_op0_addr(ap, fp)].unwrap().0).unwrap(),
                 1 => pc,

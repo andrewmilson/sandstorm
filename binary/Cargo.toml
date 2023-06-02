@@ -11,7 +11,7 @@ serde = { version = "1.0", features = [ "derive" ] }
 serde_json = { version = "1.0", features = [ "arbitrary_precision" ] }
 ruint = { version = "1.7", features = [ "serde", "num-bigint" ] }
 num-bigint = { version = "0.4" }
-ministark-gpu = { version = "0.1", git = "https://github.com/andrewmilson/ministark" }
+ministark-gpu = { version = "0.1", path = "../../playground/ministark/gpu" }
 zip = "0.6"
 bincode = "1.2"
 
