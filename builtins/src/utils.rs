@@ -41,3 +41,43 @@ pub fn gen_periodic_table<F: FftField>(matrix: Vec<Vec<F>>) -> Vec<DensePolynomi
         .map(|col| Evaluations::from_vec_and_domain(col, domain).interpolate())
         .collect()
 }
+
+pub mod starkware_curve {
+    use ark_ec::CurveConfig;
+    use ark_ec::short_weierstrass::SWCurveConfig;
+    use ark_ff::Fp256;
+    use ark_ff::Field;
+    use ark_ff::MontBackend;
+    use ark_ff::MontConfig;
+    use ministark_gpu::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481::ark::Fp;
+    use ark_ec::short_weierstrass::Affine;
+    use ark_ff::MontFp as Fp;
+
+    #[derive(MontConfig)]
+    #[modulus = "3618502788666131213697322783095070105526743751716087489154079457884512865583"]
+    #[generator = "3"]
+    pub struct FrConfig;
+    pub type Fr = Fp256<MontBackend<FrConfig, 4>>;
+
+    // StarkWare's Cairo curve params: https://docs.starkware.co/starkex/crypto/pedersen-hash-function.html
+    pub struct Curve;
+
+    impl CurveConfig for Curve {
+        type BaseField = Fp;
+        type ScalarField = Fr;
+
+        const COFACTOR: &'static [u64] = &[1];
+        const COFACTOR_INV: Self::ScalarField = Fr::ONE;
+    }
+
+    impl SWCurveConfig for Curve {
+        const COEFF_A: Self::BaseField = Fp::ONE;
+        const COEFF_B: Self::BaseField =
+            Fp!("3141592653589793238462643383279502884197169399375105820974944592307816406665");
+
+        const GENERATOR: Affine<Self> = Affine::new_unchecked(
+            Fp!("874739451078007766457464989774322083649278607533249481151382481072868806602"),
+            Fp!("152666792071518830868575557812948353041420400780739481342941381225525861407"),
+        );
+    }
+}

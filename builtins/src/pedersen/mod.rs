@@ -1,14 +1,8 @@
-use ark_ec::CurveConfig;
 use ark_ec::CurveGroup;
 use ark_ec::Group;
 use ark_ec::short_weierstrass::Affine;
 use ark_ec::short_weierstrass::Projective;
-use ark_ec::short_weierstrass::SWCurveConfig;
 use ark_ff::Field;
-use ark_ff::Fp256;
-use ark_ff::MontBackend;
-use ark_ff::MontFp as Fp;
-use ark_ff::MontConfig;
 use ark_ff::PrimeField;
 use binary::PedersenInstance;
 use constants::P0;
@@ -21,38 +15,11 @@ use ministark_gpu::fields::p3618502788666131213697322783095070105623107215331596
 use num_bigint::BigUint;
 use ruint::aliases::U256;
 use ruint::uint;
-
+use crate::utils::starkware_curve::Fr;
+use crate::utils::starkware_curve::Curve;
 use crate::utils::gen_periodic_table;
 
 pub mod constants;
-
-#[derive(MontConfig)]
-#[modulus = "3618502788666131213697322783095070105526743751716087489154079457884512865583"]
-#[generator = "3"]
-pub struct FrConfig;
-pub type Fr = Fp256<MontBackend<FrConfig, 4>>;
-
-// Pedersen curve params: https://docs.starkware.co/starkex/crypto/pedersen-hash-function.html
-pub struct PedersenCurveConfig;
-
-impl CurveConfig for PedersenCurveConfig {
-    type BaseField = Fp;
-    type ScalarField = Fr;
-
-    const COFACTOR: &'static [u64] = &[1];
-    const COFACTOR_INV: Self::ScalarField = Fr::ONE;
-}
-
-impl SWCurveConfig for PedersenCurveConfig {
-    const COEFF_A: Self::BaseField = Fp::ONE;
-    const COEFF_B: Self::BaseField =
-        Fp!("3141592653589793238462643383279502884197169399375105820974944592307816406665");
-
-    const GENERATOR: Affine<Self> = Affine::new_unchecked(
-        Fp!("874739451078007766457464989774322083649278607533249481151382481072868806602"),
-        Fp!("152666792071518830868575557812948353041420400780739481342941381225525861407"),
-    );
-}
 
 /// Computes the Starkware version of the Pedersen hash of a and b.
 /// The hash is defined by:
@@ -67,11 +34,7 @@ pub fn pedersen_hash(a: Fp, b: Fp) -> Fp {
     (P0 + processed_a + processed_b).into_affine().x
 }
 
-fn process_element(
-    x: Fp,
-    p1: Projective<PedersenCurveConfig>,
-    p2: Projective<PedersenCurveConfig>,
-) -> Projective<PedersenCurveConfig> {
+fn process_element(x: Fp, p1: Projective<Curve>, p2: Projective<Curve>) -> Projective<Curve> {
     assert_eq!(252, Fp::MODULUS_BIT_SIZE);
     let x: BigUint = x.into_bigint().into();
     let shift = 252 - 4;
@@ -84,7 +47,7 @@ fn process_element(
 
 #[derive(Clone, Copy, Debug)]
 pub struct ElementPartialStep {
-    pub point: Affine<PedersenCurveConfig>,
+    pub point: Affine<Curve>,
     pub suffix: Fp,
     pub slope: Fp,
 }
@@ -129,9 +92,9 @@ impl InstanceTrace {
 
     fn gen_element_steps(
         x: Fp,
-        p0: Affine<PedersenCurveConfig>,
-        p1: Affine<PedersenCurveConfig>,
-        p2: Affine<PedersenCurveConfig>,
+        p0: Affine<Curve>,
+        p1: Affine<Curve>,
+        p2: Affine<Curve>,
     ) -> Vec<ElementPartialStep> {
         // generate our constant points
         let mut constant_points = Vec::new();
