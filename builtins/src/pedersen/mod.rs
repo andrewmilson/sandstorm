@@ -120,16 +120,17 @@ impl InstanceTrace {
 
             let mut slope: Fp = Fp::ZERO;
             let mut partial_point_next = partial_point;
+            let partial_point_affine = partial_point.into_affine();
             if bit == uint!(1_U256) {
                 let constant_point = constant_points[i];
-                let dy = partial_point.y - constant_point.y;
-                let dx = partial_point.x - constant_point.x;
+                let dy = partial_point_affine.y - constant_point.y;
+                let dx = partial_point_affine.x - constant_point.x;
                 slope = dy / dx;
                 partial_point_next += constant_point;
             }
 
             res.push(ElementPartialStep {
-                point: partial_point.into(),
+                point: partial_point_affine,
                 suffix: Fp::from(BigUint::from(suffix)),
                 slope,
             });

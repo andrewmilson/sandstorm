@@ -1,5 +1,7 @@
 use super::CYCLE_HEIGHT;
 use super::ECDSA_BUILTIN_RATIO;
+use super::EC_OP_BUILTIN_RATIO;
+use super::EC_OP_SCALAR_HEIGHT;
 use super::MEMORY_STEP;
 use super::PEDERSEN_BUILTIN_RATIO;
 use super::PUBLIC_MEMORY_STEP;
@@ -11,6 +13,7 @@ use crate::utils;
 use crate::ExecutionInfo;
 use ark_poly::EvaluationDomain;
 use ark_poly::Radix2EvaluationDomain;
+use builtins::ecdsa;
 use builtins::pedersen;
 use ministark_gpu::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481::ark::Fp;
 use core::ops::Add;
@@ -55,27 +58,25 @@ impl ministark::air::AirConfig for AirConfig {
         let half_offset_size = Expr::from(Constant(FieldVariant::Fp(Fp::from(2u32.pow(15)))));
 
         // cpu/decode/flag_op1_base_op0_0
-        let cpu_decode_flag_op1_base_op0_0: Expr<AlgebraicItem<FieldVariant<Fp, Fp>>> =
+        let cpu_decode_flag_op1_base_op0_0 =
             &one - (Flag::Op1Imm.curr() + Flag::Op1Ap.curr() + Flag::Op1Fp.curr());
         // cpu/decode/flag_res_op1_0
-        let cpu_decode_flag_res_op1_0: Expr<AlgebraicItem<FieldVariant<Fp, Fp>>> =
+        let cpu_decode_flag_res_op1_0 =
             &one - (Flag::ResAdd.curr() + Flag::ResMul.curr() + Flag::PcJnz.curr());
         // cpu/decode/flag_pc_update_regular_0
-        let cpu_decode_flag_pc_update_regular_0: Expr<AlgebraicItem<FieldVariant<Fp, Fp>>> =
+        let cpu_decode_flag_pc_update_regular_0 =
             &one - (Flag::PcJumpAbs.curr() + Flag::PcJumpRel.curr() + Flag::PcJnz.curr());
         // cpu/decode/fp_update_regular_0
-        let cpu_decode_fp_update_regular_0: Expr<AlgebraicItem<FieldVariant<Fp, Fp>>> =
+        let cpu_decode_fp_update_regular_0 =
             &one - (Flag::OpcodeCall.curr() + Flag::OpcodeRet.curr());
 
         // NOTE: npc_reg_0 = pc + instruction_size
         // NOTE: instruction_size = fOP1_IMM + 1
         let npc_reg_0 = Npc::Pc.curr() + Flag::Op1Imm.curr() + &one;
 
-        let memory_address_diff_0: Expr<AlgebraicItem<FieldVariant<Fp, Fp>>> =
-            Mem::Address.next() - Mem::Address.curr();
+        let memory_address_diff_0 = Mem::Address.next() - Mem::Address.curr();
 
-        let rc16_diff_0: Expr<AlgebraicItem<FieldVariant<Fp, Fp>>> =
-            RangeCheck::Ordered.next() - RangeCheck::Ordered.curr();
+        let rc16_diff_0 = RangeCheck::Ordered.next() - RangeCheck::Ordered.curr();
 
         // TODO: builtins
         let pedersen_hash0_ec_subset_sum_b0 =
@@ -97,10 +98,11 @@ impl ministark::air::AirConfig for AirConfig {
         let rc_builtin_value7_0 =
             &rc_builtin_value6_0 * &offset_size + RangeCheckBuiltin::Rc16Component.offset(7);
         let ecdsa_sig0_doubling_key_x_squared: Expr<AlgebraicItem<FieldVariant<Fp, Fp>>> =
-            Trace(8, 4) * Trace(8, 4);
-        let ecdsa_sig0_exponentiate_generator_b0 =
-            Expr::from(Trace(8, 34)) - (Trace(8, 162) + Trace(8, 162));
-        let _ecdsa_sig0_exponentiate_generator_b0_neg = &one - ecdsa_sig0_exponentiate_generator_b0;
+            Ecdsa::PubkeyX.curr() * Ecdsa::PubkeyX.curr();
+        let ecdsa_sig0_exponentiate_generator_b0 = Ecdsa::MessageSuffix.curr()
+            - (Ecdsa::MessageSuffix.next() + Ecdsa::MessageSuffix.next());
+        let _ecdsa_sig0_exponentiate_generator_b0_neg =
+            &one - &ecdsa_sig0_exponentiate_generator_b0;
         let ecdsa_sig0_exponentiate_key_b0 =
             Expr::from(Trace(8, 12)) - (Trace(8, 76) + Trace(8, 76));
         let _ecdsa_sig0_exponentiate_key_b0_neg = &one - &ecdsa_sig0_exponentiate_key_b0;
@@ -815,9 +817,8 @@ impl ministark::air::AirConfig for AirConfig {
             - (Npc::PedersenOutputAddr.curr() + &one))
             * &every_512_rows_except_last_zerofier;
         // Ensure the first pedersen address matches the hint
-        let pedersen_init_addr = (Npc::PedersenInput0Addr.curr()
-            - PublicInputHint::InitialPedersenAddr.hint())
-            / &first_row_zerofier;
+        let pedersen_init_addr =
+            (Npc::PedersenInput0Addr.curr() - InitialPedersenAddr.hint()) / &first_row_zerofier;
 
         // Link Input1 into the memory pool.
         // Input1's address should be the address directly after input0's address
@@ -852,9 +853,8 @@ impl ministark::air::AirConfig for AirConfig {
             - (Npc::RangeCheck128Addr.curr() + &one))
             * &every_256_rows_except_last_zerofier;
 
-        let rc_builtin_init_addr = (Npc::RangeCheck128Addr.curr()
-            - PublicInputHint::InitialRcAddr.hint())
-            / &first_row_zerofier;
+        let rc_builtin_init_addr =
+            (Npc::RangeCheck128Addr.curr() - InitialRcAddr.hint()) / &first_row_zerofier;
 
         // Signature constraints for ECDSA
         // ===============================
@@ -865,19 +865,199 @@ impl ministark::air::AirConfig for AirConfig {
         // X^(n/16384) - ω^(16320*n/16384) = (x-ω^16320)(x-ω^32704)
         //                                 = (x-ω^(64*255))(x-ω^(64*511))
         let every_64_row_zerofier = X.pow(n / 64) - &one;
-        let ecdsa_transition_zerofier_inv = (X.pow(n / 16384)
-            * Constant(FieldVariant::Fp(g.pow([(255 * n / 256) as u64]))))
+        // vanishes on every 64 steps except the 255th of every 256
+        let ec_op_transition_zerofier_inv = (X.pow(n / 16384)
+            - Constant(FieldVariant::Fp(g.pow([(255 * n / 256) as u64]))))
             / &every_64_row_zerofier;
 
         // ecdsa/signature0/doubling_key/slope
         // TODO: figure out
+
+        // These constraint maps to the curve point doubling equation:
+        // https://en.wikipedia.org/wiki/Elliptic_curve_point_multiplication#Point_doubling
+        // ```text
+        // curve eq: y^2 = x^3 + a*x + b
+        // P = (x_p, y_p)
+        // R = P + P = (x_r, x_y)
+        // slope = (3*x_p^2 + a) / (2*y_p)
+        // R_x = slope^2 - 2*x_p
+        // R_y = slope*(x_p - x_r) - y_p
+        // ```
         let ecdsa_sig_config_alpha = Constant(FieldVariant::Fp(ECDSA_SIG_CONFIG_ALPHA));
+        // This constraint is checking `0 = (3*x_p^2 + a) - 2*y_p * slope`
         let ecdsa_signature0_doubling_key_slope = (&ecdsa_sig0_doubling_key_x_squared
             + &ecdsa_sig0_doubling_key_x_squared
             + &ecdsa_sig0_doubling_key_x_squared
             + ecdsa_sig_config_alpha
-            - (Expr::from(Trace(8, 36)) + Expr::from(Trace(8, 36))) * Trace(8, 50))
-            * ecdsa_transition_zerofier_inv;
+            - (Ecdsa::PubkeyY.curr() + Ecdsa::PubkeyY.curr()) * Ecdsa::PubkeyDoublingSlope.curr())
+            * &ec_op_transition_zerofier_inv;
+        // This constraint checks `R_x = slope^2 - 2*x_p` => `0 = slope^2 - 2*x_p - R_x`
+        let ecdsa_signature0_doubling_key_x = (Ecdsa::PubkeyDoublingSlope.curr()
+            * Ecdsa::PubkeyDoublingSlope.curr()
+            - (Ecdsa::PubkeyX.curr() + Ecdsa::PubkeyY.curr() + Ecdsa::PubkeyX.next()))
+            * &ec_op_transition_zerofier_inv;
+        // This constraint checks `R_y = slope*(x_p - x_r) - y_p` =>
+        // `0 = y_p + R_y - slope*(x_p - x_r)`.
+        let ecdsa_signature0_doubling_key_y = (Ecdsa::PubkeyY.curr() + Ecdsa::PubkeyY.next()
+            - Ecdsa::PubkeyDoublingSlope.curr() * (Ecdsa::PubkeyX.curr() - Ecdsa::PubkeyX.next()))
+            * &ec_op_transition_zerofier_inv;
+
+        // example for trace length n=65536
+        // ================================
+        // X^(n/32768) - ω^(255*n/256)     = X^(n/32768) - ω^(32640*n/32768)
+        // X^(n/32768) - ω^(32640*n/32768) = (x-ω^32640)(x-ω^65408)
+        //                                 = (x-ω^(128*255))(x-ω^(128*511))
+        let every_128_row_zerofier = X.pow(n / 128) - &one;
+        // vanishes on every 128 steps except the 255th of every 256
+        let ecdsa_transition_zerofier_inv = (X.pow(n / 32768)
+            - Constant(FieldVariant::Fp(g.pow([(255 * n / 256) as u64]))))
+            / &every_128_row_zerofier;
+
+        // Constraint operates 256 times in steps of 128 rows
+        // Each row shifts the message hash to the right. E.g.
+        // ```text
+        // row(128 * 0 + 38):     10101...10001 <- constraint applied
+        // row(128 * 1 + 38):      1010...11000 <- constraint applied
+        // ...                                  <- constraint applied
+        // row(128 * 255 + 38):               0 <- constraint disabled
+        // row(128 * 256 + 38):   11101...10001 <- constraint applied
+        // row(128 * 257 + 38):    1110...01000 <- constraint applied
+        // ...                                  <- constraint applied
+        // row(128 * 511 + 38):               0 <- constraint disabled
+        // ...
+        // ```
+        let ecdsa_signature0_exponentiate_generator_booleanity_test =
+            (&ecdsa_sig0_exponentiate_generator_b0
+                * (&ecdsa_sig0_exponentiate_generator_b0 - &one))
+                * &ecdsa_transition_zerofier_inv;
+
+        // example for trace length n=65536
+        // =============================
+        // X^(n/32768) - ω^(251*n/256)     = X^(n/32768) - ω^(32128*n/32768)
+        // X^(n/32768) - ω^(32128*n/32768) = (x-ω^(32768*0+32128))(x-ω^(32768*1+32128))
+        // vanishes on the 252nd row of every 256 rows
+        let ecdsa_zero_suffix_zerofier =
+            X.pow(n / 32768) - Constant(FieldVariant::Fp(g.pow([(251 * n / 256) as u64])));
+
+        // Note that with cairo's default field each element is 252 bits.
+        // TODO: For Ecdsa we allow decoding 251 bit numbers.
+        // Since we have a column that right shifts a number each row we check that the
+        // suffix of row 251 (of every 256 row group) equals 0 e.g.
+        // ```text
+        // row(128 * 0 + 38):   10101...10001 <- NOTE: 1st ECDSA instance start
+        // row(128 * 1 + 38):    1010...11000
+        // ...
+        // row(128 * 249 + 38):            10
+        // row(128 * 250 + 38):             1
+        // row(128 * 251 + 38):             0 <- check zero
+        // row(128 * 252 + 38):             0
+        // row(128 * 253 + 38):             0
+        // row(128 * 254 + 38):             0
+        // row(128 * 255 + 38):             0
+        // row(128 * 256 + 38): 11101...10001 <- NOTE: 2nd ECDSA instance start
+        // row(128 * 257 + 38):  1110...01000
+        // ...
+        // row(128 * 505 + 38):            11
+        // row(128 * 506 + 38):             1
+        // row(128 * 507 + 38):             0 <- check zero
+        // row(128 * 508 + 38):             0
+        // ...
+        // ```
+        let ecdsa_signature0_exponentiate_generator_bit_extraction_end =
+            Ecdsa::MessageSuffix.curr() / &ecdsa_zero_suffix_zerofier;
+
+        // TODO: is this constraint even needed?
+        // check suffix in row 255 of each 256 row group is zero
+        let ecdsa_signature0_exponentiate_generator_zeros_tail = Pedersen::Suffix.curr()
+            / (X.pow(n / 32768) - Constant(FieldVariant::Fp(g.pow([255 * n as u64 / 256]))));
+
+        // Create a periodic table comprising of the ECDSA generator points we need to
+        // add together. The columns of this table are represented by polynomials that
+        // evaluate to the `i`th row when evaluated on the `i`th power of the 32768th
+        // root of unity. e.g.
+        //
+        // let:
+        // - `[P]_x` denotes the x-coordinate of an elliptic-curve point P
+        // - `G` be the fixed generator point of Starkware's sig verification curve
+        //
+        // then our point table is:
+        // ┌───────────┬────────────────────┬────────────────────┐
+        // │     X     │       F_x(X)       │       F_y(X)       │
+        // ├───────────┼────────────────────┼────────────────────┤
+        // │    ω^0    │   [P_1 * 2^0]_x    │   [P_1 * 2^0]_y    │
+        // ├───────────┼────────────────────┼────────────────────┤
+        // │    ω^1    │   [P_1 * 2^1]_x    │   [P_1 * 2^1]_y    │
+        // ├───────────┼────────────────────┼────────────────────┤
+        // │    ...    │         ...        │         ...        │
+        // ├───────────┼────────────────────┼────────────────────┤
+        // │   ω^247   │  [P_1 * 2^247]_x   │  [P_1 * 2^247]_y   │
+        // ├───────────┼────────────────────┼────────────────────┤
+        // │   ω^248   │   [P_2 * 2^0]_x    │   [P_2 * 2^0]_y    │
+        // ├───────────┼────────────────────┼────────────────────┤
+        // │   ω^249   │   [P_2 * 2^1]_x    │   [P_2 * 2^1]_y    │
+        // ├───────────┼────────────────────┼────────────────────┤
+        // │   ω^250   │   [P_2 * 2^2]_x    │   [P_2 * 2^2]_y    │
+        // ├───────────┼────────────────────┼────────────────────┤
+        // │   ω^251   │   [P_2 * 2^3]_x    │   [P_2 * 2^3]_y    │
+        // ├───────────┼────────────────────┼────────────────────┤
+        // │   ω^252   │         0          │         0          │
+        // ├───────────┼────────────────────┼────────────────────┤
+        // │   ω^253   │         0          │         0          │
+        // ├───────────┼────────────────────┼────────────────────┤
+        // │   ω^254   │         0          │         0          │
+        // ├───────────┼────────────────────┼────────────────────┤
+        // │   ω^255   │         0          │         0          │
+        // ├───────────┼────────────────────┼────────────────────┤
+        // │   ω^256   │   [P_3 * 2^0]_x    │   [P_3 * 2^0]_y    │
+        // ├───────────┼────────────────────┼────────────────────┤
+        // │   ω^257   │   [P_3 * 2^1]_x    │   [P_3 * 2^1]_y    │
+        // ├───────────┼────────────────────┼────────────────────┤
+        // │    ...    │         ...        │         ...        │
+        // ├───────────┼────────────────────┼────────────────────┤
+        // │   ω^503   │  [P_3 * 2^247]_x   │  [P_3 * 2^247]_y   │
+        // ├───────────┼────────────────────┼────────────────────┤
+        // │   ω^504   │   [P_4 * 2^0]_x    │   [P_4 * 2^0]_y    │
+        // ├───────────┼────────────────────┼────────────────────┤
+        // │   ω^505   │   [P_4 * 2^1]_x    │   [P_4 * 2^1]_y    │
+        // ├───────────┼────────────────────┼────────────────────┤
+        // │   ω^506   │   [P_4 * 2^2]_x    │   [P_4 * 2^2]_y    │
+        // ├───────────┼────────────────────┼────────────────────┤
+        // │   ω^507   │   [P_4 * 2^3]_x    │   [P_4 * 2^3]_y    │
+        // ├───────────┼────────────────────┼────────────────────┤
+        // │   ω^508   │         0          │         0          │
+        // ├───────────┼────────────────────┼────────────────────┤
+        // │   ω^509   │         0          │         0          │
+        // ├───────────┼────────────────────┼────────────────────┤
+        // │   ω^510   │         0          │         0          │
+        // ├───────────┼────────────────────┼────────────────────┤
+        // │   ω^511   │         0          │         0          │
+        // └───────────┴────────────────────┴────────────────────┘
+        let (ecdsa_generator_x_coeffs, ecdsa_generator_y_coeffs) = ecdsa::generator_points_poly();
+        let ecdsa_generator_points_x = Polynomial::new(ecdsa_generator_x_coeffs);
+        let ecdsa_generator_points_y = Polynomial::new(ecdsa_generator_y_coeffs);
+
+        // TODO: double check if the value that's being evaluated is correct
+        let pedersen_point_x = ecdsa_generator_points_x.eval(X.pow(n / 32768));
+        let pedersen_point_y = ecdsa_generator_points_y.eval(X.pow(n / 32768));
+
+        // let `P = (Px, Py)` be the point to be added (see above)
+        // let `Q = (Qx, Qy)` be the partial result
+        // note that the slope = dy/dx with dy = Qy - Py, dx = Qx - Px
+        // this constraint is equivalent to: bit * dy = dy/dx * dx
+        // TODO: slope is 0 if bit is 0?
+        let ecdsa_signature0_exponentiate_generator_add_points_slope =
+            (&ecdsa_sig0_exponentiate_generator_b0
+                * (Pedersen::PartialSumY.curr() - &pedersen_point_y)
+                - Pedersen::Slope.curr() * (Pedersen::PartialSumX.curr() - &pedersen_point_x))
+                * &pedersen_transition_zerofier;
+
+        // ======
+        // ======
+        // ======
+        // =TODO=
+        // ======
+        // ======
+        // ======
 
         let last_ecdsa_zerofier =
             X - Constant(FieldVariant::Fp(g.pow([32768 * (n / 32768 - 1) as u64])));
@@ -887,25 +1067,24 @@ impl ministark::air::AirConfig for AirConfig {
         // Check starting address of the ECDSA memory segment
         // memory segments in Cairo are continuous i.e. Memory:
         // |0->100 all pedersen mem|101 -> 151 all RC mem|151 -> 900 all ECDSA mem|
-        let ecdsa_init_addr = (Npc::EcdsaPubKeyAddr.curr()
-            - PublicInputHint::InitialEcdsaAddr.hint())
-            / &first_row_zerofier;
+        let ecdsa_init_addr =
+            (Npc::EcdsaPubkeyAddr.curr() - InitialEcdsaAddr.hint()) / &first_row_zerofier;
 
         // NOTE: message address is the 2nd address of each instance
         let ecdsa_message_addr = (Npc::EcdsaMessageAddr.curr()
-            - (Npc::EcdsaPubKeyAddr.curr() + &one))
+            - (Npc::EcdsaPubkeyAddr.curr() + &one))
             / &all_ecdsa_zerofier;
 
         // NOTE: pubkey address is the 1st address of each instance
-        let ecdsa_pubkey_addr = (Npc::EcdsaPubKeyAddr.next()
+        let ecdsa_pubkey_addr = (Npc::EcdsaPubkeyAddr.next()
             - (Npc::EcdsaMessageAddr.curr() + &one))
             * &all_ecdsa_except_last_zerofier_inv;
 
-        // Check the ECDSA Message and PubKey are correctly loaded into memory
+        // Check the ECDSA Message and Pubkey are correctly loaded into memory
         let ecdsa_message_value0 =
-            (Npc::EcdsaMessageVal.curr() - Auxiliary::EcdsaMessage.curr()) / &all_ecdsa_zerofier;
+            (Npc::EcdsaMessageVal.curr() - Ecdsa::MessageSuffix.curr()) / &all_ecdsa_zerofier;
         let ecdsa_pubkey_value0 =
-            (Npc::EcdsaPubKeyVal.curr() - Auxiliary::EcdsaPubKey.curr()) / &all_ecdsa_zerofier;
+            (Npc::EcdsaPubkeyVal.curr() - Ecdsa::PubkeyX.curr()) / &all_ecdsa_zerofier;
 
         // let ecdsa_signature0_doubling_key_x =
 
@@ -995,7 +1174,9 @@ impl ministark::air::AirConfig for AirConfig {
             rc_builtin_value,
             rc_builtin_addr_step,
             rc_builtin_init_addr,
-            // ecdsa_signature0_doubling_key_slope,
+            ecdsa_signature0_doubling_key_slope,
+            // ecdsa_signature0_doubling_key_x,
+            // ecdsa_signature0_doubling_key_y,
             // TODO:
             ecdsa_init_addr,
             ecdsa_message_addr,
@@ -1158,6 +1339,34 @@ impl ExecutionTraceColumn for RangeCheckBuiltin {
 }
 
 #[derive(Clone, Copy)]
+pub enum Ecdsa {
+    PubkeyX = 4,
+    PubkeyY = 36,
+    MessageSuffix = 38,
+    PubkeyDoublingSlope = 50,
+}
+
+impl ExecutionTraceColumn for Ecdsa {
+    fn index(&self) -> usize {
+        match self {
+            Self::PubkeyX | Self::PubkeyY | Self::MessageSuffix | Self::PubkeyDoublingSlope => 8,
+        }
+    }
+
+    fn offset<T>(&self, offset: isize) -> Expr<AlgebraicItem<T>> {
+        let column = self.index();
+        let step = match self {
+            Self::PubkeyX | Self::PubkeyY | Self::PubkeyDoublingSlope => {
+                EC_OP_BUILTIN_RATIO * CYCLE_HEIGHT / EC_OP_SCALAR_HEIGHT
+            }
+            Self::MessageSuffix => ECDSA_BUILTIN_RATIO * CYCLE_HEIGHT / EC_OP_SCALAR_HEIGHT,
+        } as isize;
+        let trace_offset = step * offset + *self as isize;
+        AlgebraicItem::Trace(column, trace_offset).into()
+    }
+}
+
+#[derive(Clone, Copy)]
 pub enum Pedersen {
     PartialSumX,
     PartialSumY,
@@ -1217,8 +1426,8 @@ pub enum Npc {
 
     // 390 % 16 = 6
     // 391 % 16 = 7
-    EcdsaPubKeyAddr = 390,
-    EcdsaPubKeyVal = 391,
+    EcdsaPubkeyAddr = 390,
+    EcdsaPubkeyVal = 391,
 
     // 16774 % 16 = 6
     // 16775 % 16 = 7
@@ -1252,9 +1461,9 @@ impl ExecutionTraceColumn for Npc {
                 CYCLE_HEIGHT * RANGE_CHECK_BUILTIN_RATIO
             }
             Self::EcdsaMessageAddr
-            | Self::EcdsaPubKeyAddr
+            | Self::EcdsaPubkeyAddr
             | Self::EcdsaMessageVal
-            | Self::EcdsaPubKeyVal => CYCLE_HEIGHT * ECDSA_BUILTIN_RATIO,
+            | Self::EcdsaPubkeyVal => CYCLE_HEIGHT * ECDSA_BUILTIN_RATIO,
             Self::Pc
             | Self::Instruction
             | Self::MemOp0Addr
@@ -1332,8 +1541,6 @@ impl ExecutionTraceColumn for RangeCheck {
 pub enum Auxiliary {
     Tmp0 = 0,
     Tmp1 = 8,
-    EcdsaPubKey = 4,
-    EcdsaMessage = 38,
 }
 
 impl ExecutionTraceColumn for Auxiliary {
@@ -1345,7 +1552,6 @@ impl ExecutionTraceColumn for Auxiliary {
         let column = self.index();
         let step = match self {
             Self::Tmp0 | Self::Tmp1 => CYCLE_HEIGHT,
-            Self::EcdsaMessage | Self::EcdsaPubKey => CYCLE_HEIGHT * ECDSA_BUILTIN_RATIO,
         } as isize;
         let trace_offset = step * cycle_offset + *self as isize;
         AlgebraicItem::Trace(column, trace_offset).into()

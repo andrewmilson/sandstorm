@@ -44,7 +44,7 @@ fn main() {
 
 fn vanishing_poly_experiments() {
     use ministark_gpu::fields::p18446744069414584321::ark::Fp;
-    let n = 2048;
+    let n = 16388;
     let omega = Fp::get_root_of_unity(n).unwrap();
     for i in 0..n {
         let x = omega.pow([i]);

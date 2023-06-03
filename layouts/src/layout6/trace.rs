@@ -13,16 +13,19 @@ use binary::EcdsaInstance;
 use binary::PedersenInstance;
 use binary::RangeCheckInstance;
 use builtins::ecdsa;
+use builtins::ecdsa::DoublingStep;
 use builtins::pedersen;
 use ark_ff::One;
 use binary::AirPrivateInput;
 use binary::AirPublicInput;
 use builtins::range_check;
+use builtins::utils::starkware_curve::Curve;
 use num_bigint::BigUint;
 use ruint::aliases::U256;
 use crate::ExecutionInfo;
 use crate::layout6::RANGE_CHECK_BUILTIN_PARTS;
 use crate::layout6::RANGE_CHECK_BUILTIN_RATIO;
+use crate::layout6::air::Ecdsa;
 use crate::layout6::air::RangeCheckBuiltin;
 use crate::utils::RangeCheckPool;
 use super::air::Permutation;
@@ -382,17 +385,24 @@ impl CairoExecutionTrace for ExecutionTrace {
             .zip(ecdsa_traces)
             .for_each(|((npc, aux), ecdsa_trace)| {
                 let instance = ecdsa_trace.instance;
-                let pubkey = Fp::from(BigUint::from(instance.pubkey));
                 let message = Fp::from(BigUint::from(instance.message));
+                let pubkey = ecdsa_trace.pubkey;
 
-                // TODO: tmp solution
-                aux[Auxiliary::EcdsaPubKey as usize] = pubkey;
-                aux[Auxiliary::EcdsaMessage as usize] = message;
+                let (aux_steps, _) = aux.as_chunks_mut::<64>();
+                for (aux_step, pubkey_doubling_step) in
+                    zip(aux_steps, ecdsa_trace.pubkey_doubling_steps)
+                {
+                    let DoublingStep { point, slope } = pubkey_doubling_step;
+                    aux_step[Ecdsa::PubkeyX as usize] = point.x;
+                    aux_step[Ecdsa::PubkeyY as usize] = point.y;
+                    aux_step[Ecdsa::PubkeyDoublingSlope as usize] = slope;
+                }
+                aux[Ecdsa::MessageSuffix as usize] = message;
 
                 // add the instance to the memory pool
                 let (pubkey_addr, message_addr) = instance.mem_addr(initial_ecdsa_address);
-                npc[Npc::EcdsaPubKeyAddr as usize] = pubkey_addr.into();
-                npc[Npc::EcdsaPubKeyVal as usize] = pubkey;
+                npc[Npc::EcdsaPubkeyAddr as usize] = pubkey_addr.into();
+                npc[Npc::EcdsaPubkeyVal as usize] = pubkey.x;
                 npc[Npc::EcdsaMessageAddr as usize] = message_addr.into();
                 npc[Npc::EcdsaMessageVal as usize] = message;
             });

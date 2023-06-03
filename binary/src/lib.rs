@@ -169,8 +169,8 @@ pub struct Signature {
 #[derive(Deserialize, Clone, Copy, Debug)]
 pub struct EcdsaInstance {
     pub index: u32,
-    #[serde(deserialize_with = "deserialize_hex_str")]
-    pub pubkey: U256,
+    #[serde(rename = "pubkey", deserialize_with = "deserialize_hex_str")]
+    pub pubkey_x: U256,
     #[serde(rename = "msg", deserialize_with = "deserialize_hex_str")]
     pub message: U256,
     #[serde(rename = "signature_input")]
