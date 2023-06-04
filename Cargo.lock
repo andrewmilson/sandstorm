@@ -952,6 +952,7 @@ dependencies = [
  "pollster",
  "rayon",
  "sandstorm-binary",
+ "sandstorm-builtins",
  "sandstorm-layouts",
  "serde_json",
  "structopt",

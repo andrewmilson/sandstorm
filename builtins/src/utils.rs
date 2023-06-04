@@ -80,4 +80,27 @@ pub mod starkware_curve {
             Fp!("152666792071518830868575557812948353041420400780739481342941381225525861407"),
         );
     }
+
+    /// calculates the slope between points `p1` and `p2`
+    /// Returns None if one of the points is the point at infinity
+    pub fn calculate_slope(p1: Affine<Curve>, p2: Affine<Curve>) -> Option<Fp> {
+        if p1.infinity || p2.infinity || (p1.x == p2.x && p1.y != p2.y) {
+            return None;
+        }
+
+        let y1 = p1.y;
+        let y2 = p2.y;
+        let x1 = p1.x;
+        let x2 = p2.x;
+
+        Some(if x1 == x2 {
+            // use tangent line
+            assert_eq!(y1, y2);
+            let xx = x1.square();
+            (xx + xx + xx + Curve::COEFF_A) / (y1 + y1)
+        } else {
+            // use slope
+            (y2 - y1) / (x2 - x1)
+        })
+    }
 }

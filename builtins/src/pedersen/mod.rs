@@ -18,6 +18,7 @@ use ruint::uint;
 use crate::utils::starkware_curve::Fr;
 use crate::utils::starkware_curve::Curve;
 use crate::utils::gen_periodic_table;
+use crate::utils::starkware_curve::calculate_slope;
 
 pub mod constants;
 
@@ -69,14 +70,14 @@ impl InstanceTrace {
         let a_p0 = P0;
         let a_p1 = P1;
         let a_p2 = P2;
-        let a_steps = Self::gen_element_steps(a, a_p0, a_p1, a_p2);
+        let a_steps = gen_element_steps(a, a_p0, a_p1, a_p2);
 
         let b_p0 = (a_p0 + process_element(a, a_p1.into(), a_p2.into())).into();
         let b_p1 = P3;
         let b_p2 = P4;
         // check out initial value for the second input is correct
         assert_eq!(a_steps.last().unwrap().point, b_p0);
-        let b_steps = Self::gen_element_steps(b, b_p0, b_p1, b_p2);
+        let b_steps = gen_element_steps(b, b_p0, b_p1, b_p2);
 
         // check the expected output matches
         let output = pedersen_hash(a, b);
@@ -89,57 +90,55 @@ impl InstanceTrace {
             b_steps,
         }
     }
+}
 
-    fn gen_element_steps(
-        x: Fp,
-        p0: Affine<Curve>,
-        p1: Affine<Curve>,
-        p2: Affine<Curve>,
-    ) -> Vec<ElementPartialStep> {
-        // generate our constant points
-        let mut constant_points = Vec::new();
-        let mut p1_acc = Projective::from(p1);
-        for _ in 0..252 - 4 {
-            constant_points.push(p1_acc);
-            p1_acc.double_in_place();
-        }
-        let mut p2_acc = Projective::from(p2);
-        for _ in 0..4 {
-            constant_points.push(p2_acc);
-            p2_acc.double_in_place();
-        }
-
-        // generate partial sums
-        let x_int = U256::from::<BigUint>(x.into());
-        let mut partial_point = Projective::from(p0);
-        let mut res = Vec::new();
-        #[allow(clippy::needless_range_loop)]
-        for i in 0..256 {
-            let suffix = x_int >> i;
-            let bit = suffix & uint!(1_U256);
-
-            let mut slope: Fp = Fp::ZERO;
-            let mut partial_point_next = partial_point;
-            let partial_point_affine = partial_point.into_affine();
-            if bit == uint!(1_U256) {
-                let constant_point = constant_points[i];
-                let dy = partial_point_affine.y - constant_point.y;
-                let dx = partial_point_affine.x - constant_point.x;
-                slope = dy / dx;
-                partial_point_next += constant_point;
-            }
-
-            res.push(ElementPartialStep {
-                point: partial_point_affine,
-                suffix: Fp::from(BigUint::from(suffix)),
-                slope,
-            });
-
-            partial_point = partial_point_next;
-        }
-
-        res
+fn gen_element_steps(
+    x: Fp,
+    p0: Affine<Curve>,
+    p1: Affine<Curve>,
+    p2: Affine<Curve>,
+) -> Vec<ElementPartialStep> {
+    // generate our constant points
+    let mut constant_points = Vec::new();
+    let mut p1_acc = Projective::from(p1);
+    for _ in 0..252 - 4 {
+        constant_points.push(p1_acc);
+        p1_acc.double_in_place();
     }
+    let mut p2_acc = Projective::from(p2);
+    for _ in 0..4 {
+        constant_points.push(p2_acc);
+        p2_acc.double_in_place();
+    }
+
+    // generate partial sums
+    let x_int = U256::from::<BigUint>(x.into());
+    let mut partial_point = Projective::from(p0);
+    let mut res = Vec::new();
+    #[allow(clippy::needless_range_loop)]
+    for i in 0..256 {
+        let suffix = x_int >> i;
+        let bit = suffix & uint!(1_U256);
+
+        let mut slope: Fp = Fp::ZERO;
+        let mut partial_point_next = partial_point;
+        let partial_point_affine = partial_point.into_affine();
+        if bit == uint!(1_U256) {
+            let constant_point = constant_points[i];
+            slope = calculate_slope(constant_point.into(), partial_point_affine).unwrap();
+            partial_point_next += constant_point;
+        }
+
+        res.push(ElementPartialStep {
+            point: partial_point_affine,
+            suffix: Fp::from(BigUint::from(suffix)),
+            slope,
+        });
+
+        partial_point = partial_point_next;
+    }
+
+    res
 }
 
 /// Ouptut is of the form (x_points_coeffs, y_points_coeffs)

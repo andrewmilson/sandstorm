@@ -9,6 +9,7 @@ use super::RANGE_CHECK_BUILTIN_PARTS;
 use super::RANGE_CHECK_BUILTIN_RATIO;
 use super::RANGE_CHECK_STEP;
 use crate::layout6::ECDSA_SIG_CONFIG_ALPHA;
+use crate::layout6::ECDSA_SIG_CONFIG_BETA;
 use crate::utils;
 use crate::ExecutionInfo;
 use ark_poly::EvaluationDomain;
@@ -16,6 +17,7 @@ use ark_poly::Radix2EvaluationDomain;
 use builtins::ecdsa;
 use builtins::pedersen;
 use ministark_gpu::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481::ark::Fp;
+use num_traits::One;
 use core::ops::Add;
 use core::ops::Mul;
 use ark_ff::Field;
@@ -98,14 +100,13 @@ impl ministark::air::AirConfig for AirConfig {
         let rc_builtin_value7_0 =
             &rc_builtin_value6_0 * &offset_size + RangeCheckBuiltin::Rc16Component.offset(7);
         let ecdsa_sig0_doubling_key_x_squared: Expr<AlgebraicItem<FieldVariant<Fp, Fp>>> =
-            Ecdsa::PubkeyX.curr() * Ecdsa::PubkeyX.curr();
+            Ecdsa::PubkeyDoublingX.curr() * Ecdsa::PubkeyDoublingX.curr();
         let ecdsa_sig0_exponentiate_generator_b0 = Ecdsa::MessageSuffix.curr()
             - (Ecdsa::MessageSuffix.next() + Ecdsa::MessageSuffix.next());
-        let _ecdsa_sig0_exponentiate_generator_b0_neg =
-            &one - &ecdsa_sig0_exponentiate_generator_b0;
+        let ecdsa_sig0_exponentiate_generator_b0_neg = &one - &ecdsa_sig0_exponentiate_generator_b0;
         let ecdsa_sig0_exponentiate_key_b0 =
-            Expr::from(Trace(8, 12)) - (Trace(8, 76) + Trace(8, 76));
-        let _ecdsa_sig0_exponentiate_key_b0_neg = &one - &ecdsa_sig0_exponentiate_key_b0;
+            Ecdsa::RSuffix.curr() - (Ecdsa::RSuffix.next() + Ecdsa::RSuffix.next());
+        let ecdsa_sig0_exponentiate_key_b0_neg = &one - &ecdsa_sig0_exponentiate_key_b0;
         let _bitwise_sum_var_0_0: Expr<AlgebraicItem<FieldVariant<Fp, Fp>>> =
             Expr::from(Trace(7, 1))
                 + Expr::from(Trace(7, 17)) * (&two).pow(1)
@@ -732,7 +733,7 @@ impl ministark::air::AirConfig for AirConfig {
         // let `Q = (Qx, Qy)` be the partial result
         // note that the slope = dy/dx with dy = Qy - Py, dx = Qx - Px
         // this constraint is equivalent to: bit * dy = dy/dx * dx
-        // TODO: slope is 0 if bit is 0?
+        // NOTE: slope is 0 if bit is 0
         let pedersen_hash0_ec_subset_sum_add_points_slope = (&pedersen_hash0_ec_subset_sum_b0
             * (Pedersen::PartialSumY.curr() - &pedersen_point_y)
             - Pedersen::Slope.curr() * (Pedersen::PartialSumX.curr() - &pedersen_point_x))
@@ -889,17 +890,22 @@ impl ministark::air::AirConfig for AirConfig {
             + &ecdsa_sig0_doubling_key_x_squared
             + &ecdsa_sig0_doubling_key_x_squared
             + ecdsa_sig_config_alpha
-            - (Ecdsa::PubkeyY.curr() + Ecdsa::PubkeyY.curr()) * Ecdsa::PubkeyDoublingSlope.curr())
+            - (Ecdsa::PubkeyDoublingY.curr() + Ecdsa::PubkeyDoublingY.curr())
+                * Ecdsa::PubkeyDoublingSlope.curr())
             * &ec_op_transition_zerofier_inv;
         // This constraint checks `R_x = slope^2 - 2*x_p` => `0 = slope^2 - 2*x_p - R_x`
         let ecdsa_signature0_doubling_key_x = (Ecdsa::PubkeyDoublingSlope.curr()
             * Ecdsa::PubkeyDoublingSlope.curr()
-            - (Ecdsa::PubkeyX.curr() + Ecdsa::PubkeyY.curr() + Ecdsa::PubkeyX.next()))
+            - (Ecdsa::PubkeyDoublingX.curr()
+                + Ecdsa::PubkeyDoublingX.curr()
+                + Ecdsa::PubkeyDoublingX.next()))
             * &ec_op_transition_zerofier_inv;
         // This constraint checks `R_y = slope*(x_p - x_r) - y_p` =>
         // `0 = y_p + R_y - slope*(x_p - x_r)`.
-        let ecdsa_signature0_doubling_key_y = (Ecdsa::PubkeyY.curr() + Ecdsa::PubkeyY.next()
-            - Ecdsa::PubkeyDoublingSlope.curr() * (Ecdsa::PubkeyX.curr() - Ecdsa::PubkeyX.next()))
+        let ecdsa_signature0_doubling_key_y = (Ecdsa::PubkeyDoublingY.curr()
+            + Ecdsa::PubkeyDoublingY.next()
+            - Ecdsa::PubkeyDoublingSlope.curr()
+                * (Ecdsa::PubkeyDoublingX.curr() - Ecdsa::PubkeyDoublingX.next()))
             * &ec_op_transition_zerofier_inv;
 
         // example for trace length n=65536
@@ -935,12 +941,12 @@ impl ministark::air::AirConfig for AirConfig {
         // =============================
         // X^(n/32768) - ω^(251*n/256)     = X^(n/32768) - ω^(32128*n/32768)
         // X^(n/32768) - ω^(32128*n/32768) = (x-ω^(32768*0+32128))(x-ω^(32768*1+32128))
-        // vanishes on the 252nd row of every 256 rows
+        // vanishes on the 251st row of every 256 rows
         let ecdsa_zero_suffix_zerofier =
             X.pow(n / 32768) - Constant(FieldVariant::Fp(g.pow([(251 * n / 256) as u64])));
 
         // Note that with cairo's default field each element is 252 bits.
-        // TODO: For Ecdsa we allow decoding 251 bit numbers.
+        // For Cairo's ECDSA we allow the message hash to be a 251 bit number.
         // Since we have a column that right shifts a number each row we check that the
         // suffix of row 251 (of every 256 row group) equals 0 e.g.
         // ```text
@@ -968,100 +974,305 @@ impl ministark::air::AirConfig for AirConfig {
 
         // TODO: is this constraint even needed?
         // check suffix in row 255 of each 256 row group is zero
-        let ecdsa_signature0_exponentiate_generator_zeros_tail = Pedersen::Suffix.curr()
+        let ecdsa_signature0_exponentiate_generator_zeros_tail = Ecdsa::MessageSuffix.curr()
             / (X.pow(n / 32768) - Constant(FieldVariant::Fp(g.pow([255 * n as u64 / 256]))));
 
+        // TODO: double check
         // Create a periodic table comprising of the ECDSA generator points we need to
         // add together. The columns of this table are represented by polynomials that
-        // evaluate to the `i`th row when evaluated on the `i`th power of the 32768th
+        // evaluate to the `i`th row when evaluated on the `i`th power of the 256th
         // root of unity. e.g.
         //
         // let:
-        // - `[P]_x` denotes the x-coordinate of an elliptic-curve point P
-        // - `G` be the fixed generator point of Starkware's sig verification curve
+        // - `G` be the fixed generator point of Starkware's ECDSA curve
+        // - `[G]_x` denotes the x-coordinate of an elliptic-curve point P
         //
         // then our point table is:
-        // ┌───────────┬────────────────────┬────────────────────┐
-        // │     X     │       F_x(X)       │       F_y(X)       │
-        // ├───────────┼────────────────────┼────────────────────┤
-        // │    ω^0    │   [P_1 * 2^0]_x    │   [P_1 * 2^0]_y    │
-        // ├───────────┼────────────────────┼────────────────────┤
-        // │    ω^1    │   [P_1 * 2^1]_x    │   [P_1 * 2^1]_y    │
-        // ├───────────┼────────────────────┼────────────────────┤
-        // │    ...    │         ...        │         ...        │
-        // ├───────────┼────────────────────┼────────────────────┤
-        // │   ω^247   │  [P_1 * 2^247]_x   │  [P_1 * 2^247]_y   │
-        // ├───────────┼────────────────────┼────────────────────┤
-        // │   ω^248   │   [P_2 * 2^0]_x    │   [P_2 * 2^0]_y    │
-        // ├───────────┼────────────────────┼────────────────────┤
-        // │   ω^249   │   [P_2 * 2^1]_x    │   [P_2 * 2^1]_y    │
-        // ├───────────┼────────────────────┼────────────────────┤
-        // │   ω^250   │   [P_2 * 2^2]_x    │   [P_2 * 2^2]_y    │
-        // ├───────────┼────────────────────┼────────────────────┤
-        // │   ω^251   │   [P_2 * 2^3]_x    │   [P_2 * 2^3]_y    │
-        // ├───────────┼────────────────────┼────────────────────┤
-        // │   ω^252   │         0          │         0          │
-        // ├───────────┼────────────────────┼────────────────────┤
-        // │   ω^253   │         0          │         0          │
-        // ├───────────┼────────────────────┼────────────────────┤
-        // │   ω^254   │         0          │         0          │
-        // ├───────────┼────────────────────┼────────────────────┤
-        // │   ω^255   │         0          │         0          │
-        // ├───────────┼────────────────────┼────────────────────┤
-        // │   ω^256   │   [P_3 * 2^0]_x    │   [P_3 * 2^0]_y    │
-        // ├───────────┼────────────────────┼────────────────────┤
-        // │   ω^257   │   [P_3 * 2^1]_x    │   [P_3 * 2^1]_y    │
-        // ├───────────┼────────────────────┼────────────────────┤
-        // │    ...    │         ...        │         ...        │
-        // ├───────────┼────────────────────┼────────────────────┤
-        // │   ω^503   │  [P_3 * 2^247]_x   │  [P_3 * 2^247]_y   │
-        // ├───────────┼────────────────────┼────────────────────┤
-        // │   ω^504   │   [P_4 * 2^0]_x    │   [P_4 * 2^0]_y    │
-        // ├───────────┼────────────────────┼────────────────────┤
-        // │   ω^505   │   [P_4 * 2^1]_x    │   [P_4 * 2^1]_y    │
-        // ├───────────┼────────────────────┼────────────────────┤
-        // │   ω^506   │   [P_4 * 2^2]_x    │   [P_4 * 2^2]_y    │
-        // ├───────────┼────────────────────┼────────────────────┤
-        // │   ω^507   │   [P_4 * 2^3]_x    │   [P_4 * 2^3]_y    │
-        // ├───────────┼────────────────────┼────────────────────┤
-        // │   ω^508   │         0          │         0          │
-        // ├───────────┼────────────────────┼────────────────────┤
-        // │   ω^509   │         0          │         0          │
-        // ├───────────┼────────────────────┼────────────────────┤
-        // │   ω^510   │         0          │         0          │
-        // ├───────────┼────────────────────┼────────────────────┤
-        // │   ω^511   │         0          │         0          │
-        // └───────────┴────────────────────┴────────────────────┘
+        // ┌───────────┬──────────────────┬──────────────────┐
+        // │     X     │      F_x(X)      │      F_y(X)      │
+        // ├───────────┼──────────────────┼──────────────────┤
+        // │    ω^0    │   [G * 2^0]_x    │   [G * 2^0]_y    │
+        // ├───────────┼──────────────────┼──────────────────┤
+        // │    ω^1    │   [G * 2^1]_x    │   [G * 2^1]_y    │
+        // ├───────────┼──────────────────┼──────────────────┤
+        // │    ...    │         ...      │         ...      │
+        // ├───────────┼──────────────────┼──────────────────┤
+        // │   ω^255   │  [G * 2^255]_x   │  [G * 2^255]_y   │
+        // ├───────────┼──────────────────┼──────────────────┤
+        // │   ω^256   │   [G * 2^0]_x    │   [G * 2^0]_y    │
+        // ├───────────┼──────────────────┼──────────────────┤
+        // │   ω^257   │   [G * 2^1]_x    │   [G * 2^1]_y    │
+        // ├───────────┼──────────────────┼──────────────────┤
+        // │    ...    │         ...      │         ...      │
+        // └───────────┴──────────────────┴──────────────────┘
         let (ecdsa_generator_x_coeffs, ecdsa_generator_y_coeffs) = ecdsa::generator_points_poly();
         let ecdsa_generator_points_x = Polynomial::new(ecdsa_generator_x_coeffs);
         let ecdsa_generator_points_y = Polynomial::new(ecdsa_generator_y_coeffs);
 
         // TODO: double check if the value that's being evaluated is correct
-        let pedersen_point_x = ecdsa_generator_points_x.eval(X.pow(n / 32768));
-        let pedersen_point_y = ecdsa_generator_points_y.eval(X.pow(n / 32768));
+        let ecdsa_generator_point_x = ecdsa_generator_points_x.eval(X.pow(n / 32768));
+        let ecdsa_generator_point_y = ecdsa_generator_points_y.eval(X.pow(n / 32768));
 
         // let `P = (Px, Py)` be the point to be added (see above)
         // let `Q = (Qx, Qy)` be the partial result
         // note that the slope = dy/dx with dy = Qy - Py, dx = Qx - Px
         // this constraint is equivalent to: bit * dy = dy/dx * dx
-        // TODO: slope is 0 if bit is 0?
+        // NOTE: slope is 0 if bit is 0
         let ecdsa_signature0_exponentiate_generator_add_points_slope =
             (&ecdsa_sig0_exponentiate_generator_b0
-                * (Pedersen::PartialSumY.curr() - &pedersen_point_y)
-                - Pedersen::Slope.curr() * (Pedersen::PartialSumX.curr() - &pedersen_point_x))
-                * &pedersen_transition_zerofier;
+                * (Ecdsa::GeneratorPartialSumY.curr() - &ecdsa_generator_point_y)
+                - Ecdsa::GeneratorPartialSumSlope.curr()
+                    * (Ecdsa::GeneratorPartialSumX.curr() - &ecdsa_generator_point_x))
+                * &ecdsa_transition_zerofier_inv;
 
-        // ======
-        // ======
-        // ======
-        // =TODO=
-        // ======
-        // ======
-        // ======
+        // These two constraint check classic short Weierstrass curve point addition.
+        // Constraint is equivalent to:
+        // - `Qx_next = m^2 - Qx - Px, m = dy/dx`
+        // - `Qy_next = m*(Qx - Qx_next) - Qy, m = dy/dx`
+        let ecdsa_signature0_exponentiate_generator_add_points_x =
+            (Ecdsa::GeneratorPartialSumSlope.curr() * Ecdsa::GeneratorPartialSumSlope.curr()
+                - &ecdsa_sig0_exponentiate_generator_b0
+                    * (Ecdsa::GeneratorPartialSumX.curr()
+                        + &ecdsa_generator_point_x
+                        + Ecdsa::GeneratorPartialSumX.next()))
+                * &ecdsa_transition_zerofier_inv;
+        let ecdsa_signature0_exponentiate_generator_add_points_y =
+            (&ecdsa_sig0_exponentiate_generator_b0
+                * (Ecdsa::GeneratorPartialSumY.curr() + Ecdsa::GeneratorPartialSumY.next())
+                - Ecdsa::GeneratorPartialSumSlope.curr()
+                    * (Ecdsa::GeneratorPartialSumX.curr() - Ecdsa::GeneratorPartialSumX.next()))
+                * &ecdsa_transition_zerofier_inv;
+        // constraint checks that the cell contains 1/(Qx - Gx)
+        // Why this constraint? it checks that the Qx and Gx are not equal
+        let ecdsa_signature0_exponentiate_generator_add_points_x_diff_inv =
+            (Ecdsa::GeneratorPartialSumXDiffInv.curr()
+                * (Ecdsa::GeneratorPartialSumX.curr() - &ecdsa_generator_point_x)
+                - &one)
+                * &ecdsa_transition_zerofier_inv;
+        // if the bit is 0 then just copy the previous point
+        let ecdsa_signature0_exponentiate_generator_copy_point_x =
+            (&ecdsa_sig0_exponentiate_generator_b0_neg
+                * (Ecdsa::GeneratorPartialSumX.next() - Ecdsa::GeneratorPartialSumX.curr()))
+                * &ecdsa_transition_zerofier_inv;
+        let ecdsa_signature0_exponentiate_generator_copy_point_y =
+            (&ecdsa_sig0_exponentiate_generator_b0_neg
+                * (Ecdsa::GeneratorPartialSumY.next() - Ecdsa::GeneratorPartialSumY.curr()))
+                * &ecdsa_transition_zerofier_inv;
+
+        // NOTE: exponentiate key, exponentiate generator and pedersen are almost
+        // identical TODO: try DRY this code. Come up with the right
+        // abstractions first though
+
+        // Constraint operates 256 times in steps of 64 rows
+        // Each row shifts the signature's `r` value to the right. E.g.
+        // ```text
+        // row(64 * 0 + 12):     10101...10001 <- constraint applied
+        // row(64 * 1 + 12):      1010...11000 <- constraint applied
+        // ...                                 <- constraint applied
+        // row(64 * 255 + 12):               0 <- constraint disabled
+        // row(64 * 256 + 12):   11101...10001 <- constraint applied
+        // row(64 * 257 + 12):    1110...01000 <- constraint applied
+        // ...                                 <- constraint applied
+        // row(64 * 511 + 12):               0 <- constraint disabled
+        // ...
+        // ```
+        let ecdsa_signature0_exponentiate_key_booleanity_test = (&ecdsa_sig0_exponentiate_key_b0
+            * (&ecdsa_sig0_exponentiate_key_b0 - &one))
+            * &ec_op_transition_zerofier_inv;
+
+        let ec_op_zero_suffix_zerofier =
+            X.pow(n / 16384) - Constant(FieldVariant::Fp(g.pow([(251 * n / 256) as u64])));
+
+        // Note that with cairo's default field each element is 252 bits.
+        // For Cairo's ECDSA we allow the signature's `r` value to be a 251 bit number.
+        // Since we have a column that right shifts a number every 64 rows we check that
+        // the suffix of row 64*251 (of every 256 row group) equals 0 e.g.
+        // ```text
+        // row(64 * 0 + 38):   10101...10001 <- NOTE: 1st ECDSA instance start
+        // row(64 * 1 + 38):    1010...11000
+        // ...
+        // row(64 * 249 + 38):            10
+        // row(64 * 250 + 38):             1
+        // row(64 * 251 + 38):             0 <- check zero
+        // row(64 * 252 + 38):             0
+        // row(64 * 253 + 38):             0
+        // row(64 * 254 + 38):             0
+        // row(64 * 255 + 38):             0
+        // row(64 * 256 + 38): 11101...10001 <- NOTE: 2nd ECDSA instance start
+        // row(64 * 257 + 38):  1110...01000
+        // ...
+        // row(64 * 505 + 38):            11
+        // row(64 * 506 + 38):             1
+        // row(64 * 507 + 38):             0 <- check zero
+        // row(64 * 508 + 38):             0
+        // ...
+        // ```
+        let ecdsa_signature0_exponentiate_key_bit_extraction_end =
+            Ecdsa::RSuffix.curr() / &ec_op_zero_suffix_zerofier;
+
+        // TODO: is this constraint even needed?
+        // check suffix in row 255 of each 256 row group is zero
+        let ecdsa_signature0_exponentiate_key_zeros_tail = Ecdsa::RSuffix.curr()
+            / (X.pow(n / 16384) - Constant(FieldVariant::Fp(g.pow([255 * n as u64 / 256]))));
+
+        // let `P = (Px, Py)` be the doubled pubkey point to be added
+        // let `Q = (Qx, Qy)` be the partial result
+        // note that the slope = dy/dx with dy = Qy - Py, dx = Qx - Px
+        // this constraint is equivalent to: bit * dy = dy/dx * dx
+        // NOTE: slope is 0 if bit is 0
+        let ecdsa_signature0_exponentiate_key_add_points_slope = (&ecdsa_sig0_exponentiate_key_b0
+            * (Ecdsa::PubkeyPartialSumY.curr() - Ecdsa::PubkeyDoublingY.curr())
+            - Ecdsa::PubkeyPartialSumSlope.curr()
+                * (Ecdsa::PubkeyPartialSumX.curr() - Ecdsa::PubkeyDoublingX.curr()))
+            * &ec_op_transition_zerofier_inv;
+
+        // These two constraint check classic short Weierstrass curve point addition.
+        // Constraint is equivalent to:
+        // - `Qx_next = m^2 - Qx - Px, m = dy/dx`
+        // - `Qy_next = m*(Qx - Qx_next) - Qy, m = dy/dx`
+        let ecdsa_signature0_exponentiate_key_add_points_x = (Ecdsa::PubkeyPartialSumSlope.curr()
+            * Ecdsa::PubkeyPartialSumSlope.curr()
+            - &ecdsa_sig0_exponentiate_key_b0
+                * (Ecdsa::PubkeyPartialSumX.curr()
+                    + Ecdsa::PubkeyDoublingX.curr()
+                    + Ecdsa::PubkeyPartialSumX.next()))
+            * &ec_op_transition_zerofier_inv;
+        let ecdsa_signature0_exponentiate_key_add_points_y = (&ecdsa_sig0_exponentiate_key_b0
+            * (Ecdsa::PubkeyPartialSumY.curr() + Ecdsa::PubkeyPartialSumY.next())
+            - Ecdsa::PubkeyPartialSumSlope.curr()
+                * (Ecdsa::PubkeyPartialSumX.curr() - Ecdsa::PubkeyPartialSumX.next()))
+            * &ec_op_transition_zerofier_inv;
+        // constraint checks that the cell contains 1/(Qx - Px)
+        // Why this constraint? it checks that the Qx and Px are not equal
+        // with Px the x-coordinate of the doubled pubkey
+        // and Qx the x-coordinate of the partial sum of the pubkey
+        let ecdsa_signature0_exponentiate_key_add_points_x_diff_inv =
+            (Ecdsa::PubkeyPartialSumXDiffInv.curr()
+                * (Ecdsa::PubkeyPartialSumX.curr() - Ecdsa::PubkeyDoublingX.curr())
+                - &one)
+                * &ec_op_transition_zerofier_inv;
+        // if the bit is 0 then just copy the previous point
+        let ecdsa_signature0_exponentiate_key_copy_point_x = (&ecdsa_sig0_exponentiate_key_b0_neg
+            * (Ecdsa::PubkeyPartialSumX.next() - Ecdsa::PubkeyPartialSumX.curr()))
+            * &ec_op_transition_zerofier_inv;
+        let ecdsa_signature0_exponentiate_key_copy_point_y = (&ecdsa_sig0_exponentiate_key_b0_neg
+            * (Ecdsa::PubkeyPartialSumY.next() - Ecdsa::PubkeyPartialSumY.curr()))
+            * &ec_op_transition_zerofier_inv;
+
+        let all_ecdsa_zerofier = X.pow(n / 32768) - &one;
+        let all_ec_op_zerofier = X.pow(n / 16384) - &one;
+
+        // Check the correct starting values for our partial sums
+        // ======================================================
+        // #1 Check out generator `G` partial sum is offset with the `-shift_point`
+        let ecdsa_sig_config_shift_point_x = Constant(FieldVariant::Fp(ecdsa::SHIFT_POINT.x));
+        let ecdsa_sig_config_shift_point_y = Constant(FieldVariant::Fp(ecdsa::SHIFT_POINT.y));
+        let ecdsa_signature0_init_gen_x = (Ecdsa::GeneratorPartialSumX.curr()
+            - ecdsa_sig_config_shift_point_x)
+            / &all_ecdsa_zerofier;
+        let ecdsa_signature0_init_gen_y = (Ecdsa::GeneratorPartialSumY.curr()
+            + ecdsa_sig_config_shift_point_y)
+            / &all_ecdsa_zerofier;
+        // #2 Check out pubkey partial sum is offset with the `shift_point`
+        let ecdsa_signature0_init_key_x = (Ecdsa::PubkeyPartialSumX.curr()
+            - ecdsa_sig_config_shift_point_x)
+            / &all_ec_op_zerofier;
+        let ecdsa_signature0_init_key_y = (Ecdsa::PubkeyPartialSumY.curr()
+            - ecdsa_sig_config_shift_point_y)
+            / &all_ec_op_zerofier;
+
+        // Note that there are two elliptic curve operations that span 16384 rows each.
+        // 1st is the EC operation for our pubkey partial sum
+        // 2nd is the EC operation is for the partial sum of `msg_hash * G + r * P`
+        // - with the signature's `r`, Curve's generator point G and pubkey P
+        // This constraint checks the starting value for the 2nd EC operation
+        // By checking it is the sum `msg_hash * G + r * P`
+        //
+        // Note: the last GeneratorPartialSum slope is repurposed for the slope of the
+        // sum `(msg_hash * G) + (r * P)`.
+        let ecdsa_signature0_add_results_slope = (Ecdsa::GeneratorPartialSumY.offset(255)
+            - (Ecdsa::PubkeyPartialSumY.offset(255)
+                + Ecdsa::BSlope.curr()
+                    * (Ecdsa::GeneratorPartialSumX.offset(255)
+                        - Ecdsa::PubkeyPartialSumX.offset(255))))
+            / &all_ecdsa_zerofier;
+        // Now we have the slope finish the addition as per SW curve addition law.
+        // `x = m^2 - (msg_hash * G)_x - (R * P)_x, m = dy/dx`
+        // `y = m*((msg_hash*G)_x - x) - (msg_hash*G)_y, m = dy/dx`
+        let ecdsa_signature0_add_results_x = (Ecdsa::BSlope.curr() * Ecdsa::BSlope.curr()
+            - (Ecdsa::GeneratorPartialSumX.offset(255)
+                + Ecdsa::PubkeyPartialSumX.offset(255)
+                + Ecdsa::PubkeyDoublingX.offset(256)))
+            / &all_ecdsa_zerofier;
+        // TODO: introduce more generic names for PubkeyDoublingX, PubkeyDoublingY,
+        // PubkeyPartialSum* etc. since they're not just for pubkey but also the partial
+        // sum of the point `(msg_hash * G) + (r * P)`.
+        let ecdsa_signature0_add_results_y = (Ecdsa::GeneratorPartialSumY.offset(255)
+            + Ecdsa::PubkeyDoublingY.offset(256)
+            - Ecdsa::BSlope.curr()
+                * (Ecdsa::GeneratorPartialSumX.offset(255) - Ecdsa::PubkeyDoublingX.offset(256)))
+            / &all_ecdsa_zerofier;
+        // constraint checks that the cell contains 1/((msg_hash * G)_x - (r * P)_x)
+        // Once again like the slope we repurpose the last GeneratorPartialSumXDiffInv
+        // Why this constraint? it checks that the (msg_hash * G)_x and (r * P)_x are
+        // not equal. Case (1) would mean the ys are distinct => vertical slope => sum
+        // would be point at infinity - no good, case (2) would mean the points
+        // are equal and there is no slope through the points
+        let ecdsa_signature0_add_results_x_diff_inv = (Ecdsa::BXDiffInv.curr()
+            * (Ecdsa::GeneratorPartialSumX.offset(255) - Ecdsa::PubkeyPartialSumX.offset(255))
+            - &one)
+            / &all_ecdsa_zerofier;
+
+        // let `B = ((msg_hash * G) + (r * P)), H = w * B`
+        // Here we are trying to calculate `H - shift_point`
+        // NOTE: `(H - shift_point)_x` should equal `r`
+        // First we need the slope between points `H` and `-shift_point`
+        let ecdsa_signature0_extract_r_slope = (Ecdsa::PubkeyPartialSumY.offset(256 + 255)
+            + ecdsa_sig_config_shift_point_y
+            - Ecdsa::RPointSlope.curr()
+                * (Ecdsa::PubkeyPartialSumX.offset(256 + 255) - ecdsa_sig_config_shift_point_x))
+            / &all_ecdsa_zerofier;
+        // Now we have the slope we can find the x-coordinate of `H - shift_point`
+        // (which if the signature is valid will be `r`) using SW curve addition
+        // law: `x = m^2 - H_x - (-shift_point)_x, m = dy/dx`
+        let ecdsa_signature0_extract_r_x = (Ecdsa::RPointSlope.curr() * Ecdsa::RPointSlope.curr()
+            - (Ecdsa::PubkeyPartialSumX.offset(256 + 255)
+                + ecdsa_sig_config_shift_point_x
+                + Ecdsa::RSuffix.curr()))
+            / &all_ecdsa_zerofier;
+        // constraint checks that the cell contains 1/(H_x - shift_point_x)
+        // Once again like the slope we repurpose the last GeneratorPartialSumXDiffInv
+        let ecdsa_signature0_extract_r_x_diff_inv = (Ecdsa::RPointXDiffInv.curr()
+            * (Ecdsa::PubkeyPartialSumX.offset(256 + 255) - ecdsa_sig_config_shift_point_x)
+            - &one)
+            / &all_ecdsa_zerofier;
+
+        // `z` refers to the message hash. Check that it's not the zero hash.
+        let ecdsa_signature0_z_nonzero =
+            (Ecdsa::MessageSuffix.curr() * Ecdsa::MessageInv.curr() - &one) / &all_ecdsa_zerofier;
+
+        // NOTE: `PubkeyDoublingSlope.offset(255)` holds a value that isn't constrained
+        // Every 16370th of every 32768 rows PubkeyDoublingSlope contains r^(-1)
+        // Every 32754th of every 32768 rows PubkeyDoublingSlope contains w^(-1)
+        let ecdsa_signature0_r_and_w_nonzero =
+            (Ecdsa::RSuffix.curr() * Ecdsa::PubkeyDoublingSlope.offset(255) - &one)
+                / &all_ec_op_zerofier;
+
+        // check the pubkey `Q` is on the elliptic curve
+        // aka check `y^2 = x^3 + a*x + b`
+        let ecdsa_signature0_q_on_curve_x_squared = (Ecdsa::PubkeyXSquared.curr()
+            - Ecdsa::PubkeyDoublingX.curr() * Ecdsa::PubkeyDoublingX.curr())
+            / &all_ecdsa_zerofier;
+        let ecdsa_sig_config_beta = Constant(FieldVariant::Fp(ECDSA_SIG_CONFIG_BETA));
+        let ecdsa_signature0_q_on_curve_on_curve = (Ecdsa::PubkeyDoublingY.curr()
+            * Ecdsa::PubkeyDoublingY.curr()
+            - (Ecdsa::PubkeyDoublingX.curr() * Ecdsa::PubkeyXSquared.curr()
+                + Ecdsa::PubkeyDoublingX.curr() * ecdsa_sig_config_alpha
+                + ecdsa_sig_config_beta))
+            / &all_ecdsa_zerofier;
 
         let last_ecdsa_zerofier =
             X - Constant(FieldVariant::Fp(g.pow([32768 * (n / 32768 - 1) as u64])));
-        let all_ecdsa_zerofier = X.pow(n / 32768) - &one;
         let all_ecdsa_except_last_zerofier_inv = &last_ecdsa_zerofier / &all_ecdsa_zerofier;
 
         // Check starting address of the ECDSA memory segment
@@ -1084,7 +1295,7 @@ impl ministark::air::AirConfig for AirConfig {
         let ecdsa_message_value0 =
             (Npc::EcdsaMessageVal.curr() - Ecdsa::MessageSuffix.curr()) / &all_ecdsa_zerofier;
         let ecdsa_pubkey_value0 =
-            (Npc::EcdsaPubkeyVal.curr() - Ecdsa::PubkeyX.curr()) / &all_ecdsa_zerofier;
+            (Npc::EcdsaPubkeyVal.curr() - Ecdsa::PubkeyDoublingX.curr()) / &all_ecdsa_zerofier;
 
         // let ecdsa_signature0_doubling_key_x =
 
@@ -1094,6 +1305,42 @@ impl ministark::air::AirConfig for AirConfig {
 
         // point^(trace_length / 512) - trace_generator^(trace_length / 2).
         // let pedersen_hash0_copy_point_x =
+
+        let _yo = vec![
+            &ecdsa_signature0_exponentiate_generator_booleanity_test,
+            &ecdsa_signature0_exponentiate_generator_bit_extraction_end,
+            &ecdsa_signature0_exponentiate_generator_zeros_tail,
+            &ecdsa_signature0_exponentiate_generator_add_points_slope,
+            &ecdsa_signature0_exponentiate_generator_add_points_x,
+            &ecdsa_signature0_exponentiate_generator_add_points_y,
+            &ecdsa_signature0_exponentiate_generator_add_points_x_diff_inv,
+            &ecdsa_signature0_exponentiate_generator_copy_point_x,
+            &ecdsa_signature0_exponentiate_generator_copy_point_y,
+            &ecdsa_signature0_exponentiate_key_booleanity_test,
+            &ecdsa_signature0_exponentiate_key_bit_extraction_end,
+            &ecdsa_signature0_exponentiate_key_zeros_tail,
+            &ecdsa_signature0_exponentiate_key_add_points_slope,
+            &ecdsa_signature0_exponentiate_key_add_points_x,
+            &ecdsa_signature0_exponentiate_key_add_points_y,
+            &ecdsa_signature0_exponentiate_key_add_points_x_diff_inv,
+            &ecdsa_signature0_exponentiate_key_copy_point_x,
+            &ecdsa_signature0_exponentiate_key_copy_point_y,
+            &ecdsa_signature0_init_gen_x,
+            &ecdsa_signature0_init_gen_y,
+            &ecdsa_signature0_init_key_x,
+            &ecdsa_signature0_init_key_y,
+            &ecdsa_signature0_add_results_slope,
+            &ecdsa_signature0_add_results_x,
+            &ecdsa_signature0_add_results_y,
+            &ecdsa_signature0_add_results_x_diff_inv,
+            &ecdsa_signature0_extract_r_slope,
+            &ecdsa_signature0_extract_r_x,
+            &ecdsa_signature0_extract_r_x_diff_inv,
+            &ecdsa_signature0_z_nonzero,
+            &ecdsa_signature0_r_and_w_nonzero,
+            &ecdsa_signature0_q_on_curve_x_squared,
+            &ecdsa_signature0_q_on_curve_on_curve,
+        ];
 
         // NOTE: for composition OODs only seem to involve one random per constraint
         vec![
@@ -1175,9 +1422,41 @@ impl ministark::air::AirConfig for AirConfig {
             rc_builtin_addr_step,
             rc_builtin_init_addr,
             ecdsa_signature0_doubling_key_slope,
-            // ecdsa_signature0_doubling_key_x,
-            // ecdsa_signature0_doubling_key_y,
-            // TODO:
+            ecdsa_signature0_doubling_key_x,
+            ecdsa_signature0_doubling_key_y,
+            ecdsa_signature0_exponentiate_generator_booleanity_test,
+            ecdsa_signature0_exponentiate_generator_bit_extraction_end,
+            ecdsa_signature0_exponentiate_generator_zeros_tail,
+            ecdsa_signature0_exponentiate_generator_add_points_slope,
+            ecdsa_signature0_exponentiate_generator_add_points_x,
+            ecdsa_signature0_exponentiate_generator_add_points_y,
+            ecdsa_signature0_exponentiate_generator_add_points_x_diff_inv,
+            ecdsa_signature0_exponentiate_generator_copy_point_x,
+            ecdsa_signature0_exponentiate_generator_copy_point_y,
+            ecdsa_signature0_exponentiate_key_booleanity_test,
+            ecdsa_signature0_exponentiate_key_bit_extraction_end,
+            ecdsa_signature0_exponentiate_key_zeros_tail,
+            ecdsa_signature0_exponentiate_key_add_points_slope,
+            ecdsa_signature0_exponentiate_key_add_points_x,
+            ecdsa_signature0_exponentiate_key_add_points_y,
+            ecdsa_signature0_exponentiate_key_add_points_x_diff_inv,
+            ecdsa_signature0_exponentiate_key_copy_point_x,
+            ecdsa_signature0_exponentiate_key_copy_point_y,
+            ecdsa_signature0_init_gen_x,
+            ecdsa_signature0_init_gen_y,
+            ecdsa_signature0_init_key_x,
+            ecdsa_signature0_init_key_y,
+            ecdsa_signature0_add_results_slope,
+            ecdsa_signature0_add_results_x,
+            ecdsa_signature0_add_results_y,
+            ecdsa_signature0_add_results_x_diff_inv,
+            ecdsa_signature0_extract_r_slope,
+            ecdsa_signature0_extract_r_x,
+            ecdsa_signature0_extract_r_x_diff_inv,
+            ecdsa_signature0_z_nonzero,
+            ecdsa_signature0_r_and_w_nonzero,
+            ecdsa_signature0_q_on_curve_x_squared,
+            ecdsa_signature0_q_on_curve_on_curve,
             ecdsa_init_addr,
             ecdsa_message_addr,
             ecdsa_pubkey_addr,
@@ -1340,26 +1619,92 @@ impl ExecutionTraceColumn for RangeCheckBuiltin {
 
 #[derive(Clone, Copy)]
 pub enum Ecdsa {
-    PubkeyX = 4,
-    PubkeyY = 36,
-    MessageSuffix = 38,
+    PubkeyDoublingX = 4,
+    PubkeyDoublingY = 36,
     PubkeyDoublingSlope = 50,
+    PubkeyPartialSumX = 20,
+    PubkeyPartialSumY = 52,
+    PubkeyPartialSumXDiffInv = 42,
+    PubkeyPartialSumSlope = 10,
+    RSuffix = 12,
+    MessageSuffix = 38,
+    GeneratorPartialSumY = 70,
+    GeneratorPartialSumX = 6,
+    GeneratorPartialSumXDiffInv = 22,
+    GeneratorPartialSumSlope = 102,
+    // NOTE: 16346 % 64 = 26
+    // NOTE: 32730 % 64 = 26
+    RPointSlope = 16346,
+    RPointXDiffInv = 32730,
+    // NOTE: 16370 % 64 = 50
+    // NOTE: 32754 % 64 = 50
+    RInv = 16370,
+    WInv = 32754,
+    // NOTE: 32762 % 64 = 58
+    // NOTE: 16378 % 64 = 58
+    MessageInv = 16378,
+    PubkeyXSquared = 32762,
+    // NOTE: 32742 % 128 = 102
+    // NOTE: 32662 % 128 = 22
+    BSlope = 32742,
+    BXDiffInv = 32662,
 }
 
 impl ExecutionTraceColumn for Ecdsa {
     fn index(&self) -> usize {
         match self {
-            Self::PubkeyX | Self::PubkeyY | Self::MessageSuffix | Self::PubkeyDoublingSlope => 8,
+            Self::PubkeyDoublingX
+            | Self::PubkeyDoublingY
+            | Self::PubkeyPartialSumX
+            | Self::PubkeyPartialSumY
+            | Self::PubkeyPartialSumXDiffInv
+            | Self::PubkeyPartialSumSlope
+            | Self::RSuffix
+            | Self::MessageSuffix
+            | Self::PubkeyDoublingSlope
+            | Self::GeneratorPartialSumY
+            | Self::GeneratorPartialSumX
+            | Self::GeneratorPartialSumXDiffInv
+            | Self::GeneratorPartialSumSlope
+            | Self::RPointSlope
+            | Self::RPointXDiffInv
+            | Self::PubkeyXSquared
+            | Self::MessageInv
+            | Self::BSlope
+            | Self::BXDiffInv
+            | Self::RInv
+            | Self::WInv => 8,
         }
     }
 
     fn offset<T>(&self, offset: isize) -> Expr<AlgebraicItem<T>> {
         let column = self.index();
         let step = match self {
-            Self::PubkeyX | Self::PubkeyY | Self::PubkeyDoublingSlope => {
+            Self::PubkeyDoublingX
+            | Self::PubkeyDoublingY
+            | Self::PubkeyDoublingSlope
+            | Self::RSuffix
+            | Self::PubkeyPartialSumX
+            | Self::PubkeyPartialSumY
+            | Self::PubkeyPartialSumXDiffInv
+            | Self::PubkeyPartialSumSlope => {
                 EC_OP_BUILTIN_RATIO * CYCLE_HEIGHT / EC_OP_SCALAR_HEIGHT
             }
-            Self::MessageSuffix => ECDSA_BUILTIN_RATIO * CYCLE_HEIGHT / EC_OP_SCALAR_HEIGHT,
+            Self::MessageSuffix
+            | Self::GeneratorPartialSumX
+            | Self::GeneratorPartialSumY
+            | Self::GeneratorPartialSumSlope
+            | Self::GeneratorPartialSumXDiffInv => {
+                ECDSA_BUILTIN_RATIO * CYCLE_HEIGHT / EC_OP_SCALAR_HEIGHT
+            }
+            Self::RPointSlope
+            | Self::RPointXDiffInv
+            | Self::PubkeyXSquared
+            | Self::MessageInv
+            | Self::BSlope
+            | Self::BXDiffInv
+            | Self::RInv
+            | Self::WInv => ECDSA_BUILTIN_RATIO * CYCLE_HEIGHT,
         } as isize;
         let trace_offset = step * offset + *self as isize;
         AlgebraicItem::Trace(column, trace_offset).into()
@@ -1633,7 +1978,7 @@ impl VerifierChallenge for RangeCheckPermutation {
 
 struct Polynomial<T>(Vec<T>);
 
-impl<T: Clone + Zero + Mul<Output = T> + Add<Output = T>> Polynomial<T> {
+impl<T: Clone + One + Zero + Mul<Output = T> + Add<Output = T>> Polynomial<T> {
     fn new(coeffs: Vec<T>) -> Self {
         assert!(!coeffs.is_empty());
         assert!(!coeffs.iter().all(|v| v.is_zero()));
@@ -1642,7 +1987,7 @@ impl<T: Clone + Zero + Mul<Output = T> + Add<Output = T>> Polynomial<T> {
 
     fn eval(&self, x: Expr<AlgebraicItem<T>>) -> Expr<AlgebraicItem<T>> {
         let mut res = Expr::Leaf(AlgebraicItem::Constant(T::zero()));
-        let mut acc = x.clone();
+        let mut acc = Expr::from(AlgebraicItem::Constant(T::one()));
         for coeff in &self.0 {
             res += &acc * AlgebraicItem::Constant(coeff.clone());
             acc *= &x;

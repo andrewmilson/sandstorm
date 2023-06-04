@@ -38,8 +38,8 @@ rayon = { version = "1.5", optional = true }
 opt-level = 3
 
 [profile.release]
-codegen-units = 1
-lto = true
+codegen-units = 16
+lto = false
 
 [profile.bench]
 codegen-units = 1
@@ -49,3 +49,5 @@ lto = true
 [dev-dependencies]
 num-bigint = "0.4"
 ark-ec = "0.4"
+layouts = { path = "./layouts", package = "sandstorm-layouts" }
+builtins = { path = "./builtins", package = "sandstorm-builtins" }

@@ -30,6 +30,7 @@ use crate::layout6::air::RangeCheckBuiltin;
 use crate::utils::RangeCheckPool;
 use super::air::Permutation;
 use super::air::RangeCheckPermutation;
+use ark_ff::Field;
 use super::MEMORY_STEP;
 use crate::utils::get_ordered_memory_accesses;
 use crate::CairoExecutionTrace;
@@ -388,16 +389,62 @@ impl CairoExecutionTrace for ExecutionTrace {
                 let message = Fp::from(BigUint::from(instance.message));
                 let pubkey = ecdsa_trace.pubkey;
 
+                // load the EC operation steps into the trace
+                // there are two EC ops per ECDSA instance
+                // 1st is for public key scalar multiplication `r * Q`
+                // 2nd is for `B` scalar multiplication `w * B` where `B = z * G + r * Q`
                 let (aux_steps, _) = aux.as_chunks_mut::<64>();
-                for (aux_step, pubkey_doubling_step) in
-                    zip(aux_steps, ecdsa_trace.pubkey_doubling_steps)
+                let (rq_aux_steps, wb_aux_steps) = aux_steps.split_at_mut(256);
+
+                // #1 load in public key scalar multiplication `r * Q`
+                for ((aux_step, rq_step), pubkey_doubling_step) in
+                    zip(rq_aux_steps, ecdsa_trace.rq_steps).zip(ecdsa_trace.pubkey_doubling_steps)
                 {
-                    let DoublingStep { point, slope } = pubkey_doubling_step;
-                    aux_step[Ecdsa::PubkeyX as usize] = point.x;
-                    aux_step[Ecdsa::PubkeyY as usize] = point.y;
-                    aux_step[Ecdsa::PubkeyDoublingSlope as usize] = slope;
+                    aux_step[Ecdsa::PubkeyDoublingX as usize] = pubkey_doubling_step.point.x;
+                    aux_step[Ecdsa::PubkeyDoublingY as usize] = pubkey_doubling_step.point.y;
+                    aux_step[Ecdsa::PubkeyDoublingSlope as usize] = pubkey_doubling_step.slope;
+                    aux_step[Ecdsa::PubkeyPartialSumX as usize] = rq_step.partial_sum.x;
+                    aux_step[Ecdsa::PubkeyPartialSumY as usize] = rq_step.partial_sum.y;
+                    aux_step[Ecdsa::PubkeyPartialSumSlope as usize] = rq_step.slope;
+                    aux_step[Ecdsa::PubkeyPartialSumXDiffInv as usize] = rq_step.x_diff_inv;
+                    aux_step[Ecdsa::RSuffix as usize] = rq_step.suffix;
                 }
-                aux[Ecdsa::MessageSuffix as usize] = message;
+
+                // #2 load in `B` scalar multiplication `w * B` where `B = z * G + r * Q`
+                for ((aux_step, wb_step), b_doubling_step) in
+                    zip(wb_aux_steps, ecdsa_trace.wb_steps).zip(ecdsa_trace.b_doubling_steps)
+                {
+                    // TODO: need a better symbol for B and pubkey scalar mults since
+                    // PubkeyDoublingX is used for pubkey mult and B mult.
+                    aux_step[Ecdsa::PubkeyDoublingX as usize] = b_doubling_step.point.x;
+                    aux_step[Ecdsa::PubkeyDoublingY as usize] = b_doubling_step.point.y;
+                    aux_step[Ecdsa::PubkeyDoublingSlope as usize] = b_doubling_step.slope;
+                    aux_step[Ecdsa::PubkeyPartialSumX as usize] = wb_step.partial_sum.x;
+                    aux_step[Ecdsa::PubkeyPartialSumY as usize] = wb_step.partial_sum.y;
+                    aux_step[Ecdsa::PubkeyPartialSumSlope as usize] = wb_step.slope;
+                    aux_step[Ecdsa::PubkeyPartialSumXDiffInv as usize] = wb_step.x_diff_inv;
+                    aux_step[Ecdsa::RSuffix as usize] = wb_step.suffix;
+                }
+
+                // load the scalar multiplication `z * G` into the trace
+                // where `z` is the message hash and `G` is the curve generator point
+                let (zg_aux_steps, _) = aux.as_chunks_mut::<128>();
+                for (aux_step, zg_step) in zip(zg_aux_steps, ecdsa_trace.zg_steps) {
+                    aux_step[Ecdsa::GeneratorPartialSumX as usize] = zg_step.partial_sum.x;
+                    aux_step[Ecdsa::GeneratorPartialSumY as usize] = zg_step.partial_sum.y;
+                    aux_step[Ecdsa::GeneratorPartialSumSlope as usize] = zg_step.slope;
+                    aux_step[Ecdsa::GeneratorPartialSumXDiffInv as usize] = zg_step.x_diff_inv;
+                    aux_step[Ecdsa::MessageSuffix as usize] = zg_step.suffix;
+                }
+
+                aux[Ecdsa::BSlope as usize] = ecdsa_trace.b_slope;
+                aux[Ecdsa::BXDiffInv as usize] = ecdsa_trace.b_x_diff_inv;
+                aux[Ecdsa::WInv as usize] = ecdsa_trace.w_inv;
+                aux[Ecdsa::RInv as usize] = ecdsa_trace.r_inv;
+                aux[Ecdsa::RPointSlope as usize] = ecdsa_trace.r_point_slope;
+                aux[Ecdsa::RPointXDiffInv as usize] = ecdsa_trace.r_point_x_diff_inv;
+                aux[Ecdsa::MessageInv as usize] = ecdsa_trace.message_inv;
+                aux[Ecdsa::PubkeyXSquared as usize] = pubkey.x.square();
 
                 // add the instance to the memory pool
                 let (pubkey_addr, message_addr) = instance.mem_addr(initial_ecdsa_address);

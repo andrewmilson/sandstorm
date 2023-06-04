@@ -1,3 +1,8 @@
+use ark_ec::CurveGroup;
+use ark_ec::Group;
+use ark_ec::short_weierstrass::Affine;
+use ark_ec::short_weierstrass::Projective;
+use ark_ec::short_weierstrass::SWCurveConfig;
 use ark_ff::FftField;
 use ark_ff::Field;
 use ark_ff::One;
@@ -6,6 +11,10 @@ use ark_poly::DenseUVPolynomial;
 use ark_ff::PrimeField;
 use ark_poly::univariate::DensePolynomial;
 use ark_poly::Polynomial;
+use builtins::ecdsa;
+use builtins::utils::starkware_curve::Curve;
+use builtins::utils::starkware_curve::Fr;
+use ministark::utils::FieldVariant;
 use ministark_gpu::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481::ark::Fp;
 use num_bigint::BigUint;
 use std::io::Cursor;
@@ -15,6 +24,42 @@ use num_traits::Zero;
 extern crate serde_json;
 
 fn main() {
+    let (ecdsa_generator_x_coeffs, ecdsa_generator_y_coeffs) = ecdsa::generator_points_poly();
+    let x_poly = DensePolynomial::from_coefficients_vec(
+        ecdsa_generator_x_coeffs
+            .into_iter()
+            .map(|v| match v {
+                FieldVariant::Fp(v) => v,
+                _ => unreachable!(),
+            })
+            .collect::<Vec<Fp>>(),
+    );
+    let y_poly = DensePolynomial::from_coefficients_vec(
+        ecdsa_generator_y_coeffs
+            .into_iter()
+            .map(|v| match v {
+                FieldVariant::Fp(v) => v,
+                _ => unreachable!(),
+            })
+            .collect::<Vec<Fp>>(),
+    );
+
+    let generator = Projective::from(Curve::GENERATOR);
+
+    let n = 32768;
+    let omega = Fp::get_root_of_unity(n).unwrap();
+    let mut acc = generator;
+    for i in 0..256 {
+        let expected = acc.into_affine();
+        let actual_x = x_poly.evaluate(&omega.pow([128 * i]));
+        let actual_y = y_poly.evaluate(&omega.pow([128 * i]));
+        let actual = Affine::new(actual_x, actual_y);
+        assert_eq!(actual, expected);
+        // println!("Actual: {}", );
+        // println!("Expected: {}", acc.into_affine().x);
+        acc.double_in_place();
+    }
+
     // const PIE: &[u8] = include_bytes!("../example/as-pie.zip");
 
     // println!("YO: {:?}", json!(3218973821738972187381793));
