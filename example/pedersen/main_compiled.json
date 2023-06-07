@@ -69,12 +69,21 @@
         "0x800000000000010ffffffffffffffffffffffffffffffffffffffffffffffd5",
         "0x400680017fff7fff",
         "0x8",
+        "0x48127ffe7fff8000",
+        "0x480680017fff8000",
+        "0x2b5a729dad1940dcd89abe05e6755a92dc322758cf962eff13c943f9a9b056c",
+        "0x480680017fff8000",
+        "0x7e3dfe8113341ad16dfbb9e5e4d425cee0685adcd4697d4364c746107077d63",
+        "0x1104800180018000",
+        "0x800000000000010ffffffffffffffffffffffffffffffffffffffffffffffcc",
+        "0x400680017fff7fff",
+        "0x2a187281011000d0489ab805e4540082c0200258c4002c4300c142102030560",
         "0x482680017ff98000",
         "0x1",
-        "0x48127fee7fff8000",
+        "0x48127fe77fff8000",
         "0x482680017ffb8000",
         "0x1",
-        "0x48127ff57fff8000",
+        "0x48127fee7fff8000",
         "0x48127ffa7fff8000",
         "0x208b7fff7fff7ffe"
     ],
@@ -1520,40 +1529,52 @@
                 },
                 "hints": [],
                 "inst": {
-                    "end_col": 36,
-                    "end_line": 19,
+                    "end_col": 46,
+                    "end_line": 37,
                     "input_file": {
-                        "filename": "example/pedersen/main.cairo"
+                        "filename": "/Users/andrewmilson/cairo_venv/lib/python3.9/site-packages/starkware/cairo/common/bitwise.cairo"
                     },
                     "parent_location": [
                         {
-                            "end_col": 21,
-                            "end_line": 12,
+                            "end_col": 37,
+                            "end_line": 39,
                             "input_file": {
                                 "filename": "example/pedersen/main.cairo"
                             },
                             "parent_location": [
                                 {
-                                    "end_col": 15,
-                                    "end_line": 43,
+                                    "end_col": 46,
+                                    "end_line": 37,
                                     "input_file": {
-                                        "filename": "example/pedersen/main.cairo"
+                                        "filename": "/Users/andrewmilson/cairo_venv/lib/python3.9/site-packages/starkware/cairo/common/bitwise.cairo"
                                     },
-                                    "start_col": 5,
-                                    "start_line": 43
+                                    "parent_location": [
+                                        {
+                                            "end_col": 6,
+                                            "end_line": 45,
+                                            "input_file": {
+                                                "filename": "example/pedersen/main.cairo"
+                                            },
+                                            "start_col": 18,
+                                            "start_line": 42
+                                        },
+                                        "While trying to retrieve the implicit argument 'bitwise_ptr' in:"
+                                    ],
+                                    "start_col": 18,
+                                    "start_line": 37
                                 },
-                                "While trying to retrieve the implicit argument 'output_ptr' in:"
+                                "While expanding the reference 'bitwise_ptr' in:"
                             ],
-                            "start_col": 11,
-                            "start_line": 12
+                            "start_col": 18,
+                            "start_line": 39
                         },
-                        "While expanding the reference 'output_ptr' in:"
+                        "While trying to update the implicit return value 'bitwise_ptr' in:"
                     ],
-                    "start_col": 22,
-                    "start_line": 19
+                    "start_col": 18,
+                    "start_line": 37
                 }
             },
-            "62": {
+            "61": {
                 "accessible_scopes": [
                     "__main__",
                     "__main__.main"
@@ -1580,37 +1601,13 @@
                 },
                 "hints": [],
                 "inst": {
-                    "end_col": 52,
-                    "end_line": 30,
+                    "end_col": 85,
+                    "end_line": 43,
                     "input_file": {
                         "filename": "example/pedersen/main.cairo"
                     },
-                    "parent_location": [
-                        {
-                            "end_col": 49,
-                            "end_line": 12,
-                            "input_file": {
-                                "filename": "example/pedersen/main.cairo"
-                            },
-                            "parent_location": [
-                                {
-                                    "end_col": 15,
-                                    "end_line": 43,
-                                    "input_file": {
-                                        "filename": "example/pedersen/main.cairo"
-                                    },
-                                    "start_col": 5,
-                                    "start_line": 43
-                                },
-                                "While trying to retrieve the implicit argument 'pedersen_ptr' in:"
-                            ],
-                            "start_col": 23,
-                            "start_line": 12
-                        },
-                        "While expanding the reference 'pedersen_ptr' in:"
-                    ],
-                    "start_col": 40,
-                    "start_line": 30
+                    "start_col": 9,
+                    "start_line": 43
                 }
             },
             "63": {
@@ -1640,37 +1637,13 @@
                 },
                 "hints": [],
                 "inst": {
-                    "end_col": 46,
-                    "end_line": 25,
+                    "end_col": 85,
+                    "end_line": 44,
                     "input_file": {
                         "filename": "example/pedersen/main.cairo"
                     },
-                    "parent_location": [
-                        {
-                            "end_col": 66,
-                            "end_line": 12,
-                            "input_file": {
-                                "filename": "example/pedersen/main.cairo"
-                            },
-                            "parent_location": [
-                                {
-                                    "end_col": 15,
-                                    "end_line": 43,
-                                    "input_file": {
-                                        "filename": "example/pedersen/main.cairo"
-                                    },
-                                    "start_col": 5,
-                                    "start_line": 43
-                                },
-                                "While trying to retrieve the implicit argument 'range_check_ptr' in:"
-                            ],
-                            "start_col": 51,
-                            "start_line": 12
-                        },
-                        "While expanding the reference 'range_check_ptr' in:"
-                    ],
-                    "start_col": 27,
-                    "start_line": 25
+                    "start_col": 9,
+                    "start_line": 44
                 }
             },
             "65": {
@@ -1700,6 +1673,263 @@
                 },
                 "hints": [],
                 "inst": {
+                    "end_col": 6,
+                    "end_line": 45,
+                    "input_file": {
+                        "filename": "example/pedersen/main.cairo"
+                    },
+                    "start_col": 18,
+                    "start_line": 42
+                }
+            },
+            "67": {
+                "accessible_scopes": [
+                    "__main__",
+                    "__main__.main"
+                ],
+                "flow_tracking_data": {
+                    "ap_tracking": {
+                        "group": 5,
+                        "offset": 37
+                    },
+                    "reference_ids": {
+                        "__main__.main.__temp0": 26,
+                        "__main__.main.amount": 29,
+                        "__main__.main.amount_hash": 32,
+                        "__main__.main.bitwise_ptr": 36,
+                        "__main__.main.ecdsa_ptr": 33,
+                        "__main__.main.output_ptr": 25,
+                        "__main__.main.pedersen_ptr": 31,
+                        "__main__.main.prez": 35,
+                        "__main__.main.range_check_ptr": 27,
+                        "__main__.main.res": 24,
+                        "__main__.main.sig": 30,
+                        "__main__.main.user": 28,
+                        "__main__.main.yoyo": 37
+                    }
+                },
+                "hints": [],
+                "inst": {
+                    "end_col": 96,
+                    "end_line": 46,
+                    "input_file": {
+                        "filename": "example/pedersen/main.cairo"
+                    },
+                    "start_col": 5,
+                    "start_line": 46
+                }
+            },
+            "69": {
+                "accessible_scopes": [
+                    "__main__",
+                    "__main__.main"
+                ],
+                "flow_tracking_data": {
+                    "ap_tracking": {
+                        "group": 5,
+                        "offset": 37
+                    },
+                    "reference_ids": {
+                        "__main__.main.__temp0": 26,
+                        "__main__.main.amount": 29,
+                        "__main__.main.amount_hash": 32,
+                        "__main__.main.bitwise_ptr": 36,
+                        "__main__.main.ecdsa_ptr": 33,
+                        "__main__.main.output_ptr": 25,
+                        "__main__.main.pedersen_ptr": 31,
+                        "__main__.main.prez": 35,
+                        "__main__.main.range_check_ptr": 27,
+                        "__main__.main.res": 24,
+                        "__main__.main.sig": 30,
+                        "__main__.main.user": 28,
+                        "__main__.main.yoyo": 37
+                    }
+                },
+                "hints": [],
+                "inst": {
+                    "end_col": 36,
+                    "end_line": 19,
+                    "input_file": {
+                        "filename": "example/pedersen/main.cairo"
+                    },
+                    "parent_location": [
+                        {
+                            "end_col": 21,
+                            "end_line": 12,
+                            "input_file": {
+                                "filename": "example/pedersen/main.cairo"
+                            },
+                            "parent_location": [
+                                {
+                                    "end_col": 15,
+                                    "end_line": 49,
+                                    "input_file": {
+                                        "filename": "example/pedersen/main.cairo"
+                                    },
+                                    "start_col": 5,
+                                    "start_line": 49
+                                },
+                                "While trying to retrieve the implicit argument 'output_ptr' in:"
+                            ],
+                            "start_col": 11,
+                            "start_line": 12
+                        },
+                        "While expanding the reference 'output_ptr' in:"
+                    ],
+                    "start_col": 22,
+                    "start_line": 19
+                }
+            },
+            "71": {
+                "accessible_scopes": [
+                    "__main__",
+                    "__main__.main"
+                ],
+                "flow_tracking_data": {
+                    "ap_tracking": {
+                        "group": 5,
+                        "offset": 38
+                    },
+                    "reference_ids": {
+                        "__main__.main.__temp0": 26,
+                        "__main__.main.amount": 29,
+                        "__main__.main.amount_hash": 32,
+                        "__main__.main.bitwise_ptr": 36,
+                        "__main__.main.ecdsa_ptr": 33,
+                        "__main__.main.output_ptr": 25,
+                        "__main__.main.pedersen_ptr": 31,
+                        "__main__.main.prez": 35,
+                        "__main__.main.range_check_ptr": 27,
+                        "__main__.main.res": 24,
+                        "__main__.main.sig": 30,
+                        "__main__.main.user": 28,
+                        "__main__.main.yoyo": 37
+                    }
+                },
+                "hints": [],
+                "inst": {
+                    "end_col": 52,
+                    "end_line": 30,
+                    "input_file": {
+                        "filename": "example/pedersen/main.cairo"
+                    },
+                    "parent_location": [
+                        {
+                            "end_col": 49,
+                            "end_line": 12,
+                            "input_file": {
+                                "filename": "example/pedersen/main.cairo"
+                            },
+                            "parent_location": [
+                                {
+                                    "end_col": 15,
+                                    "end_line": 49,
+                                    "input_file": {
+                                        "filename": "example/pedersen/main.cairo"
+                                    },
+                                    "start_col": 5,
+                                    "start_line": 49
+                                },
+                                "While trying to retrieve the implicit argument 'pedersen_ptr' in:"
+                            ],
+                            "start_col": 23,
+                            "start_line": 12
+                        },
+                        "While expanding the reference 'pedersen_ptr' in:"
+                    ],
+                    "start_col": 40,
+                    "start_line": 30
+                }
+            },
+            "72": {
+                "accessible_scopes": [
+                    "__main__",
+                    "__main__.main"
+                ],
+                "flow_tracking_data": {
+                    "ap_tracking": {
+                        "group": 5,
+                        "offset": 39
+                    },
+                    "reference_ids": {
+                        "__main__.main.__temp0": 26,
+                        "__main__.main.amount": 29,
+                        "__main__.main.amount_hash": 32,
+                        "__main__.main.bitwise_ptr": 36,
+                        "__main__.main.ecdsa_ptr": 33,
+                        "__main__.main.output_ptr": 25,
+                        "__main__.main.pedersen_ptr": 31,
+                        "__main__.main.prez": 35,
+                        "__main__.main.range_check_ptr": 27,
+                        "__main__.main.res": 24,
+                        "__main__.main.sig": 30,
+                        "__main__.main.user": 28,
+                        "__main__.main.yoyo": 37
+                    }
+                },
+                "hints": [],
+                "inst": {
+                    "end_col": 46,
+                    "end_line": 25,
+                    "input_file": {
+                        "filename": "example/pedersen/main.cairo"
+                    },
+                    "parent_location": [
+                        {
+                            "end_col": 66,
+                            "end_line": 12,
+                            "input_file": {
+                                "filename": "example/pedersen/main.cairo"
+                            },
+                            "parent_location": [
+                                {
+                                    "end_col": 15,
+                                    "end_line": 49,
+                                    "input_file": {
+                                        "filename": "example/pedersen/main.cairo"
+                                    },
+                                    "start_col": 5,
+                                    "start_line": 49
+                                },
+                                "While trying to retrieve the implicit argument 'range_check_ptr' in:"
+                            ],
+                            "start_col": 51,
+                            "start_line": 12
+                        },
+                        "While expanding the reference 'range_check_ptr' in:"
+                    ],
+                    "start_col": 27,
+                    "start_line": 25
+                }
+            },
+            "74": {
+                "accessible_scopes": [
+                    "__main__",
+                    "__main__.main"
+                ],
+                "flow_tracking_data": {
+                    "ap_tracking": {
+                        "group": 5,
+                        "offset": 40
+                    },
+                    "reference_ids": {
+                        "__main__.main.__temp0": 26,
+                        "__main__.main.amount": 29,
+                        "__main__.main.amount_hash": 32,
+                        "__main__.main.bitwise_ptr": 36,
+                        "__main__.main.ecdsa_ptr": 33,
+                        "__main__.main.output_ptr": 25,
+                        "__main__.main.pedersen_ptr": 31,
+                        "__main__.main.prez": 35,
+                        "__main__.main.range_check_ptr": 27,
+                        "__main__.main.res": 24,
+                        "__main__.main.sig": 30,
+                        "__main__.main.user": 28,
+                        "__main__.main.yoyo": 37
+                    }
+                },
+                "hints": [],
+                "inst": {
                     "end_col": 57,
                     "end_line": 10,
                     "input_file": {
@@ -1722,12 +1952,12 @@
                                     "parent_location": [
                                         {
                                             "end_col": 15,
-                                            "end_line": 43,
+                                            "end_line": 49,
                                             "input_file": {
                                                 "filename": "example/pedersen/main.cairo"
                                             },
                                             "start_col": 5,
-                                            "start_line": 43
+                                            "start_line": 49
                                         },
                                         "While trying to retrieve the implicit argument 'ecdsa_ptr' in:"
                                     ],
@@ -1745,7 +1975,7 @@
                     "start_line": 10
                 }
             },
-            "66": {
+            "75": {
                 "accessible_scopes": [
                     "__main__",
                     "__main__.main"
@@ -1753,13 +1983,13 @@
                 "flow_tracking_data": {
                     "ap_tracking": {
                         "group": 5,
-                        "offset": 34
+                        "offset": 41
                     },
                     "reference_ids": {
                         "__main__.main.__temp0": 26,
                         "__main__.main.amount": 29,
                         "__main__.main.amount_hash": 32,
-                        "__main__.main.bitwise_ptr": 34,
+                        "__main__.main.bitwise_ptr": 36,
                         "__main__.main.ecdsa_ptr": 33,
                         "__main__.main.output_ptr": 25,
                         "__main__.main.pedersen_ptr": 31,
@@ -1767,7 +1997,8 @@
                         "__main__.main.range_check_ptr": 27,
                         "__main__.main.res": 24,
                         "__main__.main.sig": 30,
-                        "__main__.main.user": 28
+                        "__main__.main.user": 28,
+                        "__main__.main.yoyo": 37
                     }
                 },
                 "hints": [],
@@ -1779,8 +2010,8 @@
                     },
                     "parent_location": [
                         {
-                            "end_col": 37,
-                            "end_line": 39,
+                            "end_col": 6,
+                            "end_line": 45,
                             "input_file": {
                                 "filename": "example/pedersen/main.cairo"
                             },
@@ -1794,12 +2025,12 @@
                                     "parent_location": [
                                         {
                                             "end_col": 15,
-                                            "end_line": 43,
+                                            "end_line": 49,
                                             "input_file": {
                                                 "filename": "example/pedersen/main.cairo"
                                             },
                                             "start_col": 5,
-                                            "start_line": 43
+                                            "start_line": 49
                                         },
                                         "While trying to retrieve the implicit argument 'bitwise_ptr' in:"
                                     ],
@@ -1809,7 +2040,7 @@
                                 "While expanding the reference 'bitwise_ptr' in:"
                             ],
                             "start_col": 18,
-                            "start_line": 39
+                            "start_line": 42
                         },
                         "While trying to update the implicit return value 'bitwise_ptr' in:"
                     ],
@@ -1817,7 +2048,7 @@
                     "start_line": 37
                 }
             },
-            "67": {
+            "76": {
                 "accessible_scopes": [
                     "__main__",
                     "__main__.main"
@@ -1825,13 +2056,13 @@
                 "flow_tracking_data": {
                     "ap_tracking": {
                         "group": 5,
-                        "offset": 35
+                        "offset": 42
                     },
                     "reference_ids": {
                         "__main__.main.__temp0": 26,
                         "__main__.main.amount": 29,
                         "__main__.main.amount_hash": 32,
-                        "__main__.main.bitwise_ptr": 34,
+                        "__main__.main.bitwise_ptr": 36,
                         "__main__.main.ecdsa_ptr": 33,
                         "__main__.main.output_ptr": 25,
                         "__main__.main.pedersen_ptr": 31,
@@ -1839,18 +2070,19 @@
                         "__main__.main.range_check_ptr": 27,
                         "__main__.main.res": 24,
                         "__main__.main.sig": 30,
-                        "__main__.main.user": 28
+                        "__main__.main.user": 28,
+                        "__main__.main.yoyo": 37
                     }
                 },
                 "hints": [],
                 "inst": {
                     "end_col": 15,
-                    "end_line": 43,
+                    "end_line": 49,
                     "input_file": {
                         "filename": "example/pedersen/main.cairo"
                     },
                     "start_col": 5,
-                    "start_line": 43
+                    "start_line": 49
                 }
             }
         }
@@ -2018,6 +2250,14 @@
                     },
                     "pc": 58,
                     "value": "[cast(ap + (-2), starkware.cairo.common.cairo_builtins.BitwiseBuiltin**)]"
+                },
+                {
+                    "ap_tracking_data": {
+                        "group": 5,
+                        "offset": 37
+                    },
+                    "pc": 67,
+                    "value": "[cast(ap + (-2), starkware.cairo.common.cairo_builtins.BitwiseBuiltin**)]"
                 }
             ],
             "type": "reference"
@@ -2178,6 +2418,21 @@
                     },
                     "pc": 34,
                     "value": "cast(1628448741648245036800002906075225705100596136133912895015035902954123957052, felt)"
+                }
+            ],
+            "type": "reference"
+        },
+        "__main__.main.yoyo": {
+            "cairo_type": "felt",
+            "full_name": "__main__.main.yoyo",
+            "references": [
+                {
+                    "ap_tracking_data": {
+                        "group": 5,
+                        "offset": 37
+                    },
+                    "pc": 67,
+                    "value": "[cast(ap + (-1), felt*)]"
                 }
             ],
             "type": "reference"
@@ -3139,6 +3394,22 @@
                     "offset": 30
                 },
                 "pc": 58,
+                "value": "[cast(ap + (-1), felt*)]"
+            },
+            {
+                "ap_tracking_data": {
+                    "group": 5,
+                    "offset": 37
+                },
+                "pc": 67,
+                "value": "[cast(ap + (-2), starkware.cairo.common.cairo_builtins.BitwiseBuiltin**)]"
+            },
+            {
+                "ap_tracking_data": {
+                    "group": 5,
+                    "offset": 37
+                },
+                "pc": 67,
                 "value": "[cast(ap + (-1), felt*)]"
             }
         ]

@@ -223,7 +223,7 @@ impl<const N_BITS: usize, const SPACING: usize> DilutedCheckPool<N_BITS, SPACING
             // check all non diluted bits are zero
             let mut res = v;
             for i in 0..N_BITS {
-                res ^= uint!(1_U256) << (i * SPACING);
+                res &= !(uint!(1_U256) << (i * SPACING));
             }
             res == U256::ZERO
         });

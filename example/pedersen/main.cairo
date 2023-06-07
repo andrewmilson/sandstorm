@@ -39,6 +39,12 @@ func main{output_ptr, pedersen_ptr: HashBuiltin*, range_check_ptr, ecdsa_ptr: Si
     let (prez) = bitwise_and(12, 10);  // Binary (1100, 1010).
     assert prez = 8;  // Binary 1000.
 
+    let (yoyo) = bitwise_and(
+        1225578735933442828068102633747590437426782890965066746429241472187377583468,
+        3568809569741913715045370357918125425757114920266578211811626257903121825123
+    );
+    assert yoyo = 1190020890442526208725573243584847930292605552660038159110459769316048045408;
+
     // output_ptr and pedersen_ptr will be implicitly returned.
     return ();
 }

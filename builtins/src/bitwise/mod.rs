@@ -68,6 +68,7 @@ pub struct Partition256<const SPACING: usize> {
 
 impl<const SPACING: usize> Partition256<SPACING> {
     pub fn new(v: U256) -> Self {
+        // least significant first
         let [l0, l1, l2, l3] = v.into_limbs();
         Self {
             low: Partition128::new(((l1 as u128) << 64) + l0 as u128),
@@ -80,14 +81,14 @@ impl<const SPACING: usize> Partition256<SPACING> {
 pub struct InstanceTrace<const SPACING: usize> {
     pub instance: BitwiseInstance,
     pub x: Fp,
-    pub x_partition: Partition256<SPACING>,
     pub y: Fp,
-    pub y_partition: Partition256<SPACING>,
     pub x_and_y: Fp,
-    pub x_and_y_partition: Partition256<SPACING>,
     pub x_xor_y: Fp,
-    pub x_xor_y_partition: Partition256<SPACING>,
     pub x_or_y: Fp,
+    pub x_partition: Partition256<SPACING>,
+    pub y_partition: Partition256<SPACING>,
+    pub x_and_y_partition: Partition256<SPACING>,
+    pub x_xor_y_partition: Partition256<SPACING>,
 }
 
 impl<const SPACING: usize> InstanceTrace<SPACING> {
@@ -107,17 +108,18 @@ impl<const SPACING: usize> InstanceTrace<SPACING> {
         let x_and_y = BigUint::from(x_and_y).into();
         let x_xor_y = BigUint::from(x_xor_y).into();
         let x_or_y = BigUint::from(x_or_y).into();
+
         Self {
             instance,
             x,
-            x_partition,
             y,
-            y_partition,
             x_and_y,
-            x_and_y_partition,
             x_xor_y,
-            x_xor_y_partition,
             x_or_y,
+            x_partition,
+            y_partition,
+            x_and_y_partition,
+            x_xor_y_partition,
         }
     }
 }

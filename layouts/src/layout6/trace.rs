@@ -507,6 +507,27 @@ impl CairoExecutionTrace for ExecutionTrace {
             .for_each(|((npc, dilution), bitwise_trace)| {
                 let instance = bitwise_trace.instance;
 
+                {
+                    // add shifts to ensure a unique unpacking
+                    let x_and_y_v0 = bitwise_trace.x_and_y_partition.high.high[0];
+                    let x_and_y_v1 = bitwise_trace.x_and_y_partition.high.high[1];
+                    let x_and_y_v2 = bitwise_trace.x_and_y_partition.high.high[2];
+                    let x_and_y_v3 = bitwise_trace.x_and_y_partition.high.high[3];
+                    let v0 = x_and_y_v0 + bitwise_trace.x_xor_y_partition.high.high[0];
+                    let v1 = x_and_y_v1 + bitwise_trace.x_xor_y_partition.high.high[1];
+                    let v2 = x_and_y_v2 + bitwise_trace.x_xor_y_partition.high.high[2];
+                    let v3 = x_and_y_v3 + bitwise_trace.x_xor_y_partition.high.high[3];
+                    // only fails if the AIR will error
+                    assert_eq!(v0, (v0 << 4) >> 4);
+                    assert_eq!(v1, (v1 << 4) >> 4);
+                    assert_eq!(v2, (v2 << 4) >> 4);
+                    assert_eq!(v3, (v3 << 8) >> 8);
+                    dilution[Bitwise::Bits16Chunk3Offset0ResShifted as usize] = (v0 << 4).into();
+                    dilution[Bitwise::Bits16Chunk3Offset1ResShifted as usize] = (v1 << 4).into();
+                    dilution[Bitwise::Bits16Chunk3Offset2ResShifted as usize] = (v2 << 4).into();
+                    dilution[Bitwise::Bits16Chunk3Offset3ResShifted as usize] = (v3 << 8).into();
+                }
+
                 // NOTE: the order of these partitions matters
                 let partitions = [
                     bitwise_trace.x_partition,
@@ -530,13 +551,13 @@ impl CairoExecutionTrace for ExecutionTrace {
                     dilution_step[Bitwise::Bits16Chunk1Offset2 as usize] = chunk1[2].into();
                     dilution_step[Bitwise::Bits16Chunk1Offset3 as usize] = chunk1[3].into();
 
-                    let chunk2 = partition.low.high;
+                    let chunk2 = partition.high.low;
                     dilution_step[Bitwise::Bits16Chunk2Offset0 as usize] = chunk2[0].into();
                     dilution_step[Bitwise::Bits16Chunk2Offset1 as usize] = chunk2[1].into();
                     dilution_step[Bitwise::Bits16Chunk2Offset2 as usize] = chunk2[2].into();
                     dilution_step[Bitwise::Bits16Chunk2Offset3 as usize] = chunk2[3].into();
 
-                    let chunk3 = partition.low.high;
+                    let chunk3 = partition.high.high;
                     dilution_step[Bitwise::Bits16Chunk3Offset0 as usize] = chunk3[0].into();
                     dilution_step[Bitwise::Bits16Chunk3Offset1 as usize] = chunk3[1].into();
                     dilution_step[Bitwise::Bits16Chunk3Offset2 as usize] = chunk3[2].into();

@@ -53,6 +53,10 @@ impl ministark::air::AirConfig for AirConfig {
         let trace_domain = Radix2EvaluationDomain::<Fp>::new(n).unwrap();
         let g = trace_domain.group_gen();
         assert!(n >= CYCLE_HEIGHT, "must be a multiple of cycle height");
+        // TODO: might be good to have more trace size assertions for builtins etc.
+        // for example ECDSA requires a minimum trace size of 2048 for this layout.
+        // NOTE: All this stuff is taken care by the runner of if you run properly
+        // i.e correct params
         let x = Expr::from(X);
         let one = Expr::from(Constant(FieldVariant::Fp(Fp::ONE)));
         let two = Expr::from(Constant(FieldVariant::Fp(Fp::from(2u32))));
@@ -121,14 +125,14 @@ impl ministark::air::AirConfig for AirConfig {
                 + Bitwise::Bits16Chunk1Offset3.curr() * (&two).pow(67);
         // bits 128->255 (inclusive) of a bitwise number
         let bitwise_sum_var_8_0: Expr<AlgebraicItem<FieldVariant<Fp, Fp>>> =
-            Bitwise::Bits16Chunk2Offset0.curr() * (&two).pow(129)
-                + Bitwise::Bits16Chunk2Offset1.curr() * (&two).pow(130)
-                + Bitwise::Bits16Chunk2Offset2.curr() * (&two).pow(131)
-                + Bitwise::Bits16Chunk2Offset3.curr() * (&two).pow(132)
-                + Bitwise::Bits16Chunk3Offset0.curr() * (&two).pow(193)
-                + Bitwise::Bits16Chunk3Offset1.curr() * (&two).pow(194)
-                + Bitwise::Bits16Chunk3Offset2.curr() * (&two).pow(195)
-                + Bitwise::Bits16Chunk3Offset3.curr() * (&two).pow(196);
+            Bitwise::Bits16Chunk2Offset0.curr() * (&two).pow(128)
+                + Bitwise::Bits16Chunk2Offset1.curr() * (&two).pow(129)
+                + Bitwise::Bits16Chunk2Offset2.curr() * (&two).pow(130)
+                + Bitwise::Bits16Chunk2Offset3.curr() * (&two).pow(131)
+                + Bitwise::Bits16Chunk3Offset0.curr() * (&two).pow(192)
+                + Bitwise::Bits16Chunk3Offset1.curr() * (&two).pow(193)
+                + Bitwise::Bits16Chunk3Offset2.curr() * (&two).pow(194)
+                + Bitwise::Bits16Chunk3Offset3.curr() * (&two).pow(195);
 
         // example for trace length n=64
         // =============================
@@ -1397,11 +1401,6 @@ impl ministark::air::AirConfig for AirConfig {
             - (Npc::BitwiseXOrYAddr.curr() + &one))
             * &all_bitwise_except_last_zerofier_inv;
 
-        // let bitwise_x_addr = Npc::BitwisePoolAddr.offset(0);
-        // let bitwise_y_addr = Npc::BitwisePoolAddr.offset(1);
-        let bitwise_x_and_y_val = Npc::BitwisePoolVal.offset(2);
-        let bitwise_x_xor_y_val = Npc::BitwisePoolVal.offset(3);
-
         // check all values `x`, `y`, `x&y` and `x^y` are partitioned
         // NOTE: not `x|y` since this is calculated trivially using `x&y` and `x^y`
         // Partitioning in this context is the process of breaking up our number into
@@ -1421,11 +1420,12 @@ impl ministark::air::AirConfig for AirConfig {
         let bitwise_partition = (&bitwise_sum_var_0_0 + &bitwise_sum_var_8_0
             - Npc::BitwisePoolVal.curr())
             * &every_256_row_zerofier_inv;
-        // TODO
 
         // NOTE: `x | y = (x & y) + (x ^ y)`
+        let bitwise_x_and_y_val = Npc::BitwisePoolVal.offset(2);
+        let bitwise_x_xor_y_val = Npc::BitwisePoolVal.offset(3);
         let bitwise_or_is_and_plus_xor = (Npc::BitwiseXOrYVal.curr()
-            - (&bitwise_x_and_y_val + &bitwise_x_xor_y_val))
+            - (bitwise_x_and_y_val + bitwise_x_xor_y_val))
             * &all_bitwise_zerofier_inv;
 
         // example for trace length n=2048
@@ -1493,7 +1493,35 @@ impl ministark::air::AirConfig for AirConfig {
             - (x_xor_y_16_bit_segment + &x_and_y_16_bit_segment + x_and_y_16_bit_segment))
             * &every_16_bit_segment_zerofier_inv;
 
-        // let bitwise_unique_unpacking192 =
+        // NOTE: with these constraints we force the last 4 bits of x&y and x^y to be 0
+        // this is important since we are dealing with a 252bit field (not 256bit field)
+        let x_and_y_16_bit_segment = Bitwise::Bits16Chunk3Offset0.offset(2);
+        let x_xor_y_16_bit_segment = Bitwise::Bits16Chunk3Offset0.offset(3);
+        let bitwise_unique_unpacking192 = ((x_and_y_16_bit_segment + x_xor_y_16_bit_segment)
+            * (&two).pow(4)
+            - Bitwise::Bits16Chunk3Offset0ResShifted.curr())
+            * &all_bitwise_zerofier_inv;
+        let x_and_y_16_bit_segment = Bitwise::Bits16Chunk3Offset1.offset(2);
+        let x_xor_y_16_bit_segment = Bitwise::Bits16Chunk3Offset1.offset(3);
+        let bitwise_unique_unpacking193 = ((x_and_y_16_bit_segment + x_xor_y_16_bit_segment)
+            * (&two).pow(4)
+            - Bitwise::Bits16Chunk3Offset1ResShifted.curr())
+            * &all_bitwise_zerofier_inv;
+        let x_and_y_16_bit_segment = Bitwise::Bits16Chunk3Offset2.offset(2);
+        let x_xor_y_16_bit_segment = Bitwise::Bits16Chunk3Offset2.offset(3);
+        let bitwise_unique_unpacking194 = ((x_and_y_16_bit_segment + x_xor_y_16_bit_segment)
+            * (&two).pow(4)
+            - Bitwise::Bits16Chunk3Offset2ResShifted.curr())
+            * &all_bitwise_zerofier_inv;
+        let x_and_y_16_bit_segment = Bitwise::Bits16Chunk3Offset3.offset(2);
+        let x_xor_y_16_bit_segment = Bitwise::Bits16Chunk3Offset3.offset(3);
+        let bitwise_unique_unpacking195 = ((x_and_y_16_bit_segment + x_xor_y_16_bit_segment)
+            * (&two).pow(8)
+            - Bitwise::Bits16Chunk3Offset3ResShifted.curr())
+            * &all_bitwise_zerofier_inv;
+
+        // Constraint expression for bitwise/unique_unpacking193: (column7_row721 +
+        // column7_row977) * 16 - column7_row521
 
         // new
         // let bitwise_partition =
@@ -1734,6 +1762,10 @@ impl ministark::air::AirConfig for AirConfig {
             bitwise_partition,
             bitwise_or_is_and_plus_xor,
             bitwise_addition_is_xor_with_and,
+            bitwise_unique_unpacking192,
+            bitwise_unique_unpacking193,
+            bitwise_unique_unpacking194,
+            bitwise_unique_unpacking195,
             // // TODO: bitwise/addition_is_xor_with_and
             // // TODO: bitwise/unique_unpacking192
         ]
@@ -2004,26 +2036,41 @@ impl ExecutionTraceColumn for Ecdsa {
 
 #[derive(Clone, Copy)]
 pub enum Bitwise {
-    /// for 1st chunk 64 bits
+    // TODO: better names or just don't use this
+    // for 1st chunk 64 bits
     Bits16Chunk0Offset0 = 1,
     Bits16Chunk0Offset1 = 17,
     Bits16Chunk0Offset2 = 33,
     Bits16Chunk0Offset3 = 49,
-    /// for 2nd chunk of 64 bits
+    // for 2nd chunk of 64 bits
     Bits16Chunk1Offset0 = 65,
     Bits16Chunk1Offset1 = 81,
     Bits16Chunk1Offset2 = 97,
     Bits16Chunk1Offset3 = 113,
-    /// for 3rd chunk of 64 bits
+    // for 3rd chunk of 64 bits
     Bits16Chunk2Offset0 = 129,
     Bits16Chunk2Offset1 = 145,
     Bits16Chunk2Offset2 = 161,
     Bits16Chunk2Offset3 = 177,
-    /// for 4th chunk of 64 bits
+    // for 4th chunk of 64 bits
     Bits16Chunk3Offset0 = 193,
     Bits16Chunk3Offset1 = 209,
     Bits16Chunk3Offset2 = 225,
     Bits16Chunk3Offset3 = 241,
+    // these fields hold shifted values to ensure
+    // that there has been a unique unpacking
+    // NOTE: 8/8 = 1
+    // NOTE: 0 = 2^5 * 0
+    Bits16Chunk3Offset0ResShifted = 9,
+    // NOTE: 520/8 = 65
+    // NOTE: 64 = 2^5 * 2
+    Bits16Chunk3Offset1ResShifted = 521,
+    // NOTE: 264/8 = 33
+    // NOTE: 64 = 2^5 * 1
+    Bits16Chunk3Offset2ResShifted = 265,
+    // NOTE: 776/8 = 97
+    // NOTE: 64 = 2^5 * 3
+    Bits16Chunk3Offset3ResShifted = 777,
 }
 
 impl ExecutionTraceColumn for Bitwise {
@@ -2044,13 +2091,39 @@ impl ExecutionTraceColumn for Bitwise {
             | Self::Bits16Chunk3Offset0
             | Self::Bits16Chunk3Offset1
             | Self::Bits16Chunk3Offset2
-            | Self::Bits16Chunk3Offset3 => 7,
+            | Self::Bits16Chunk3Offset3
+            | Self::Bits16Chunk3Offset0ResShifted
+            | Self::Bits16Chunk3Offset1ResShifted
+            | Self::Bits16Chunk3Offset2ResShifted
+            | Self::Bits16Chunk3Offset3ResShifted => 7,
         }
     }
 
     fn offset<T>(&self, offset: isize) -> Expr<AlgebraicItem<T>> {
         let column = self.index();
-        AlgebraicItem::Trace(column, offset * 256 + *self as isize).into()
+        let step = match self {
+            Self::Bits16Chunk0Offset0
+            | Self::Bits16Chunk0Offset1
+            | Self::Bits16Chunk0Offset2
+            | Self::Bits16Chunk0Offset3
+            | Self::Bits16Chunk1Offset0
+            | Self::Bits16Chunk1Offset1
+            | Self::Bits16Chunk1Offset2
+            | Self::Bits16Chunk1Offset3
+            | Self::Bits16Chunk2Offset0
+            | Self::Bits16Chunk2Offset1
+            | Self::Bits16Chunk2Offset2
+            | Self::Bits16Chunk2Offset3
+            | Self::Bits16Chunk3Offset0
+            | Self::Bits16Chunk3Offset1
+            | Self::Bits16Chunk3Offset2
+            | Self::Bits16Chunk3Offset3 => 256,
+            Self::Bits16Chunk3Offset0ResShifted
+            | Self::Bits16Chunk3Offset1ResShifted
+            | Self::Bits16Chunk3Offset2ResShifted
+            | Self::Bits16Chunk3Offset3ResShifted => 1024,
+        };
+        AlgebraicItem::Trace(column, offset * step + *self as isize).into()
     }
 }
 
