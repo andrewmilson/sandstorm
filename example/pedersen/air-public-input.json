@@ -1,350 +1,448 @@
 {
-    "public_memory": [
-        {
-            "address": 1,
-            "page": 0,
-            "value": "0x40780017fff7fff"
-        },
-        {
-            "address": 2,
-            "page": 0,
-            "value": "0x4"
-        },
-        {
-            "address": 3,
-            "page": 0,
-            "value": "0x1104800180018000"
-        },
-        {
-            "address": 4,
-            "page": 0,
-            "value": "0xf"
-        },
-        {
-            "address": 5,
-            "page": 0,
-            "value": "0x10780017fff7fff"
-        },
-        {
-            "address": 6,
-            "page": 0,
-            "value": "0x0"
-        },
-        {
-            "address": 7,
-            "page": 0,
-            "value": "0x400380007ffb7ffc"
-        },
-        {
-            "address": 8,
-            "page": 0,
-            "value": "0x400380017ffb7ffd"
-        },
-        {
-            "address": 9,
-            "page": 0,
-            "value": "0x482680017ffb8000"
-        },
-        {
-            "address": 10,
-            "page": 0,
-            "value": "0x3"
-        },
-        {
-            "address": 11,
-            "page": 0,
-            "value": "0x480280027ffb8000"
-        },
-        {
-            "address": 12,
-            "page": 0,
-            "value": "0x208b7fff7fff7ffe"
-        },
-        {
-            "address": 13,
-            "page": 0,
-            "value": "0x400380017ff97ffa"
-        },
-        {
-            "address": 14,
-            "page": 0,
-            "value": "0x400380007ff97ffb"
-        },
-        {
-            "address": 15,
-            "page": 0,
-            "value": "0x482680017ff98000"
-        },
-        {
-            "address": 16,
-            "page": 0,
-            "value": "0x2"
-        },
-        {
-            "address": 17,
-            "page": 0,
-            "value": "0x208b7fff7fff7ffe"
-        },
-        {
-            "address": 18,
-            "page": 0,
-            "value": "0x480a7ffb7fff8000"
-        },
-        {
-            "address": 19,
-            "page": 0,
-            "value": "0x480680017fff8000"
-        },
-        {
-            "address": 20,
-            "page": 0,
-            "value": "0x1"
-        },
-        {
-            "address": 21,
-            "page": 0,
-            "value": "0x480680017fff8000"
-        },
-        {
-            "address": 22,
-            "page": 0,
-            "value": "0x2"
-        },
-        {
-            "address": 23,
-            "page": 0,
-            "value": "0x1104800180018000"
-        },
-        {
-            "address": 24,
-            "page": 0,
-            "value": "0x800000000000010fffffffffffffffffffffffffffffffffffffffffffffff1"
-        },
-        {
-            "address": 25,
-            "page": 0,
-            "value": "0x400280007ffa7fff"
-        },
-        {
-            "address": 26,
-            "page": 0,
-            "value": "0x480680017fff8000"
-        },
-        {
-            "address": 27,
-            "page": 0,
-            "value": "0x7d007d007d007d007d007d007d007d00"
-        },
-        {
-            "address": 28,
-            "page": 0,
-            "value": "0x400280007ffc7fff"
-        },
-        {
-            "address": 29,
-            "page": 0,
-            "value": "0x48127ffd7fff8000"
-        },
-        {
-            "address": 30,
-            "page": 0,
-            "value": "0x480680017fff8000"
-        },
-        {
-            "address": 31,
-            "page": 0,
-            "value": "0x10e1"
-        },
-        {
-            "address": 32,
-            "page": 0,
-            "value": "0x480680017fff8000"
-        },
-        {
-            "address": 33,
-            "page": 0,
-            "value": "0x0"
-        },
-        {
-            "address": 34,
-            "page": 0,
-            "value": "0x1104800180018000"
-        },
-        {
-            "address": 35,
-            "page": 0,
-            "value": "0x800000000000010ffffffffffffffffffffffffffffffffffffffffffffffe6"
-        },
-        {
-            "address": 36,
-            "page": 0,
-            "value": "0x480a7ffd7fff8000"
-        },
-        {
-            "address": 37,
-            "page": 0,
-            "value": "0x48127ffe7fff8000"
-        },
-        {
-            "address": 38,
-            "page": 0,
-            "value": "0x480680017fff8000"
-        },
-        {
-            "address": 39,
-            "page": 0,
-            "value": "0x399ab58e2d17603eeccae95933c81d504ce475eb1bd0080d2316b84232e133c"
-        },
-        {
-            "address": 40,
-            "page": 0,
-            "value": "0x480680017fff8000"
-        },
-        {
-            "address": 41,
-            "page": 0,
-            "value": "0x2b5a729dad1940dcd89abe05e6755a92dc322758cf962eff13c943f9a9b056c"
-        },
-        {
-            "address": 42,
-            "page": 0,
-            "value": "0x480680017fff8000"
-        },
-        {
-            "address": 43,
-            "page": 0,
-            "value": "0x7e3dfe8113341ad16dfbb9e5e4d425cee0685adcd4697d4364c746107077d63"
-        },
-        {
-            "address": 44,
-            "page": 0,
-            "value": "0x1104800180018000"
-        },
-        {
-            "address": 45,
-            "page": 0,
-            "value": "0x800000000000010ffffffffffffffffffffffffffffffffffffffffffffffe2"
-        },
-        {
-            "address": 46,
-            "page": 0,
-            "value": "0x482680017ffa8000"
-        },
-        {
-            "address": 47,
-            "page": 0,
-            "value": "0x1"
-        },
-        {
-            "address": 48,
-            "page": 0,
-            "value": "0x48127ff57fff8000"
-        },
-        {
-            "address": 49,
-            "page": 0,
-            "value": "0x482680017ffc8000"
-        },
-        {
-            "address": 50,
-            "page": 0,
-            "value": "0x1"
-        },
-        {
-            "address": 51,
-            "page": 0,
-            "value": "0x48127ffc7fff8000"
-        },
-        {
-            "address": 52,
-            "page": 0,
-            "value": "0x208b7fff7fff7ffe"
-        },
-        {
-            "address": 53,
-            "page": 0,
-            "value": "0x37"
-        },
-        {
-            "address": 54,
-            "page": 0,
-            "value": "0x0"
-        },
-        {
-            "address": 55,
-            "page": 0,
-            "value": "0x58"
-        },
-        {
-            "address": 56,
-            "page": 0,
-            "value": "0x59"
-        },
-        {
-            "address": 57,
-            "page": 0,
-            "value": "0x119"
-        },
-        {
-            "address": 58,
-            "page": 0,
-            "value": "0x199"
-        },
-        {
-            "address": 84,
-            "page": 0,
-            "value": "0x59"
-        },
-        {
-            "address": 85,
-            "page": 0,
-            "value": "0x5f"
-        },
-        {
-            "address": 86,
-            "page": 0,
-            "value": "0x11a"
-        },
-        {
-            "address": 87,
-            "page": 0,
-            "value": "0x19b"
-        },
-        {
-            "address": 88,
-            "page": 0,
-            "value": "0x5bb9440e27889a364bcb678b1f679ecd1347acdedcbf36e83494f857cc58026"
-        }
-    ],
-    "rc_max": 32770,
-    "layout_params": null,
     "memory_segments": {
         "program": {
             "stop_ptr": 5,
             "begin_addr": 1
         },
         "execution": {
-            "stop_ptr": 88,
-            "begin_addr": 55
+            "stop_ptr": 113,
+            "begin_addr": 71
         },
         "output": {
-            "stop_ptr": 89,
-            "begin_addr": 88
+            "stop_ptr": 114,
+            "begin_addr": 113
         },
         "pedersen": {
-            "stop_ptr": 95,
-            "begin_addr": 89
+            "stop_ptr": 120,
+            "begin_addr": 114
         },
         "range_check": {
-            "stop_ptr": 282,
-            "begin_addr": 281
+            "stop_ptr": 12403,
+            "begin_addr": 12402
         },
         "ecdsa": {
-            "stop_ptr": 411,
-            "begin_addr": 409
+            "stop_ptr": 20596,
+            "begin_addr": 20594
+        },
+        "bitwise": {
+            "stop_ptr": 20727,
+            "begin_addr": 20722
+        },
+        "ec_op": {
+            "stop_ptr": 30962,
+            "begin_addr": 30962
         }
     },
-    "rc_min": 32000,
-    "layout": "layout6",
-    "n_steps": 2048
+    "rc_max": 32770,
+    "layout_params": null,
+    "public_memory": [
+        {
+            "page": 0,
+            "address": 1,
+            "value": "0x40780017fff7fff"
+        },
+        {
+            "page": 0,
+            "address": 2,
+            "value": "0x5"
+        },
+        {
+            "page": 0,
+            "address": 3,
+            "value": "0x1104800180018000"
+        },
+        {
+            "page": 0,
+            "address": 4,
+            "value": "0x15"
+        },
+        {
+            "page": 0,
+            "address": 5,
+            "value": "0x10780017fff7fff"
+        },
+        {
+            "page": 0,
+            "address": 6,
+            "value": "0x0"
+        },
+        {
+            "page": 0,
+            "address": 7,
+            "value": "0x400380007ffb7ffc"
+        },
+        {
+            "page": 0,
+            "address": 8,
+            "value": "0x400380017ffb7ffd"
+        },
+        {
+            "page": 0,
+            "address": 9,
+            "value": "0x482680017ffb8000"
+        },
+        {
+            "page": 0,
+            "address": 10,
+            "value": "0x3"
+        },
+        {
+            "page": 0,
+            "address": 11,
+            "value": "0x480280027ffb8000"
+        },
+        {
+            "page": 0,
+            "address": 12,
+            "value": "0x208b7fff7fff7ffe"
+        },
+        {
+            "page": 0,
+            "address": 13,
+            "value": "0x400380007ffb7ffc"
+        },
+        {
+            "page": 0,
+            "address": 14,
+            "value": "0x400380017ffb7ffd"
+        },
+        {
+            "page": 0,
+            "address": 15,
+            "value": "0x482680017ffb8000"
+        },
+        {
+            "page": 0,
+            "address": 16,
+            "value": "0x5"
+        },
+        {
+            "page": 0,
+            "address": 17,
+            "value": "0x480280027ffb8000"
+        },
+        {
+            "page": 0,
+            "address": 18,
+            "value": "0x208b7fff7fff7ffe"
+        },
+        {
+            "page": 0,
+            "address": 19,
+            "value": "0x400380017ff97ffa"
+        },
+        {
+            "page": 0,
+            "address": 20,
+            "value": "0x400380007ff97ffb"
+        },
+        {
+            "page": 0,
+            "address": 21,
+            "value": "0x482680017ff98000"
+        },
+        {
+            "page": 0,
+            "address": 22,
+            "value": "0x2"
+        },
+        {
+            "page": 0,
+            "address": 23,
+            "value": "0x208b7fff7fff7ffe"
+        },
+        {
+            "page": 0,
+            "address": 24,
+            "value": "0x480a7ffa7fff8000"
+        },
+        {
+            "page": 0,
+            "address": 25,
+            "value": "0x480680017fff8000"
+        },
+        {
+            "page": 0,
+            "address": 26,
+            "value": "0x1"
+        },
+        {
+            "page": 0,
+            "address": 27,
+            "value": "0x480680017fff8000"
+        },
+        {
+            "page": 0,
+            "address": 28,
+            "value": "0x2"
+        },
+        {
+            "page": 0,
+            "address": 29,
+            "value": "0x1104800180018000"
+        },
+        {
+            "page": 0,
+            "address": 30,
+            "value": "0x800000000000010ffffffffffffffffffffffffffffffffffffffffffffffeb"
+        },
+        {
+            "page": 0,
+            "address": 31,
+            "value": "0x400280007ff97fff"
+        },
+        {
+            "page": 0,
+            "address": 32,
+            "value": "0x480680017fff8000"
+        },
+        {
+            "page": 0,
+            "address": 33,
+            "value": "0x7d007d007d007d007d007d007d007d00"
+        },
+        {
+            "page": 0,
+            "address": 34,
+            "value": "0x400280007ffb7fff"
+        },
+        {
+            "page": 0,
+            "address": 35,
+            "value": "0x48127ffd7fff8000"
+        },
+        {
+            "page": 0,
+            "address": 36,
+            "value": "0x480680017fff8000"
+        },
+        {
+            "page": 0,
+            "address": 37,
+            "value": "0x10e1"
+        },
+        {
+            "page": 0,
+            "address": 38,
+            "value": "0x480680017fff8000"
+        },
+        {
+            "page": 0,
+            "address": 39,
+            "value": "0x0"
+        },
+        {
+            "page": 0,
+            "address": 40,
+            "value": "0x1104800180018000"
+        },
+        {
+            "page": 0,
+            "address": 41,
+            "value": "0x800000000000010ffffffffffffffffffffffffffffffffffffffffffffffe0"
+        },
+        {
+            "page": 0,
+            "address": 42,
+            "value": "0x480a7ffc7fff8000"
+        },
+        {
+            "page": 0,
+            "address": 43,
+            "value": "0x48127ffe7fff8000"
+        },
+        {
+            "page": 0,
+            "address": 44,
+            "value": "0x480680017fff8000"
+        },
+        {
+            "page": 0,
+            "address": 45,
+            "value": "0x399ab58e2d17603eeccae95933c81d504ce475eb1bd0080d2316b84232e133c"
+        },
+        {
+            "page": 0,
+            "address": 46,
+            "value": "0x480680017fff8000"
+        },
+        {
+            "page": 0,
+            "address": 47,
+            "value": "0x2b5a729dad1940dcd89abe05e6755a92dc322758cf962eff13c943f9a9b056c"
+        },
+        {
+            "page": 0,
+            "address": 48,
+            "value": "0x480680017fff8000"
+        },
+        {
+            "page": 0,
+            "address": 49,
+            "value": "0x7e3dfe8113341ad16dfbb9e5e4d425cee0685adcd4697d4364c746107077d63"
+        },
+        {
+            "page": 0,
+            "address": 50,
+            "value": "0x1104800180018000"
+        },
+        {
+            "page": 0,
+            "address": 51,
+            "value": "0x800000000000010ffffffffffffffffffffffffffffffffffffffffffffffe2"
+        },
+        {
+            "page": 0,
+            "address": 52,
+            "value": "0x480a7ffd7fff8000"
+        },
+        {
+            "page": 0,
+            "address": 53,
+            "value": "0x480680017fff8000"
+        },
+        {
+            "page": 0,
+            "address": 54,
+            "value": "0xc"
+        },
+        {
+            "page": 0,
+            "address": 55,
+            "value": "0x480680017fff8000"
+        },
+        {
+            "page": 0,
+            "address": 56,
+            "value": "0xa"
+        },
+        {
+            "page": 0,
+            "address": 57,
+            "value": "0x1104800180018000"
+        },
+        {
+            "page": 0,
+            "address": 58,
+            "value": "0x800000000000010ffffffffffffffffffffffffffffffffffffffffffffffd5"
+        },
+        {
+            "page": 0,
+            "address": 59,
+            "value": "0x400680017fff7fff"
+        },
+        {
+            "page": 0,
+            "address": 60,
+            "value": "0x8"
+        },
+        {
+            "page": 0,
+            "address": 61,
+            "value": "0x482680017ff98000"
+        },
+        {
+            "page": 0,
+            "address": 62,
+            "value": "0x1"
+        },
+        {
+            "page": 0,
+            "address": 63,
+            "value": "0x48127fee7fff8000"
+        },
+        {
+            "page": 0,
+            "address": 64,
+            "value": "0x482680017ffb8000"
+        },
+        {
+            "page": 0,
+            "address": 65,
+            "value": "0x1"
+        },
+        {
+            "page": 0,
+            "address": 66,
+            "value": "0x48127ff57fff8000"
+        },
+        {
+            "page": 0,
+            "address": 67,
+            "value": "0x48127ffa7fff8000"
+        },
+        {
+            "page": 0,
+            "address": 68,
+            "value": "0x208b7fff7fff7ffe"
+        },
+        {
+            "page": 0,
+            "address": 69,
+            "value": "0x47"
+        },
+        {
+            "page": 0,
+            "address": 70,
+            "value": "0x0"
+        },
+        {
+            "page": 0,
+            "address": 71,
+            "value": "0x71"
+        },
+        {
+            "page": 0,
+            "address": 72,
+            "value": "0x72"
+        },
+        {
+            "page": 0,
+            "address": 73,
+            "value": "0x3072"
+        },
+        {
+            "page": 0,
+            "address": 74,
+            "value": "0x5072"
+        },
+        {
+            "page": 0,
+            "address": 75,
+            "value": "0x50f2"
+        },
+        {
+            "page": 0,
+            "address": 108,
+            "value": "0x72"
+        },
+        {
+            "page": 0,
+            "address": 109,
+            "value": "0x78"
+        },
+        {
+            "page": 0,
+            "address": 110,
+            "value": "0x3073"
+        },
+        {
+            "page": 0,
+            "address": 111,
+            "value": "0x5074"
+        },
+        {
+            "page": 0,
+            "address": 112,
+            "value": "0x50f7"
+        },
+        {
+            "page": 0,
+            "address": 113,
+            "value": "0x5bb9440e27889a364bcb678b1f679ecd1347acdedcbf36e83494f857cc58026"
+        }
+    ],
+    "n_steps": 131072,
+    "layout": "perpetual_with_bitwise",
+    "rc_min": 32000
 }

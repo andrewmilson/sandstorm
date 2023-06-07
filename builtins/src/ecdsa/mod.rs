@@ -1,13 +1,18 @@
+use std::sync::OnceLock;
+
 use ark_ec::CurveGroup;
 use ark_ec::Group;
 use ark_ec::short_weierstrass::Projective;
 use ark_ec::short_weierstrass::SWCurveConfig;
+use ark_ff::Zero;
 use binary::EcdsaInstance;
+use binary::Signature;
 use ministark::utils::FieldVariant;
 use num_bigint::BigUint;
 use ruint::aliases::U256;
 use ruint::uint;
 use ark_ff::Field;
+use crate::pedersen::pedersen_hash;
 use crate::utils::gen_periodic_table;
 use crate::utils::starkware_curve::Fr;
 use crate::utils::starkware_curve::Curve;
@@ -17,6 +22,10 @@ use ark_ec::short_weierstrass::Affine;
 use ark_ff::PrimeField;
 
 pub const SHIFT_POINT: Affine<Curve> = super::pedersen::constants::P0;
+
+/// An ECDSA trace for a dummy instance
+/// Created once since creating new instance traces each time is expensive.
+static DUMMY_INSTANCE_TRACE: OnceLock<InstanceTrace> = OnceLock::new();
 
 #[derive(Clone, Debug)]
 pub struct EcMultPartialStep {
@@ -134,6 +143,19 @@ impl InstanceTrace {
             wb_steps,
         }
     }
+
+    /// Creates a new dummy instance.
+    /// Can be used for filling holes in an execution trace
+    pub fn new_dummy(index: u32) -> Self {
+        let mut dummy_trace = DUMMY_INSTANCE_TRACE
+            .get_or_init(|| {
+                let dummy_instance = gen_dummy_instance(0);
+                Self::new(dummy_instance)
+            })
+            .clone();
+        dummy_trace.instance.index = index;
+        dummy_trace
+    }
 }
 
 /// Generates a list of the steps involved with an elliptic curve multiply
@@ -190,6 +212,55 @@ fn doubling_steps(mut p: Projective<Curve>) -> Vec<DoublingStep> {
     res
 }
 
+/// Generates a dummy signature using `private_key = 1`
+fn gen_dummy_instance(index: u32) -> EcdsaInstance {
+    let privkey = Fr::ONE;
+    let message_hash = BigUint::from(pedersen_hash(Fp::ONE, Fp::ZERO));
+    assert!(!message_hash.is_zero());
+    assert!(message_hash < BigUint::from(2u32).pow(251));
+    let message_hash = Fr::from(message_hash);
+
+    for i in 1u64.. {
+        let k = Fr::from(i);
+
+        // Cannot fail because 0 < k < EC_ORDER and EC_ORDER is prime.
+        let x = (Curve::GENERATOR * k).into_affine().x;
+
+        let r = BigUint::from(x);
+        if r.is_zero() || r >= BigUint::from(2u32).pow(251) {
+            // Bad value. This fails with negligible probability.
+            continue;
+        }
+
+        let r = Fr::from(r);
+        if (message_hash + r * privkey).is_zero() {
+            // Bad value. This fails with negligible probability.
+            continue;
+        }
+
+        let w = k / (message_hash + r * privkey);
+        let w_int = BigUint::from(w);
+        if w_int.is_zero() || w_int >= BigUint::from(2u32).pow(251) {
+            // Bad value. This fails with negligible probability.
+            continue;
+        }
+
+        let pubkey = (Curve::GENERATOR * privkey).into_affine();
+
+        return EcdsaInstance {
+            index,
+            pubkey_x: U256::from(BigUint::from(pubkey.x)),
+            message: U256::from(BigUint::from(message_hash)),
+            signature: Signature {
+                r: U256::from(BigUint::from(r)),
+                w: U256::from(w_int),
+            },
+        };
+    }
+
+    unreachable!()
+}
+
 /// Verifies a signature
 /// Returns the associated public key if the signature is valid
 /// Returns None if the signature is invalid
@@ -230,7 +301,6 @@ fn mimic_ec_mult_air(
     mut point: Projective<Curve>,
     shift_point: Projective<Curve>,
 ) -> Option<Projective<Curve>> {
-    println!("{}", Fp::MODULUS_BIT_SIZE);
     if !(1..Fp::MODULUS_BIT_SIZE).contains(&(m.bits() as u32)) {
         return None;
     }

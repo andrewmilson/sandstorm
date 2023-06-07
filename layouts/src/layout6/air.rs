@@ -1,3 +1,4 @@
+use super::BITWISE_RATIO;
 use super::CYCLE_HEIGHT;
 use super::ECDSA_BUILTIN_RATIO;
 use super::EC_OP_BUILTIN_RATIO;
@@ -107,35 +108,38 @@ impl ministark::air::AirConfig for AirConfig {
         let ecdsa_sig0_exponentiate_key_b0 =
             Ecdsa::RSuffix.curr() - (Ecdsa::RSuffix.next() + Ecdsa::RSuffix.next());
         let ecdsa_sig0_exponentiate_key_b0_neg = &one - &ecdsa_sig0_exponentiate_key_b0;
-        let _bitwise_sum_var_0_0: Expr<AlgebraicItem<FieldVariant<Fp, Fp>>> =
-            Expr::from(Trace(7, 1))
-                + Expr::from(Trace(7, 17)) * (&two).pow(1)
-                + Expr::from(Trace(7, 33)) * (&two).pow(2)
-                + Expr::from(Trace(7, 49)) * (&two).pow(3)
-                + Expr::from(Trace(7, 65)) * (&two).pow(64)
-                + Expr::from(Trace(7, 81)) * (&two).pow(65)
-                + Expr::from(Trace(7, 97)) * (&two).pow(66)
-                + Expr::from(Trace(7, 113)) * (&two).pow(67);
-        let _bitwise_sum_var_8_0: Expr<AlgebraicItem<FieldVariant<Fp, Fp>>> =
-            Expr::from(Trace(7, 129)) * (&two).pow(129)
-                + Expr::from(Trace(7, 145)) * (&two).pow(130)
-                + Expr::from(Trace(7, 161)) * (&two).pow(131)
-                + Expr::from(Trace(7, 177)) * (&two).pow(132)
-                + Expr::from(Trace(7, 193)) * (&two).pow(193)
-                + Expr::from(Trace(7, 209)) * (&two).pow(194)
-                + Expr::from(Trace(7, 255)) * (&two).pow(195)
-                + Expr::from(Trace(7, 241)) * (&two).pow(196);
+
+        // bits 0->127 (inclusive) of a bitwise number
+        let bitwise_sum_var_0_0: Expr<AlgebraicItem<FieldVariant<Fp, Fp>>> =
+            Bitwise::Bits16Chunk0Offset0.curr()
+                + Bitwise::Bits16Chunk0Offset1.curr() * (&two).pow(1)
+                + Bitwise::Bits16Chunk0Offset2.curr() * (&two).pow(2)
+                + Bitwise::Bits16Chunk0Offset3.curr() * (&two).pow(3)
+                + Bitwise::Bits16Chunk1Offset0.curr() * (&two).pow(64)
+                + Bitwise::Bits16Chunk1Offset1.curr() * (&two).pow(65)
+                + Bitwise::Bits16Chunk1Offset2.curr() * (&two).pow(66)
+                + Bitwise::Bits16Chunk1Offset3.curr() * (&two).pow(67);
+        // bits 128->255 (inclusive) of a bitwise number
+        let bitwise_sum_var_8_0: Expr<AlgebraicItem<FieldVariant<Fp, Fp>>> =
+            Bitwise::Bits16Chunk2Offset0.curr() * (&two).pow(129)
+                + Bitwise::Bits16Chunk2Offset1.curr() * (&two).pow(130)
+                + Bitwise::Bits16Chunk2Offset2.curr() * (&two).pow(131)
+                + Bitwise::Bits16Chunk2Offset3.curr() * (&two).pow(132)
+                + Bitwise::Bits16Chunk3Offset0.curr() * (&two).pow(193)
+                + Bitwise::Bits16Chunk3Offset1.curr() * (&two).pow(194)
+                + Bitwise::Bits16Chunk3Offset2.curr() * (&two).pow(195)
+                + Bitwise::Bits16Chunk3Offset3.curr() * (&two).pow(196);
 
         // example for trace length n=64
         // =============================
         // x^(n/16)                 = (x - ω_0)(x - ω_16)(x - ω_32)(x - ω_48)
         // x^(n/16) - c             = (x - c*ω_0)(x - c*ω_16)(x - c*ω_32)(x - c*ω_48)
-        // x^(n/16) - ω^(n/16)      = (x - ω_1)(x - ω_17)(x - ω_33)(x - ω_49)
-        // x^(n/16) - ω^(n/16)^(15) = (x - ω_15)(x - ω_31)(x - ω_47)(x - ω_63)
+        // x^(n/16) - ω^(n/16)      = (x - ω_1)(x - ω_17)(x - ω_33)(x - )
+        // x^(n/16) - ω^(n/16)^(15) = (x - ω_15)(x - ω_31)(x - ω_47)(x - ω_6ω_493)
         let flag0_offset =
             FieldVariant::Fp(g.pow([(Flag::Zero as usize * n / CYCLE_HEIGHT) as u64]));
         let flag0_zerofier = X.pow(n / CYCLE_HEIGHT) - Constant(flag0_offset);
-        let flags_zerofier = &flag0_zerofier / (X.pow(n) - &one);
+        let flags_zerofier_inv = &flag0_zerofier / (X.pow(n) - &one);
 
         // check decoded flag values are 0 or 1
         // NOTE: This expression is a bit confusing. The zerofier forces this constraint
@@ -143,7 +147,7 @@ impl ministark::air::AirConfig for AirConfig {
         // DstReg). Funnily enough any flag here would work (it just wouldn't be SHARP
         // compatible).
         let cpu_decode_opcode_rc_b =
-            (Flag::DstReg.curr() * Flag::DstReg.curr() - Flag::DstReg.curr()) * &flags_zerofier;
+            (Flag::DstReg.curr() * Flag::DstReg.curr() - Flag::DstReg.curr()) * &flags_zerofier_inv;
 
         // The first word of each instruction:
         // ┌─────────────────────────────────────────────────────────────────────────┐
@@ -165,38 +169,39 @@ impl ministark::air::AirConfig for AirConfig {
         // force constraint to apply every 16 trace rows (every cairo cycle)
         // e.g. (x - ω_0)(x - ω_16)(x - ω_32)(x - ω_48) for n=64
         let all_cycles_zerofier = X.pow(n / CYCLE_HEIGHT) - &one;
+        let all_cycles_zerofier_inv = &one / all_cycles_zerofier;
         let cpu_decode_opcode_rc_input = (Npc::Instruction.curr()
             - (((&whole_flag_prefix * &offset_size + RangeCheck::OffOp1.curr()) * &offset_size
                 + RangeCheck::OffOp0.curr())
                 * &offset_size
                 + RangeCheck::OffDst.curr()))
-            / &all_cycles_zerofier;
+            * &all_cycles_zerofier_inv;
 
         // constraint for the Op1Src flag group - forces vals 000, 100, 010 or 001
         let cpu_decode_flag_op1_base_op0_bit = (&cpu_decode_flag_op1_base_op0_0
             * &cpu_decode_flag_op1_base_op0_0
             - &cpu_decode_flag_op1_base_op0_0)
-            / &all_cycles_zerofier;
+            * &all_cycles_zerofier_inv;
 
         // forces only one or none of ResAdd, ResMul or PcJnz to be 1
         // TODO: Why the F is PcJnz in here? Res flag group is only bit 5 and 6
         // NOTE: looks like it's a handy optimization to calculate next_fp and next_ap
         let cpu_decode_flag_res_op1_bit = (&cpu_decode_flag_res_op1_0 * &cpu_decode_flag_res_op1_0
             - &cpu_decode_flag_res_op1_0)
-            / &all_cycles_zerofier;
+            * &all_cycles_zerofier_inv;
 
         // constraint forces PcUpdate flag to be 000, 100, 010 or 001
         let cpu_decode_flag_pc_update_regular_bit = (&cpu_decode_flag_pc_update_regular_0
             * &cpu_decode_flag_pc_update_regular_0
             - &cpu_decode_flag_pc_update_regular_0)
-            / &all_cycles_zerofier;
+            * &all_cycles_zerofier_inv;
 
         // forces max only OpcodeRet or OpcodeAssertEq to be 1
         // TODO: why OpcodeCall not included? that would make whole flag group
         let cpu_decode_fp_update_regular_bit = (&cpu_decode_fp_update_regular_0
             * &cpu_decode_fp_update_regular_0
             - &cpu_decode_fp_update_regular_0)
-            / &all_cycles_zerofier;
+            * &all_cycles_zerofier_inv;
 
         // cpu/operands/mem_dst_addr
         // NOTE: Pseudo code from cairo whitepaper
@@ -211,7 +216,7 @@ impl ministark::air::AirConfig for AirConfig {
             - (Flag::DstReg.curr() * RangeCheck::Fp.curr()
                 + (&one - Flag::DstReg.curr()) * RangeCheck::Ap.curr()
                 + RangeCheck::OffDst.curr()))
-            / &all_cycles_zerofier;
+            * &all_cycles_zerofier_inv;
 
         // whitepaper pseudocode
         // ```
@@ -226,7 +231,7 @@ impl ministark::air::AirConfig for AirConfig {
             - (Flag::Op0Reg.curr() * RangeCheck::Fp.curr()
                 + (&one - Flag::Op0Reg.curr()) * RangeCheck::Ap.curr()
                 + RangeCheck::OffOp0.curr()))
-            / &all_cycles_zerofier;
+            * &all_cycles_zerofier_inv;
 
         // NOTE: StarkEx contracts as: cpu_operands_mem1_addr
         let cpu_operands_mem_op1_addr = (Npc::MemOp1Addr.curr() + &half_offset_size
@@ -235,13 +240,13 @@ impl ministark::air::AirConfig for AirConfig {
                 + Flag::Op1Fp.curr() * RangeCheck::Fp.curr()
                 + &cpu_decode_flag_op1_base_op0_0 * Npc::MemOp0.curr()
                 + RangeCheck::OffOp1.curr()))
-            / &all_cycles_zerofier;
+            * &all_cycles_zerofier_inv;
 
         // op1 * op0
         // NOTE: starkex cpu/operands/ops_mul
         let cpu_operands_ops_mul = (RangeCheck::Op0MulOp1.curr()
             - Npc::MemOp0.curr() * Npc::MemOp1.curr())
-            / &all_cycles_zerofier;
+            * &all_cycles_zerofier_inv;
 
         // From cairo whitepaper
         // ```
@@ -271,17 +276,18 @@ impl ministark::air::AirConfig for AirConfig {
             - (Flag::ResAdd.curr() * (Npc::MemOp0.curr() + Npc::MemOp1.curr())
                 + Flag::ResMul.curr() * RangeCheck::Op0MulOp1.curr()
                 + &cpu_decode_flag_res_op1_0 * Npc::MemOp1.curr()))
-            / &all_cycles_zerofier;
+            * &all_cycles_zerofier_inv;
 
         // example for trace length n=64
         // =============================
         // all_cycles_zerofier              = (x - ω_0)(x - ω_16)(x - ω_32)(x - ω_48)
-        // X - ω^(16*(n/16 - 1))           = x - ω^n/w^16 = x - 1/w_16 = x - w_48
+        // X - ω^(16*(n/16 - 1))            = x - ω^n/w^16 = x - 1/w_16 = x - w_48
         // (X - w_48) / all_cycles_zerofier = (x - ω_0)(x - ω_16)(x - ω_32)
         let last_cycle_zerofier = X - Constant(FieldVariant::Fp(
             g.pow([(CYCLE_HEIGHT * (n / CYCLE_HEIGHT - 1)) as u64]),
         ));
-        let all_cycles_except_last_zerofier = &last_cycle_zerofier / &all_cycles_zerofier;
+        let last_cycle_zerofier_inv = &one / &last_cycle_zerofier;
+        let all_cycles_except_last_zerofier_inv = &last_cycle_zerofier * &all_cycles_zerofier_inv;
 
         // Updating the program counter
         // ============================
@@ -291,7 +297,7 @@ impl ministark::air::AirConfig for AirConfig {
         // from whitepaper `t0 = fPC_JNZ * dst`
         let cpu_update_registers_update_pc_tmp0 = (Auxiliary::Tmp0.curr()
             - Flag::PcJnz.curr() * Npc::MemDst.curr())
-            * &all_cycles_except_last_zerofier;
+            * &all_cycles_except_last_zerofier_inv;
 
         // From the whitepaper "To verify that we make a regular update if dst = 0, we
         // need an auxiliary variable, v (to fill the trace in the case dst != 0, set v
@@ -301,7 +307,7 @@ impl ministark::air::AirConfig for AirConfig {
         // NOTE: `t1 = t0 * v`
         let cpu_update_registers_update_pc_tmp1 = (Auxiliary::Tmp1.curr()
             - Auxiliary::Tmp0.curr() * RangeCheck::Res.curr())
-            * &all_cycles_except_last_zerofier;
+            * &all_cycles_except_last_zerofier_inv;
 
         // There are two constraints here bundled in one. The first is `t0 * (next_pc −
         // (pc + op1)) = 0` (ensures if dst != 0 a relative jump is made) and the second
@@ -318,12 +324,12 @@ impl ministark::air::AirConfig for AirConfig {
             - (&cpu_decode_flag_pc_update_regular_0 * &npc_reg_0
                 + Flag::PcJumpAbs.curr() * RangeCheck::Res.curr()
                 + Flag::PcJumpRel.curr() * (Npc::Pc.curr() + RangeCheck::Res.curr())))
-            * &all_cycles_except_last_zerofier;
+            * &all_cycles_except_last_zerofier_inv;
 
         // ensure `if dst == 0: pc + instruction_size == next_pc`
         let cpu_update_registers_update_pc_pc_cond_positive =
             ((Auxiliary::Tmp1.curr() - Flag::PcJnz.curr()) * (Npc::Pc.next() - npc_reg_0))
-                * &all_cycles_except_last_zerofier;
+                * &all_cycles_except_last_zerofier_inv;
 
         // Updating the allocation pointer
         // ===============================
@@ -336,7 +342,7 @@ impl ministark::air::AirConfig for AirConfig {
                 + Flag::ApAdd.curr() * RangeCheck::Res.curr()
                 + Flag::ApAdd1.curr()
                 + Flag::OpcodeCall.curr() * &two))
-            * &all_cycles_except_last_zerofier;
+            * &all_cycles_except_last_zerofier_inv;
 
         // Updating the frame pointer
         // ==========================
@@ -347,17 +353,17 @@ impl ministark::air::AirConfig for AirConfig {
             - (&cpu_decode_fp_update_regular_0 * RangeCheck::Fp.curr()
                 + Flag::OpcodeRet.curr() * Npc::MemDst.curr()
                 + Flag::OpcodeCall.curr() * (RangeCheck::Ap.curr() + &two)))
-            * &all_cycles_except_last_zerofier;
+            * &all_cycles_except_last_zerofier_inv;
 
         // push registers to memory (see section 8.4 in the whitepaper).
         // These are essentially the assertions for assert `op0 == pc +
         // instruction_size` and `assert dst == fp`.
         let cpu_opcodes_call_push_fp = (Flag::OpcodeCall.curr()
             * (Npc::MemDst.curr() - RangeCheck::Fp.curr()))
-            / &all_cycles_zerofier;
+            * &all_cycles_zerofier_inv;
         let cpu_opcodes_call_push_pc = (Flag::OpcodeCall.curr()
             * (Npc::MemOp0.curr() - (Npc::Pc.curr() + Flag::Op1Imm.curr() + &one)))
-            / &all_cycles_zerofier;
+            * &all_cycles_zerofier_inv;
 
         // make sure all offsets are valid for the call opcode
         // ===================================================
@@ -367,29 +373,29 @@ impl ministark::air::AirConfig for AirConfig {
         // biased representation
         let cpu_opcodes_call_off0 = (Flag::OpcodeCall.curr()
             * (RangeCheck::OffDst.curr() - &half_offset_size))
-            / &all_cycles_zerofier;
+            * &all_cycles_zerofier_inv;
         // checks `if opcode == OpcodeCall: assert off_op0 = 2^15 + 1`
         // TODO: why +1?
         let cpu_opcodes_call_off1 = (Flag::OpcodeCall.curr()
             * (RangeCheck::OffOp0.curr() - (&half_offset_size + &one)))
-            / &all_cycles_zerofier;
+            * &all_cycles_zerofier_inv;
         // TODO: I don't understand this one - Flag::OpcodeCall.curr() is 0 or 1. Why
         // not just replace `Flag::OpcodeCall.curr() + Flag::OpcodeCall.curr() +
         // &one + &one` with `4`
         let cpu_opcodes_call_flags = (Flag::OpcodeCall.curr()
             * (Flag::OpcodeCall.curr() + Flag::OpcodeCall.curr() + &one + &one
                 - (Flag::DstReg.curr() + Flag::Op0Reg.curr() + &four)))
-            / &all_cycles_zerofier;
+            * &all_cycles_zerofier_inv;
         // checks `if opcode == OpcodeRet: assert off_dst = 2^15 - 2`
         // TODO: why -2 🤯? Instruction size?
         let cpu_opcodes_ret_off0 = (Flag::OpcodeRet.curr()
             * (RangeCheck::OffDst.curr() + &two - &half_offset_size))
-            / &all_cycles_zerofier;
+            * &all_cycles_zerofier_inv;
         // checks `if opcode == OpcodeRet: assert off_op1 = 2^15 - 1`
         // TODO: why -1?
         let cpu_opcodes_ret_off2 = (Flag::OpcodeRet.curr()
             * (RangeCheck::OffOp1.curr() + &one - &half_offset_size))
-            / &all_cycles_zerofier;
+            * &all_cycles_zerofier_inv;
         // checks `if OpcodeRet: assert PcJumpAbs=1, DstReg=1, Op1Fp=1, ResLogic=0`
         let cpu_opcodes_ret_flags = (Flag::OpcodeRet.curr()
             * (Flag::PcJumpAbs.curr()
@@ -397,24 +403,25 @@ impl ministark::air::AirConfig for AirConfig {
                 + Flag::Op1Fp.curr()
                 + &cpu_decode_flag_res_op1_0
                 - &four))
-            / &all_cycles_zerofier;
+            * &all_cycles_zerofier_inv;
         // handles the "assert equal" instruction. Represents this pseudo code from the
         // whitepaper `assert res = dst`.
         let cpu_opcodes_assert_eq_assert_eq = (Flag::OpcodeAssertEq.curr()
             * (Npc::MemDst.curr() - RangeCheck::Res.curr()))
-            / &all_cycles_zerofier;
+            * &all_cycles_zerofier_inv;
 
         let first_row_zerofier = &x - &one;
+        let first_row_zerofier_inv = &one / first_row_zerofier;
 
         // boundary constraint expression for initial registers
-        let initial_ap = (RangeCheck::Ap.curr() - InitialAp.hint()) / &first_row_zerofier;
-        let initial_fp = (RangeCheck::Fp.curr() - InitialAp.hint()) / &first_row_zerofier;
-        let initial_pc = (Npc::Pc.curr() - InitialPc.hint()) / &first_row_zerofier;
+        let initial_ap = (RangeCheck::Ap.curr() - InitialAp.hint()) * &first_row_zerofier_inv;
+        let initial_fp = (RangeCheck::Fp.curr() - InitialAp.hint()) * &first_row_zerofier_inv;
+        let initial_pc = (Npc::Pc.curr() - InitialPc.hint()) * &first_row_zerofier_inv;
 
         // boundary constraint expression for final registers
-        let final_ap = (RangeCheck::Ap.curr() - FinalAp.hint()) / &last_cycle_zerofier;
-        let final_fp = (RangeCheck::Fp.curr() - InitialAp.hint()) / &last_cycle_zerofier;
-        let final_pc = (Npc::Pc.curr() - FinalPc.hint()) / &last_cycle_zerofier;
+        let final_ap = (RangeCheck::Ap.curr() - FinalAp.hint()) * &last_cycle_zerofier_inv;
+        let final_fp = (RangeCheck::Fp.curr() - InitialAp.hint()) * &last_cycle_zerofier_inv;
+        let final_pc = (Npc::Pc.curr() - FinalPc.hint()) * &last_cycle_zerofier_inv;
 
         // examples for trace length n=8
         // =============================
@@ -424,7 +431,7 @@ impl ministark::air::AirConfig for AirConfig {
         let every_second_row_zerofier = X.pow(n / 2) - &one;
         let second_last_row_zerofier =
             X - Constant(FieldVariant::Fp(g.pow([2 * (n as u64 / 2 - 1)])));
-        let every_second_row_except_last_zerofier =
+        let every_second_row_except_last_zerofier_inv =
             &second_last_row_zerofier / &every_second_row_zerofier;
 
         // Memory access constraints
@@ -439,7 +446,7 @@ impl ministark::air::AirConfig for AirConfig {
             + Npc::Pc.curr()
             + MemoryPermutation::A.challenge() * Npc::Instruction.curr()
             - MemoryPermutation::Z.challenge())
-            / &first_row_zerofier;
+            * &first_row_zerofier_inv;
         // memory permutation transition constraint
         // NOTE: memory entries are stacked in the trace like so:
         // ┌─────┬───────────┬─────┐
@@ -462,7 +469,7 @@ impl ministark::air::AirConfig for AirConfig {
                 - (Npc::PubMemAddr.curr()
                     + MemoryPermutation::A.challenge() * Npc::PubMemVal.curr()))
                 * Permutation::Memory.curr())
-            * &every_second_row_except_last_zerofier;
+            * &every_second_row_except_last_zerofier_inv;
         // Check the last permutation value to verify public memory
         let memory_multi_column_perm_perm_last =
             (Permutation::Memory.curr() - MemoryProduct.hint()) / &second_last_row_zerofier;
@@ -471,18 +478,19 @@ impl ministark::air::AirConfig for AirConfig {
         // "Continuity" constraint in cairo whitepaper 9.7.2
         let memory_diff_is_bit = (&memory_address_diff_0 * &memory_address_diff_0
             - &memory_address_diff_0)
-            * &every_second_row_except_last_zerofier;
+            * &every_second_row_except_last_zerofier_inv;
         // if the address stays the same then the value stays the same
         // "Single-valued" constraint in cairo whitepaper 9.7.2.
         // cairo uses nondeterministic read-only memory so if the address is the same
         // the value should also stay the same.
         let memory_is_func = ((&memory_address_diff_0 - &one)
             * (Mem::Value.curr() - Mem::Value.next()))
-            * &every_second_row_except_last_zerofier;
+            * &every_second_row_except_last_zerofier_inv;
         // boundary condition stating the first memory address == 1
-        let memory_initial_addr = (Mem::Address.curr() - &one) / &first_row_zerofier;
+        let memory_initial_addr = (Mem::Address.curr() - &one) * &first_row_zerofier_inv;
         // applies every 8 rows
         let every_eighth_row_zerofier = X.pow(n / 8) - &one;
+        let every_eighth_row_zerofier_inv = &one / &every_eighth_row_zerofier;
         // Read cairo whitepaper section 9.8 as to why the public memory cells are 0.
         // The high level is that the way public memory works is that the prover is
         // forced (with these constraints) to exclude the public memory from one of
@@ -490,19 +498,19 @@ impl ministark::air::AirConfig for AirConfig {
         // terminates with more-or-less the permutation of just the public input. The
         // verifier can relatively cheaply calculate this terminal. The constraint for
         // this terminal is `memory_multi_column_perm_perm_last`.
-        let public_memory_addr_zero = Npc::PubMemAddr.curr() / &every_eighth_row_zerofier;
-        let public_memory_value_zero = Npc::PubMemVal.curr() / &every_eighth_row_zerofier;
+        let public_memory_addr_zero = Npc::PubMemAddr.curr() * &every_eighth_row_zerofier_inv;
+        let public_memory_value_zero = Npc::PubMemVal.curr() * &every_eighth_row_zerofier_inv;
 
         // examples for trace length n=16
         // =====================================
         // x^(n/4) - 1              = (x - ω_0)(x - ω_4)(x - ω_8)(x - ω_12)
         // x - ω^(4*(n/4 - 1))      = x - ω^n/w^4 = x - 1/w_4 = x - w_12
         // (x - w_12) / x^(n/4) - 1 = (x - ω_0)(x - ω_4)(x - ω_8)
-        let every_fourth_row_zerofier = X.pow(n / 4) - &one;
+        let every_fourth_row_zerofier_inv = &one / (X.pow(n / 4) - &one);
         let fourth_last_row_zerofier =
             X - Constant(FieldVariant::Fp(g.pow([4 * (n as u64 / 4 - 1)])));
-        let every_fourth_row_except_last_zerofier =
-            &fourth_last_row_zerofier / &every_fourth_row_zerofier;
+        let every_fourth_row_except_last_zerofier_inv =
+            &fourth_last_row_zerofier * &every_fourth_row_zerofier_inv;
 
         // Range check constraints
         // =======================
@@ -512,84 +520,130 @@ impl ministark::air::AirConfig for AirConfig {
             * Permutation::RangeCheck.curr()
             + RangeCheck::OffDst.curr()
             - RangeCheckPermutation::Z.challenge())
-            / &first_row_zerofier;
+            * &first_row_zerofier_inv;
         let rc16_perm_step0 = ((RangeCheckPermutation::Z.challenge() - RangeCheck::Ordered.next())
             * Permutation::RangeCheck.next()
             - (RangeCheckPermutation::Z.challenge() - RangeCheck::OffOp1.curr())
                 * Permutation::RangeCheck.curr())
-            * &every_fourth_row_except_last_zerofier;
+            * &every_fourth_row_except_last_zerofier_inv;
         let rc16_perm_last =
             (Permutation::RangeCheck.curr() - RangeCheckProduct.hint()) / &fourth_last_row_zerofier;
         // Check the value increases by 0 or 1
-        let rc16_diff_is_bit =
-            (&rc16_diff_0 * &rc16_diff_0 - &rc16_diff_0) * &every_fourth_row_except_last_zerofier;
+        let rc16_diff_is_bit = (&rc16_diff_0 * &rc16_diff_0 - &rc16_diff_0)
+            * &every_fourth_row_except_last_zerofier_inv;
         // Prover sends the minimim and maximum as a public input.
         // Verifier checks the RC min and max fall within [0, 2^16).
         let rc16_minimum =
-            (RangeCheck::Ordered.curr() - RangeCheckMin.hint()) / &first_row_zerofier;
+            (RangeCheck::Ordered.curr() - RangeCheckMin.hint()) * &first_row_zerofier_inv;
         let rc16_maximum =
             (RangeCheck::Ordered.curr() - RangeCheckMax.hint()) / &fourth_last_row_zerofier;
 
-        // TODO: find out what diluted constraints are for. Might be starkex specific
+        // Diluted Check constraints
+        // =========================
+        // A "dilution" is spreading out of the bits in a number.
+        // Dilutions have two parameters (1) the number of bits they operate on and
+        // (2) the spread of each bit. For example the the dilution of binary
+        // digit 1111 to 0001000100010001 operates on 4 bits with a spread of 4.
+        let diluted_check_permutation_init0 = ((DilutedCheckPermutation::Z.challenge()
+            - DilutedCheck::Ordered.curr())
+            * Permutation::DilutedCheck.curr()
+            + DilutedCheck::Unordered.curr()
+            - DilutedCheckPermutation::Z.challenge())
+            * &first_row_zerofier_inv;
+
+        // Diluted checks operate every 8 rows (twice per cycle)
+        let zerofier_8th_last_row =
+            X - Constant(FieldVariant::Fp(g.pow([512 * (n as u64 / 512 - 1)])));
+        let zerofier_8th_last_row_inv = &one / &zerofier_8th_last_row;
+        let every_8_row_zerofier = X.pow(8) - &one;
+        let every_8_row_zerofier_inv = &one / &every_8_row_zerofier;
+        let every_8_rows_except_last_zerofier_inv =
+            &zerofier_8th_last_row * &every_8_row_zerofier_inv;
+
+        // we have an out-of-order and in-order list of diluted values for this layout
+        // (layout6). We want to check each list is a permutation of one another
+        let diluted_check_permutation_step0 = ((DilutedCheckPermutation::Z.challenge()
+            - DilutedCheck::Ordered.next())
+            * Permutation::DilutedCheck.next()
+            - (DilutedCheckPermutation::Z.challenge() - DilutedCheck::Unordered.curr())
+                * Permutation::DilutedCheck.curr())
+            * &every_8_rows_except_last_zerofier_inv;
+        let diluted_check_permutation_last = (Permutation::DilutedCheck.curr()
+            - DilutedCheckProduct.hint())
+            * &zerofier_8th_last_row_inv;
+
+        // Initial aggregate value should be =1
+        let diluted_check_init = DilutedCheck::Aggregate.curr() * &first_row_zerofier_inv;
+
+        // Check first, in-order, diluted value
+        let diluted_check_first_element =
+            (DilutedCheck::Ordered.curr() - DilutedCheckFirst.hint()) * &first_row_zerofier_inv;
+
+        // TODO: add more docs
+        // `diluted_diff` is related to `u` in `compute_diluted_cumulative_value`
+        // Note that if there is no difference between the current and next ordered
+        // diluted values then `diluted_diff == 0` and the previous aggregate value is
+        // copied over
+        let diluted_diff = DilutedCheck::Ordered.next() - DilutedCheck::Ordered.curr();
+        let diluted_check_step = (DilutedCheck::Aggregate.next()
+            - (DilutedCheck::Aggregate.curr()
+                * (&one + DilutedCheckAggregation::Z.challenge() * &diluted_diff)
+                + DilutedCheckAggregation::A.challenge() * &diluted_diff * diluted_diff))
+            * &every_8_rows_except_last_zerofier_inv;
+
+        // Check the last cumulative value.
+        // NOTE: This can be calculated efficiently by the verifier.
+        let diluted_check_last = (DilutedCheck::Aggregate.curr()
+            - DilutedCheckCumulativeValue.hint())
+            * &zerofier_8th_last_row_inv;
 
         // Pedersen builtin
         // ================
         // Each hash spans across 256 rows - that's one hash per 16 cairo steps.
-        let every_256_row_zerofier = X.pow(n / 256) - &one;
+        let every_256_row_zerofier_inv = &one / (X.pow(n / 256) - &one);
 
         // These first few pedersen constraints check that the number is in the range
-        // 100000000000000000000000000000000000000000000000000000010001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001
+        // ```text
+        //  100000000000000000000000000000000000000000000000000000010001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001
+        //  ^                                                       ^    ^
+        // 251                                                     196  191
+        // ```
 
-        // pedersen/hash0/ec_subset_sum/bit_unpacking/last_one_is_zero
-        // column8_row82 * (column3_row0 - (column3_row1 + column3_row1))
-        // TODO: figure out what Trace(8, 86) is
+        // Use knowledge of bits 251,196,192 to determine if there is overflow
         let pedersen_hash0_ec_subset_sub_bit_unpacking_last_one_is_zero =
-            (Expr::from(Trace(8, 86))
+            (Pedersen::Bit251AndBit196AndBit192.curr()
                 * (Pedersen::Suffix.curr() - (Pedersen::Suffix.next() + Pedersen::Suffix.next())))
-                / &every_256_row_zerofier;
-
-        // pedersen/hash0/ec_subset_sum/bit_unpacking/zeroes_between_ones0
-        // TODO: better name than shift
+                * &every_256_row_zerofier_inv;
         let shift191 = Constant(FieldVariant::Fp(Fp::from(BigUint::from(2u32).pow(191u32))));
         let pedersen_hash0_ec_subset_sub_bit_unpacking_zeros_between_ones =
-            (Expr::from(Trace(8, 86))
+            (Pedersen::Bit251AndBit196AndBit192.curr()
                 * (Pedersen::Suffix.next() - Pedersen::Suffix.offset(192) * shift191))
-                / &every_256_row_zerofier;
-
-        // pedersen/hash0/ec_subset_sum/bit_unpacking/cumulative_bit192
-        // TODO: column 4
+                * &every_256_row_zerofier_inv;
         let pedersen_hash0_ec_subset_sum_bit_unpacking_cumulative_bit192 =
-            (Expr::from(Trace(8, 86))
-                - Pedersen::Slope.offset(255)
+            (Pedersen::Bit251AndBit196AndBit192.curr()
+                - Pedersen::Bit251AndBit196.curr()
                     * (Pedersen::Suffix.offset(192)
                         - (Pedersen::Suffix.offset(193) + Pedersen::Suffix.offset(193))))
-                / &every_256_row_zerofier;
-
-        // pedersen/hash0/ec_subset_sum/bit_unpacking/zeroes_between_ones192
+                * &every_256_row_zerofier_inv;
         let shift3 = Constant(FieldVariant::Fp(Fp::from(BigUint::from(2u32).pow(3u32))));
         let pedersen_hash0_ec_subset_sum_bit_unpacking_zeroes_between_ones192 =
-            (Expr::from(Trace(4, 255)) * Pedersen::Suffix.offset(193)
-                - Pedersen::Suffix.offset(196) * shift3)
-                / &every_256_row_zerofier;
-
-        // pedersen/hash0/ec_subset_sum/bit_unpacking/cumulative_bit196
+            (Pedersen::Bit251AndBit196.curr()
+                * (Pedersen::Suffix.offset(193) - Pedersen::Suffix.offset(196) * shift3))
+                * &every_256_row_zerofier_inv;
         let pedersen_hash0_ec_subset_sum_bit_unpacking_cumulative_bit196 =
-            (Expr::from(Trace(4, 255))
+            (Pedersen::Bit251AndBit196.curr()
                 - (Pedersen::Suffix.offset(251)
                     - (Pedersen::Suffix.offset(252) + Pedersen::Suffix.offset(252)))
                     * (Pedersen::Suffix.offset(196)
                         - (Pedersen::Suffix.offset(197) + Pedersen::Suffix.offset(197))))
-                / &every_256_row_zerofier;
-
-        // pedersen/hash0/ec_subset_sum/bit_unpacking/zeroes_between_ones196
-        // (column3_row251 - (column3_row252 + column3_row252)) * (column3_row197 -
-        // 18014398509481984 * column3_row251)
+                * &every_256_row_zerofier_inv;
+        // TODO: docs
         let shift54 = Constant(FieldVariant::Fp(Fp::from(BigUint::from(2u32).pow(54u32))));
         let pedersen_hash0_ec_subset_sum_bit_unpacking_zeroes_between_ones196 = ((Pedersen::Suffix
             .offset(251)
             - (Pedersen::Suffix.offset(252) + Pedersen::Suffix.offset(252)))
             * (Pedersen::Suffix.offset(197) - Pedersen::Suffix.offset(251) * shift54))
-            / &every_256_row_zerofier;
+            * &every_256_row_zerofier_inv;
 
         // example for trace length n=512
         // =============================
@@ -597,9 +651,9 @@ impl ministark::air::AirConfig for AirConfig {
         // (x-ω^255)(x-ω^511) / (X^n-1) = 1/(x-ω^0)..(x-ω^254)(x-ω^256)..(x-ω^510)
         // vanishes on groups of 256 consecutive rows except the last row in each group
         // TODO: come up with better names for these
-        let pedersen_transition_zerofier = (X.pow(n / 256)
+        let pedersen_transition_zerofier_inv = (X.pow(n / 256)
             * Constant(FieldVariant::Fp(g.pow([(255 * n / 256) as u64]))))
-            / &all_cycles_zerofier;
+            * &all_cycles_zerofier_inv;
 
         // Constraint operated on groups of 256 rows.
         // Each row shifts a large number to the right. E.g.
@@ -616,7 +670,7 @@ impl ministark::air::AirConfig for AirConfig {
         // ```
         let pedersen_hash0_ec_subset_sum_booleanity_test = (&pedersen_hash0_ec_subset_sum_b0
             * (&pedersen_hash0_ec_subset_sum_b0 - &one))
-            * &pedersen_transition_zerofier;
+            * &pedersen_transition_zerofier_inv;
 
         // example for trace length n=512
         // =============================
@@ -624,8 +678,8 @@ impl ministark::air::AirConfig for AirConfig {
         // X^(n/256) - ω^(255*n/256)    = (x-ω^252)(x-ω^508)
         // (x-ω^255)(x-ω^511) / (X^n-1) = 1/(x-ω^0)..(x-ω^254)(x-ω^256)..(x-ω^510)
         // vanishes on the 252nd row of every 256 rows
-        let pedersen_zero_suffix_zerofier =
-            X.pow(n / 256) - Constant(FieldVariant::Fp(g.pow([(63 * n / 64) as u64])));
+        let pedersen_zero_suffix_zerofier_inv =
+            &one / (X.pow(n / 256) - Constant(FieldVariant::Fp(g.pow([(63 * n / 64) as u64]))));
 
         // Note that with cairo's default field each element is 252 bits.
         // Therefore we are decomposing 252 bit numbers to do pedersen hash.
@@ -652,12 +706,12 @@ impl ministark::air::AirConfig for AirConfig {
         // ```
         // <https://docs.starkware.co/starkex/crypto/pedersen-hash-function.html>
         let pedersen_hash0_ec_subset_sum_bit_extraction_end =
-            Pedersen::Suffix.curr() / &pedersen_zero_suffix_zerofier;
+            Pedersen::Suffix.curr() * &pedersen_zero_suffix_zerofier_inv;
 
         // TODO: is this constraint even needed?
         // check suffix in row 255 of each 256 row group is zero
         let pedersen_hash0_ec_subset_sum_zeros_tail = Pedersen::Suffix.curr()
-            / (X.pow(n / 256) - Constant(FieldVariant::Fp(g.pow([255 * n as u64 / 256]))));
+            * (&one / (X.pow(n / 256) - Constant(FieldVariant::Fp(g.pow([255 * n as u64 / 256])))));
 
         // Create a periodic table comprising of the constant Pedersen points we need to
         // add together. The columns of this table are represented by polynomials that
@@ -737,7 +791,7 @@ impl ministark::air::AirConfig for AirConfig {
         let pedersen_hash0_ec_subset_sum_add_points_slope = (&pedersen_hash0_ec_subset_sum_b0
             * (Pedersen::PartialSumY.curr() - &pedersen_point_y)
             - Pedersen::Slope.curr() * (Pedersen::PartialSumX.curr() - &pedersen_point_x))
-            * &pedersen_transition_zerofier;
+            * &pedersen_transition_zerofier_inv;
 
         // These two constraint check classic short Weierstrass curve point addition.
         // Constraint is equivalent to:
@@ -749,19 +803,19 @@ impl ministark::air::AirConfig for AirConfig {
                 * (Pedersen::PartialSumX.curr()
                     + &pedersen_point_x
                     + Pedersen::PartialSumX.next()))
-            * &pedersen_transition_zerofier;
+            * &pedersen_transition_zerofier_inv;
         let pedersen_hash0_ec_subset_sum_add_points_y = (&pedersen_hash0_ec_subset_sum_b0
             * (Pedersen::PartialSumY.curr() + Pedersen::PartialSumY.next())
             - Pedersen::Slope.curr()
                 * (Pedersen::PartialSumX.curr() - Pedersen::PartialSumX.next()))
-            * &pedersen_transition_zerofier;
+            * &pedersen_transition_zerofier_inv;
         // if the bit is 0 then just copy the previous point
         let pedersen_hash0_ec_subset_sum_copy_point_x = (&pedersen_hash0_ec_subset_sum_b0_negate
             * (Pedersen::PartialSumX.next() - Pedersen::PartialSumX.curr()))
-            * &pedersen_transition_zerofier;
+            * &pedersen_transition_zerofier_inv;
         let pedersen_hash0_ec_subset_sum_copy_point_y = (&pedersen_hash0_ec_subset_sum_b0_negate
             * (Pedersen::PartialSumY.next() - Pedersen::PartialSumY.curr()))
-            * &pedersen_transition_zerofier;
+            * &pedersen_transition_zerofier_inv;
 
         // example for trace length n=1024
         // =============================
@@ -775,9 +829,9 @@ impl ministark::air::AirConfig for AirConfig {
         // has been calculated already and as a result of how constraints are
         // evaluated it will be cached.
         // TODO: check all zerofiers are being multiplied or divided correctly
-        let every_512_row_zerofier = (X.pow(n / 512)
+        let every_512_row_zerofier_inv = (X.pow(n / 512)
             - Constant(FieldVariant::Fp(g.pow([n as u64 / 2]))))
-            / &every_256_row_zerofier;
+            * &every_256_row_zerofier_inv;
 
         // A single pedersen hash `H(a, b)` is computed every 512 cycles.
         // The constraints for each hash is split in two consecutive 256 row groups.
@@ -788,30 +842,31 @@ impl ministark::air::AirConfig for AirConfig {
         // - 2nd group we check e0 (processed `a`) is the first partial sum
         let pedersen_hash0_copy_point_x = (Pedersen::PartialSumX.offset(256)
             - Pedersen::PartialSumX.offset(255))
-            * &every_512_row_zerofier;
+            * &every_512_row_zerofier_inv;
         let pedersen_hash0_copy_point_y = (Pedersen::PartialSumY.offset(256)
             - Pedersen::PartialSumY.offset(255))
-            * &every_512_row_zerofier;
+            * &every_512_row_zerofier_inv;
         // TODO: introducing a new zerofier that's equivalent to the
         // previous one? double check every_512_row_zerofier
         let every_512_row_zerofier = X.pow(n / 512) - Constant(FieldVariant::Fp(Fp::ONE));
+        let every_512_row_zerofier_inv = &one / &every_512_row_zerofier;
         let shift_point = pedersen::constants::P0;
         let pedersen_hash0_init_x = (Pedersen::PartialSumX.curr()
             - Constant(FieldVariant::Fp(shift_point.x)))
-            / &every_512_row_zerofier;
+            * &every_512_row_zerofier_inv;
         let pedersen_hash0_init_y = (Pedersen::PartialSumY.curr()
             - Constant(FieldVariant::Fp(shift_point.y)))
-            / &every_512_row_zerofier;
+            * &every_512_row_zerofier_inv;
 
         // TODO: fix naming
         let zerofier_512th_last_row =
             X - Constant(FieldVariant::Fp(g.pow([512 * (n as u64 / 512 - 1)])));
         let every_512_rows_except_last_zerofier =
-            &zerofier_512th_last_row / &every_512_row_zerofier;
+            &zerofier_512th_last_row * &every_512_row_zerofier_inv;
 
         // Link Input0 into the memory pool.
         let pedersen_input0_value0 =
-            (Npc::PedersenInput0Val.curr() - Pedersen::Suffix.curr()) / &every_512_row_zerofier;
+            (Npc::PedersenInput0Val.curr() - Pedersen::Suffix.curr()) * &every_512_row_zerofier_inv;
         // Input0's next address should be the address directly
         // after the output address of the previous hash
         let pedersen_input0_addr = (Npc::PedersenInput0Addr.next()
@@ -819,24 +874,24 @@ impl ministark::air::AirConfig for AirConfig {
             * &every_512_rows_except_last_zerofier;
         // Ensure the first pedersen address matches the hint
         let pedersen_init_addr =
-            (Npc::PedersenInput0Addr.curr() - InitialPedersenAddr.hint()) / &first_row_zerofier;
+            (Npc::PedersenInput0Addr.curr() - InitialPedersenAddr.hint()) * &first_row_zerofier_inv;
 
         // Link Input1 into the memory pool.
         // Input1's address should be the address directly after input0's address
         let pedersen_input1_value0 = (Npc::PedersenInput1Val.curr() - Pedersen::Suffix.offset(256))
-            / &every_512_row_zerofier;
+            * &every_512_row_zerofier_inv;
         let pedersen_input1_addr = (Npc::PedersenInput1Addr.curr()
             - (Npc::PedersenInput0Addr.curr() + &one))
-            / &every_512_row_zerofier;
+            * &every_512_row_zerofier_inv;
 
         // Link pedersen output into the memory pool.
         // Output's address should be the address directly after input1's address.
         let pedersen_output_value0 = (Npc::PedersenOutputVal.curr()
             - Pedersen::PartialSumX.offset(511))
-            / &every_512_row_zerofier;
+            * &every_512_row_zerofier_inv;
         let pedersen_output_addr = (Npc::PedersenOutputAddr.curr()
             - (Npc::PedersenInput1Addr.curr() + &one))
-            / &every_512_row_zerofier;
+            * &every_512_row_zerofier_inv;
 
         // 128bit Range check builtin
         // ===================
@@ -845,17 +900,17 @@ impl ministark::air::AirConfig for AirConfig {
         let zerofier_256th_last_row =
             X - Constant(FieldVariant::Fp(g.pow([256 * (n as u64 / 256 - 1)])));
         let every_256_rows_except_last_zerofier =
-            &zerofier_256th_last_row / &every_256_row_zerofier;
+            &zerofier_256th_last_row * &every_256_row_zerofier_inv;
 
         // Hook up range check with the memory pool
         let rc_builtin_value =
-            (rc_builtin_value7_0 - Npc::RangeCheck128Val.curr()) / &every_256_row_zerofier;
+            (rc_builtin_value7_0 - Npc::RangeCheck128Val.curr()) * &every_256_row_zerofier_inv;
         let rc_builtin_addr_step = (Npc::RangeCheck128Addr.next()
             - (Npc::RangeCheck128Addr.curr() + &one))
             * &every_256_rows_except_last_zerofier;
 
         let rc_builtin_init_addr =
-            (Npc::RangeCheck128Addr.curr() - InitialRcAddr.hint()) / &first_row_zerofier;
+            (Npc::RangeCheck128Addr.curr() - InitialRcAddr.hint()) * &first_row_zerofier_inv;
 
         // Signature constraints for ECDSA
         // ===============================
@@ -1160,7 +1215,9 @@ impl ministark::air::AirConfig for AirConfig {
             * &ec_op_transition_zerofier_inv;
 
         let all_ecdsa_zerofier = X.pow(n / 32768) - &one;
+        let all_ecdsa_zerofier_inv = &one / all_ecdsa_zerofier;
         let all_ec_op_zerofier = X.pow(n / 16384) - &one;
+        let all_ec_op_zerofier_inv = &one / all_ec_op_zerofier;
 
         // Check the correct starting values for our partial sums
         // ======================================================
@@ -1169,17 +1226,17 @@ impl ministark::air::AirConfig for AirConfig {
         let ecdsa_sig_config_shift_point_y = Constant(FieldVariant::Fp(ecdsa::SHIFT_POINT.y));
         let ecdsa_signature0_init_gen_x = (Ecdsa::GeneratorPartialSumX.curr()
             - ecdsa_sig_config_shift_point_x)
-            / &all_ecdsa_zerofier;
+            * &all_ecdsa_zerofier_inv;
         let ecdsa_signature0_init_gen_y = (Ecdsa::GeneratorPartialSumY.curr()
             + ecdsa_sig_config_shift_point_y)
-            / &all_ecdsa_zerofier;
+            * &all_ecdsa_zerofier_inv;
         // #2 Check out pubkey partial sum is offset with the `shift_point`
         let ecdsa_signature0_init_key_x = (Ecdsa::PubkeyPartialSumX.curr()
             - ecdsa_sig_config_shift_point_x)
-            / &all_ec_op_zerofier;
+            * &all_ec_op_zerofier_inv;
         let ecdsa_signature0_init_key_y = (Ecdsa::PubkeyPartialSumY.curr()
             - ecdsa_sig_config_shift_point_y)
-            / &all_ec_op_zerofier;
+            * &all_ec_op_zerofier_inv;
 
         // Note that there are two elliptic curve operations that span 16384 rows each.
         // 1st is the EC operation for our pubkey partial sum
@@ -1195,7 +1252,7 @@ impl ministark::air::AirConfig for AirConfig {
                 + Ecdsa::BSlope.curr()
                     * (Ecdsa::GeneratorPartialSumX.offset(255)
                         - Ecdsa::PubkeyPartialSumX.offset(255))))
-            / &all_ecdsa_zerofier;
+            * &all_ecdsa_zerofier_inv;
         // Now we have the slope finish the addition as per SW curve addition law.
         // `x = m^2 - (msg_hash * G)_x - (R * P)_x, m = dy/dx`
         // `y = m*((msg_hash*G)_x - x) - (msg_hash*G)_y, m = dy/dx`
@@ -1203,7 +1260,7 @@ impl ministark::air::AirConfig for AirConfig {
             - (Ecdsa::GeneratorPartialSumX.offset(255)
                 + Ecdsa::PubkeyPartialSumX.offset(255)
                 + Ecdsa::PubkeyDoublingX.offset(256)))
-            / &all_ecdsa_zerofier;
+            * &all_ecdsa_zerofier_inv;
         // TODO: introduce more generic names for PubkeyDoublingX, PubkeyDoublingY,
         // PubkeyPartialSum* etc. since they're not just for pubkey but also the partial
         // sum of the point `(msg_hash * G) + (r * P)`.
@@ -1211,7 +1268,7 @@ impl ministark::air::AirConfig for AirConfig {
             + Ecdsa::PubkeyDoublingY.offset(256)
             - Ecdsa::BSlope.curr()
                 * (Ecdsa::GeneratorPartialSumX.offset(255) - Ecdsa::PubkeyDoublingX.offset(256)))
-            / &all_ecdsa_zerofier;
+            * &all_ecdsa_zerofier_inv;
         // constraint checks that the cell contains 1/((msg_hash * G)_x - (r * P)_x)
         // Once again like the slope we repurpose the last GeneratorPartialSumXDiffInv
         // Why this constraint? it checks that the (msg_hash * G)_x and (r * P)_x are
@@ -1221,7 +1278,7 @@ impl ministark::air::AirConfig for AirConfig {
         let ecdsa_signature0_add_results_x_diff_inv = (Ecdsa::BXDiffInv.curr()
             * (Ecdsa::GeneratorPartialSumX.offset(255) - Ecdsa::PubkeyPartialSumX.offset(255))
             - &one)
-            / &all_ecdsa_zerofier;
+            * &all_ecdsa_zerofier_inv;
 
         // let `B = ((msg_hash * G) + (r * P)), H = w * B`
         // Here we are trying to calculate `H - shift_point`
@@ -1231,7 +1288,7 @@ impl ministark::air::AirConfig for AirConfig {
             + ecdsa_sig_config_shift_point_y
             - Ecdsa::RPointSlope.curr()
                 * (Ecdsa::PubkeyPartialSumX.offset(256 + 255) - ecdsa_sig_config_shift_point_x))
-            / &all_ecdsa_zerofier;
+            * &all_ecdsa_zerofier_inv;
         // Now we have the slope we can find the x-coordinate of `H - shift_point`
         // (which if the signature is valid will be `r`) using SW curve addition
         // law: `x = m^2 - H_x - (-shift_point)_x, m = dy/dx`
@@ -1239,52 +1296,53 @@ impl ministark::air::AirConfig for AirConfig {
             - (Ecdsa::PubkeyPartialSumX.offset(256 + 255)
                 + ecdsa_sig_config_shift_point_x
                 + Ecdsa::RSuffix.curr()))
-            / &all_ecdsa_zerofier;
+            * &all_ecdsa_zerofier_inv;
         // constraint checks that the cell contains 1/(H_x - shift_point_x)
         // Once again like the slope we repurpose the last GeneratorPartialSumXDiffInv
         let ecdsa_signature0_extract_r_x_diff_inv = (Ecdsa::RPointXDiffInv.curr()
             * (Ecdsa::PubkeyPartialSumX.offset(256 + 255) - ecdsa_sig_config_shift_point_x)
             - &one)
-            / &all_ecdsa_zerofier;
+            * &all_ecdsa_zerofier_inv;
 
         // `z` refers to the message hash. Check that it's not the zero hash.
-        let ecdsa_signature0_z_nonzero =
-            (Ecdsa::MessageSuffix.curr() * Ecdsa::MessageInv.curr() - &one) / &all_ecdsa_zerofier;
+        let ecdsa_signature0_z_nonzero = (Ecdsa::MessageSuffix.curr() * Ecdsa::MessageInv.curr()
+            - &one)
+            * &all_ecdsa_zerofier_inv;
 
         // NOTE: `PubkeyDoublingSlope.offset(255)` holds a value that isn't constrained
         // Every 16370th of every 32768 rows PubkeyDoublingSlope contains r^(-1)
         // Every 32754th of every 32768 rows PubkeyDoublingSlope contains w^(-1)
         let ecdsa_signature0_r_and_w_nonzero =
             (Ecdsa::RSuffix.curr() * Ecdsa::PubkeyDoublingSlope.offset(255) - &one)
-                / &all_ec_op_zerofier;
+                * &all_ec_op_zerofier_inv;
 
         // check the pubkey `Q` is on the elliptic curve
         // aka check `y^2 = x^3 + a*x + b`
         let ecdsa_signature0_q_on_curve_x_squared = (Ecdsa::PubkeyXSquared.curr()
             - Ecdsa::PubkeyDoublingX.curr() * Ecdsa::PubkeyDoublingX.curr())
-            / &all_ecdsa_zerofier;
+            * &all_ecdsa_zerofier_inv;
         let ecdsa_sig_config_beta = Constant(FieldVariant::Fp(ECDSA_SIG_CONFIG_BETA));
         let ecdsa_signature0_q_on_curve_on_curve = (Ecdsa::PubkeyDoublingY.curr()
             * Ecdsa::PubkeyDoublingY.curr()
             - (Ecdsa::PubkeyDoublingX.curr() * Ecdsa::PubkeyXSquared.curr()
                 + Ecdsa::PubkeyDoublingX.curr() * ecdsa_sig_config_alpha
                 + ecdsa_sig_config_beta))
-            / &all_ecdsa_zerofier;
+            * &all_ecdsa_zerofier_inv;
 
         let last_ecdsa_zerofier =
             X - Constant(FieldVariant::Fp(g.pow([32768 * (n / 32768 - 1) as u64])));
-        let all_ecdsa_except_last_zerofier_inv = &last_ecdsa_zerofier / &all_ecdsa_zerofier;
+        let all_ecdsa_except_last_zerofier_inv = &last_ecdsa_zerofier * &all_ecdsa_zerofier_inv;
 
         // Check starting address of the ECDSA memory segment
         // memory segments in Cairo are continuous i.e. Memory:
         // |0->100 all pedersen mem|101 -> 151 all RC mem|151 -> 900 all ECDSA mem|
         let ecdsa_init_addr =
-            (Npc::EcdsaPubkeyAddr.curr() - InitialEcdsaAddr.hint()) / &first_row_zerofier;
+            (Npc::EcdsaPubkeyAddr.curr() - InitialEcdsaAddr.hint()) * &first_row_zerofier_inv;
 
         // NOTE: message address is the 2nd address of each instance
         let ecdsa_message_addr = (Npc::EcdsaMessageAddr.curr()
             - (Npc::EcdsaPubkeyAddr.curr() + &one))
-            / &all_ecdsa_zerofier;
+            * &all_ecdsa_zerofier_inv;
 
         // NOTE: pubkey address is the 1st address of each instance
         let ecdsa_pubkey_addr = (Npc::EcdsaPubkeyAddr.next()
@@ -1293,9 +1351,154 @@ impl ministark::air::AirConfig for AirConfig {
 
         // Check the ECDSA Message and Pubkey are correctly loaded into memory
         let ecdsa_message_value0 =
-            (Npc::EcdsaMessageVal.curr() - Ecdsa::MessageSuffix.curr()) / &all_ecdsa_zerofier;
+            (Npc::EcdsaMessageVal.curr() - Ecdsa::MessageSuffix.curr()) * &all_ecdsa_zerofier_inv;
         let ecdsa_pubkey_value0 =
-            (Npc::EcdsaPubkeyVal.curr() - Ecdsa::PubkeyDoublingX.curr()) / &all_ecdsa_zerofier;
+            (Npc::EcdsaPubkeyVal.curr() - Ecdsa::PubkeyDoublingX.curr()) * &all_ecdsa_zerofier_inv;
+
+        // bitwise builtin
+        // ===============
+
+        // check the initial bitwise segment memory address
+        // all addresses associated with bitwise checks are continuous
+        let bitwise_init_var_pool_addr =
+            (Npc::BitwisePoolAddr.curr() - InitialBitwiseAddr.hint()) * &first_row_zerofier_inv;
+
+        // example for trace length n=1024
+        // ================================
+        // X^(n/1024) - ω^(3*n/4)      = X^(n/1024) - ω^(768*n/1024)
+        // X^(n/1024) - ω^(768*n/1024) = (x-ω^768)
+        // X^(n/256) - 1               = (x-ω^0)(x-ω^256)(x-ω^512)(x-ω^768)
+        // (x-ω^768)/(X^(n/256) - 1)   = 1/((x-ω^0)(x-ω^256)(x-ω^512))
+        // vanishes on every 256th row except the 3rd of every 4
+        let bitwise_transition_zerofier_inv = (X.pow(n / 1024)
+            - Constant(FieldVariant::Fp(g.pow([(3 * n / 4) as u64]))))
+            * &every_256_row_zerofier_inv;
+
+        let all_bitwise_zerofier = X.pow(n / 1024) - &one;
+        let all_bitwise_zerofier_inv = &one / &all_bitwise_zerofier;
+
+        // Checks memory address for four bitwise inputs
+        // `x`, `y`, `x&y` and `x^y` are continuous
+        let bitwise_step_var_pool_addr = (Npc::BitwisePoolAddr.next()
+            - (Npc::BitwisePoolAddr.curr() + &one))
+            * &bitwise_transition_zerofier_inv;
+        // need to check one more address for `x|y`
+        let bitwise_x_or_y_addr = (Npc::BitwiseXOrYAddr.curr()
+            - (Npc::BitwisePoolAddr.offset(3) + &one))
+            * &all_bitwise_zerofier_inv;
+
+        let last_bitwise_zerofier =
+            X - Constant(FieldVariant::Fp(g.pow([1024 * (n / 1024 - 1) as u64])));
+        let all_bitwise_except_last_zerofier_inv =
+            &last_bitwise_zerofier * &all_bitwise_zerofier_inv;
+
+        // check the next bitwise instance has the correct address
+        let bitwise_next_var_pool_addr = (Npc::BitwisePoolAddr.offset(4)
+            - (Npc::BitwiseXOrYAddr.curr() + &one))
+            * &all_bitwise_except_last_zerofier_inv;
+
+        // let bitwise_x_addr = Npc::BitwisePoolAddr.offset(0);
+        // let bitwise_y_addr = Npc::BitwisePoolAddr.offset(1);
+        let bitwise_x_and_y_val = Npc::BitwisePoolVal.offset(2);
+        let bitwise_x_xor_y_val = Npc::BitwisePoolVal.offset(3);
+
+        // check all values `x`, `y`, `x&y` and `x^y` are partitioned
+        // NOTE: not `x|y` since this is calculated trivially using `x&y` and `x^y`
+        // Partitioning in this context is the process of breaking up our number into
+        // strided bit chunks. Firstly the bottom 128 bits are handled by
+        // `bitwise_sum_var_0_0` and the top 128 bits are handles by
+        // `bitwise_sum_var_8_0`. Then each 128 bit chunk is broken up into two 64 bit
+        // chunks. Each of these 64 bit chunks is broken up into four stridings of a
+        // 16 bit integer. For example to break up the 64 bit binary integer `v`:
+        // ```text
+        //  v = 0b1100_1010_0110_1001_0101_0100_0100_0000_0100_0010_0001_0010_1111_0111_1100
+        // s0 = 0b0000_0000_0000_0001_0001_0000_0000_0000_0000_0000_0001_0000_0001_0001_0000
+        // s1 = 0b0000_0001_0001_0000_0000_0000_0000_0000_0000_0001_0000_0001_0001_0001_0000
+        // s2 = 0b0001_0000_0001_0000_0001_0001_0001_0000_0001_0000_0000_0000_0001_0001_0001
+        // s3 = 0b0001_0001_0000_0001_0000_0000_0000_0000_0000_0000_0000_0000_0001_0000_0001
+        // ```
+        // note that `v = s0 * 2^0 + s1 * 2^1 + s2 * 2^2 + s3 * 2^3`.
+        let bitwise_partition = (&bitwise_sum_var_0_0 + &bitwise_sum_var_8_0
+            - Npc::BitwisePoolVal.curr())
+            * &every_256_row_zerofier_inv;
+        // TODO
+
+        // NOTE: `x | y = (x & y) + (x ^ y)`
+        let bitwise_or_is_and_plus_xor = (Npc::BitwiseXOrYVal.curr()
+            - (&bitwise_x_and_y_val + &bitwise_x_xor_y_val))
+            * &all_bitwise_zerofier_inv;
+
+        // example for trace length n=2048
+        // ===============================
+        // X^(n/1024) - ω^(1*n/64))  = X^(n/1024) - ω^(16 * n / 1024))
+        //                           = (x - ω^(16 * 1))(x - ω^(1024 + (16 * 1)))
+        // X^(n/1024) - ω^(1*n/32))  = X^(n/1024) - ω^(32 * n / 1024))
+        //                           = (x - ω^(16 * 2))(x - ω^(1024 + (16 * 2)))
+        // X^(n/1024) - ω^(3*n/64))  = X^(n/1024) - ω^(48 * n / 1024))
+        //                           = (x - ω^(16 * 3))(x - ω^(1024 + (16 * 3)))
+        // X^(n/1024) - ω^(1*n/16))  = X^(n/1024) - ω^(64 * n / 1024))
+        //                           = (x - ω^(16 * 4))(x - ω^(1024 + (16 * 4)))
+        // X^(n/1024) - ω^(5*n/64))  = X^(n/1024) - ω^(80 * n / 1024))
+        //                           = (x - ω^(16 * 5))(x - ω^(1024 + (16 * 5)))
+        // X^(n/1024) - ω^(3*n/32))  = X^(n/1024) - ω^(96 * n / 1024))
+        //                           = (x - ω^(16 * 6))(x - ω^(1024 + (16 * 6)))
+        // X^(n/1024) - ω^(7*n/64))  = X^(n/1024) - ω^(112 * n / 1024))
+        //                           = (x - ω^(16 * 7))(x - ω^(1024 + (16 * 7)))
+        // X^(n/1024) - ω^(1*n/8))   = X^(n/1024) - ω^(128 * n / 1024))
+        //                           = (x - ω^(16 * 8))(x - ω^(1024 + (16 * 8)))
+        // X^(n/1024) - ω^(9*n/64))  = X^(n/1024) - ω^(144 * n / 1024))
+        //                           = (x - ω^(16 * 9))(x - ω^(1024 + (16 * 9)))
+        // X^(n/1024) - ω^(5*n/32))  = X^(n/1024) - ω^(160 * n / 1024))
+        //                           = (x - ω^(16 * 10))(x - ω^(1024 + (16 * 10)))
+        // X^(n/1024) - ω^(11*n/64)) = X^(n/1024) - ω^(176 * n / 1024))
+        //                           = (x - ω^(16 * 11))(x - ω^(1024 + (16 * 11)))
+        // X^(n/1024) - ω^(3*n/16))  = X^(n/1024) - ω^(192 * n / 1024))
+        //                           = (x - ω^(16 * 12))(x - ω^(1024 + (16 * 12)))
+        // X^(n/1024) - ω^(13*n/64)) = X^(n/1024) - ω^(208 * n / 1024))
+        //                           = (x - ω^(16 * 13))(x - ω^(1024 + (16 * 13)))
+        // X^(n/1024) - ω^(7*n/32))  = X^(n/1024) - ω^(224 * n / 1024))
+        //                           = (x - ω^(16 * 14))(x - ω^(1024 + (16 * 14)))
+        // X^(n/1024) - ω^(15*n/64)) = X^(n/1024) - ω^(240 * n / 1024))
+        //                           = (x - ω^(16 * 15))(x - ω^(1024 + (16 * 15)))
+        // NOTE: when you multiply all these together you get:
+        // $\prod_{i=1}^{15}(x - ω^(16 * i))(x - ω^(1024 + (16 * i)))$
+        // now multiply this product by $x^(n / 1024) - 1$
+        // TODO: isn't this zerofier just equivalent to $x^(n / 16) - 1$?
+        let every_16_bit_segment_zerofier = (X.pow(n / 1024)
+            - Constant(FieldVariant::Fp(g.pow([n as u64 / 64]))))
+            * (X.pow(n / 1024) - Constant(FieldVariant::Fp(g.pow([n as u64 / 32]))))
+            * (X.pow(n / 1024) - Constant(FieldVariant::Fp(g.pow([3 * n as u64 / 64]))))
+            * (X.pow(n / 1024) - Constant(FieldVariant::Fp(g.pow([n as u64 / 16]))))
+            * (X.pow(n / 1024) - Constant(FieldVariant::Fp(g.pow([5 * n as u64 / 64]))))
+            * (X.pow(n / 1024) - Constant(FieldVariant::Fp(g.pow([3 * n as u64 / 32]))))
+            * (X.pow(n / 1024) - Constant(FieldVariant::Fp(g.pow([7 * n as u64 / 64]))))
+            * (X.pow(n / 1024) - Constant(FieldVariant::Fp(g.pow([n as u64 / 8]))))
+            * (X.pow(n / 1024) - Constant(FieldVariant::Fp(g.pow([9 * n as u64 / 64]))))
+            * (X.pow(n / 1024) - Constant(FieldVariant::Fp(g.pow([5 * n as u64 / 32]))))
+            * (X.pow(n / 1024) - Constant(FieldVariant::Fp(g.pow([11 * n as u64 / 64]))))
+            * (X.pow(n / 1024) - Constant(FieldVariant::Fp(g.pow([3 * n as u64 / 16]))))
+            * (X.pow(n / 1024) - Constant(FieldVariant::Fp(g.pow([13 * n as u64 / 64]))))
+            * (X.pow(n / 1024) - Constant(FieldVariant::Fp(g.pow([7 * n as u64 / 32]))))
+            * (X.pow(n / 1024) - Constant(FieldVariant::Fp(g.pow([15 * n as u64 / 64]))))
+            * &all_bitwise_zerofier;
+        let every_16_bit_segment_zerofier_inv = &one / every_16_bit_segment_zerofier;
+
+        // NOTE: `x+y = (x^y) + (x&y) + (x&y)`
+        // TODO: CHECK: only when x and y are sufficiently diluted?
+        let x_16_bit_segment = Bitwise::Bits16Chunk0Offset0.offset(0);
+        let y_16_bit_segment = Bitwise::Bits16Chunk0Offset0.offset(1);
+        let x_and_y_16_bit_segment = Bitwise::Bits16Chunk0Offset0.offset(2);
+        let x_xor_y_16_bit_segment = Bitwise::Bits16Chunk0Offset0.offset(3);
+        let bitwise_addition_is_xor_with_and = (x_16_bit_segment + y_16_bit_segment
+            - (x_xor_y_16_bit_segment + &x_and_y_16_bit_segment + x_and_y_16_bit_segment))
+            * &every_16_bit_segment_zerofier_inv;
+
+        // let bitwise_unique_unpacking192 =
+
+        // new
+        // let bitwise_partition =
+        // let bitwise_or_is_and_plus_xor =
+        // new
 
         // let ecdsa_signature0_doubling_key_x =
 
@@ -1306,7 +1509,50 @@ impl ministark::air::AirConfig for AirConfig {
         // point^(trace_length / 512) - trace_generator^(trace_length / 2).
         // let pedersen_hash0_copy_point_x =
 
-        let _yo = vec![
+        let _tmp = vec![
+            &memory_initial_addr,
+            &public_memory_addr_zero,
+            &public_memory_value_zero,
+            &rc16_perm_init0,
+            &rc16_perm_step0,
+            &rc16_perm_last,
+            &rc16_diff_is_bit,
+            &rc16_minimum,
+            &rc16_maximum,
+            // TODO: diluted constraints
+            // TODO: understand these constraints
+            &pedersen_hash0_ec_subset_sub_bit_unpacking_last_one_is_zero,
+            &pedersen_hash0_ec_subset_sub_bit_unpacking_zeros_between_ones,
+            &pedersen_hash0_ec_subset_sum_bit_unpacking_cumulative_bit192,
+            &pedersen_hash0_ec_subset_sum_bit_unpacking_zeroes_between_ones192,
+            &pedersen_hash0_ec_subset_sum_bit_unpacking_cumulative_bit196,
+            // TODO: understand these constraints
+            &pedersen_hash0_ec_subset_sum_bit_unpacking_zeroes_between_ones196,
+            &pedersen_hash0_ec_subset_sum_booleanity_test,
+            &pedersen_hash0_ec_subset_sum_bit_extraction_end,
+            &pedersen_hash0_ec_subset_sum_zeros_tail,
+            &pedersen_hash0_ec_subset_sum_add_points_slope,
+            &pedersen_hash0_ec_subset_sum_add_points_x,
+            &pedersen_hash0_ec_subset_sum_add_points_y,
+            &pedersen_hash0_ec_subset_sum_copy_point_x,
+            &pedersen_hash0_ec_subset_sum_copy_point_y,
+            &pedersen_hash0_copy_point_x,
+            &pedersen_hash0_copy_point_y,
+            &pedersen_hash0_init_x,
+            &pedersen_hash0_init_y,
+            &pedersen_input0_value0,
+            &pedersen_input0_addr,
+            &pedersen_init_addr,
+            &pedersen_input1_value0,
+            &pedersen_input1_addr,
+            &pedersen_output_value0,
+            &pedersen_output_addr,
+            &rc_builtin_value,
+            &rc_builtin_addr_step,
+            &rc_builtin_init_addr,
+            &ecdsa_signature0_doubling_key_slope,
+            &ecdsa_signature0_doubling_key_x,
+            &ecdsa_signature0_doubling_key_y,
             &ecdsa_signature0_exponentiate_generator_booleanity_test,
             &ecdsa_signature0_exponentiate_generator_bit_extraction_end,
             &ecdsa_signature0_exponentiate_generator_zeros_tail,
@@ -1340,6 +1586,18 @@ impl ministark::air::AirConfig for AirConfig {
             &ecdsa_signature0_r_and_w_nonzero,
             &ecdsa_signature0_q_on_curve_x_squared,
             &ecdsa_signature0_q_on_curve_on_curve,
+            &ecdsa_init_addr,
+            &ecdsa_message_addr,
+            &ecdsa_pubkey_addr,
+            &ecdsa_message_value0,
+            &ecdsa_pubkey_value0,
+            &diluted_check_permutation_init0,
+            &diluted_check_permutation_step0,
+            &diluted_check_permutation_last,
+            &diluted_check_init,
+            &diluted_check_first_element,
+            &diluted_check_step,
+            &diluted_check_last,
         ];
 
         // NOTE: for composition OODs only seem to involve one random per constraint
@@ -1391,77 +1649,93 @@ impl ministark::air::AirConfig for AirConfig {
             rc16_diff_is_bit,
             rc16_minimum,
             rc16_maximum,
-            // TODO: diluted constraints
-            // TODO: understand these constranints
+            // diluted_check_permutation_init0,
+            // diluted_check_permutation_step0,
+            // diluted_check_permutation_last,
+            // diluted_check_init,
+            // diluted_check_first_element,
+            // diluted_check_step,
+            // diluted_check_last,
+            // // TODO: understand these constraints
             // pedersen_hash0_ec_subset_sub_bit_unpacking_last_one_is_zero,
             // pedersen_hash0_ec_subset_sub_bit_unpacking_zeros_between_ones,
             // pedersen_hash0_ec_subset_sum_bit_unpacking_cumulative_bit192,
             // pedersen_hash0_ec_subset_sum_bit_unpacking_zeroes_between_ones192,
             // pedersen_hash0_ec_subset_sum_bit_unpacking_cumulative_bit196,
+            // // TODO: understand these constraints
             // pedersen_hash0_ec_subset_sum_bit_unpacking_zeroes_between_ones196,
-            pedersen_hash0_ec_subset_sum_booleanity_test,
-            pedersen_hash0_ec_subset_sum_bit_extraction_end,
-            pedersen_hash0_ec_subset_sum_zeros_tail,
-            pedersen_hash0_ec_subset_sum_add_points_slope,
-            pedersen_hash0_ec_subset_sum_add_points_x,
-            pedersen_hash0_ec_subset_sum_add_points_y,
-            pedersen_hash0_ec_subset_sum_copy_point_x,
-            pedersen_hash0_ec_subset_sum_copy_point_y,
-            pedersen_hash0_copy_point_x,
-            pedersen_hash0_copy_point_y,
-            pedersen_hash0_init_x,
-            pedersen_hash0_init_y,
-            pedersen_input0_value0,
-            pedersen_input0_addr,
-            pedersen_init_addr,
-            pedersen_input1_value0,
-            pedersen_input1_addr,
-            pedersen_output_value0,
-            pedersen_output_addr,
-            rc_builtin_value,
-            rc_builtin_addr_step,
-            rc_builtin_init_addr,
-            ecdsa_signature0_doubling_key_slope,
-            ecdsa_signature0_doubling_key_x,
-            ecdsa_signature0_doubling_key_y,
-            ecdsa_signature0_exponentiate_generator_booleanity_test,
-            ecdsa_signature0_exponentiate_generator_bit_extraction_end,
-            ecdsa_signature0_exponentiate_generator_zeros_tail,
-            ecdsa_signature0_exponentiate_generator_add_points_slope,
-            ecdsa_signature0_exponentiate_generator_add_points_x,
-            ecdsa_signature0_exponentiate_generator_add_points_y,
-            ecdsa_signature0_exponentiate_generator_add_points_x_diff_inv,
-            ecdsa_signature0_exponentiate_generator_copy_point_x,
-            ecdsa_signature0_exponentiate_generator_copy_point_y,
-            ecdsa_signature0_exponentiate_key_booleanity_test,
-            ecdsa_signature0_exponentiate_key_bit_extraction_end,
-            ecdsa_signature0_exponentiate_key_zeros_tail,
-            ecdsa_signature0_exponentiate_key_add_points_slope,
-            ecdsa_signature0_exponentiate_key_add_points_x,
-            ecdsa_signature0_exponentiate_key_add_points_y,
-            ecdsa_signature0_exponentiate_key_add_points_x_diff_inv,
-            ecdsa_signature0_exponentiate_key_copy_point_x,
-            ecdsa_signature0_exponentiate_key_copy_point_y,
-            ecdsa_signature0_init_gen_x,
-            ecdsa_signature0_init_gen_y,
-            ecdsa_signature0_init_key_x,
-            ecdsa_signature0_init_key_y,
-            ecdsa_signature0_add_results_slope,
-            ecdsa_signature0_add_results_x,
-            ecdsa_signature0_add_results_y,
-            ecdsa_signature0_add_results_x_diff_inv,
-            ecdsa_signature0_extract_r_slope,
-            ecdsa_signature0_extract_r_x,
-            ecdsa_signature0_extract_r_x_diff_inv,
-            ecdsa_signature0_z_nonzero,
-            ecdsa_signature0_r_and_w_nonzero,
-            ecdsa_signature0_q_on_curve_x_squared,
-            ecdsa_signature0_q_on_curve_on_curve,
-            ecdsa_init_addr,
-            ecdsa_message_addr,
-            ecdsa_pubkey_addr,
-            ecdsa_message_value0,
-            ecdsa_pubkey_value0,
+            // pedersen_hash0_ec_subset_sum_booleanity_test,
+            // pedersen_hash0_ec_subset_sum_bit_extraction_end,
+            // pedersen_hash0_ec_subset_sum_zeros_tail,
+            // pedersen_hash0_ec_subset_sum_add_points_slope,
+            // pedersen_hash0_ec_subset_sum_add_points_x,
+            // pedersen_hash0_ec_subset_sum_add_points_y,
+            // pedersen_hash0_ec_subset_sum_copy_point_x,
+            // pedersen_hash0_ec_subset_sum_copy_point_y,
+            // pedersen_hash0_copy_point_x,
+            // pedersen_hash0_copy_point_y,
+            // pedersen_hash0_init_x,
+            // pedersen_hash0_init_y,
+            // pedersen_input0_value0,
+            // pedersen_input0_addr,
+            // pedersen_init_addr,
+            // pedersen_input1_value0,
+            // pedersen_input1_addr,
+            // pedersen_output_value0,
+            // pedersen_output_addr,
+            // rc_builtin_value,
+            // rc_builtin_addr_step,
+            // rc_builtin_init_addr,
+            // ecdsa_signature0_doubling_key_slope,
+            // ecdsa_signature0_doubling_key_x,
+            // ecdsa_signature0_doubling_key_y,
+            // ecdsa_signature0_exponentiate_generator_booleanity_test,
+            // ecdsa_signature0_exponentiate_generator_bit_extraction_end,
+            // ecdsa_signature0_exponentiate_generator_zeros_tail,
+            // ecdsa_signature0_exponentiate_generator_add_points_slope,
+            // ecdsa_signature0_exponentiate_generator_add_points_x,
+            // ecdsa_signature0_exponentiate_generator_add_points_y,
+            // ecdsa_signature0_exponentiate_generator_add_points_x_diff_inv,
+            // ecdsa_signature0_exponentiate_generator_copy_point_x,
+            // ecdsa_signature0_exponentiate_generator_copy_point_y,
+            // ecdsa_signature0_exponentiate_key_booleanity_test,
+            // ecdsa_signature0_exponentiate_key_bit_extraction_end,
+            // ecdsa_signature0_exponentiate_key_zeros_tail,
+            // ecdsa_signature0_exponentiate_key_add_points_slope,
+            // ecdsa_signature0_exponentiate_key_add_points_x,
+            // ecdsa_signature0_exponentiate_key_add_points_y,
+            // ecdsa_signature0_exponentiate_key_add_points_x_diff_inv,
+            // ecdsa_signature0_exponentiate_key_copy_point_x,
+            // ecdsa_signature0_exponentiate_key_copy_point_y,
+            // ecdsa_signature0_init_gen_x,
+            // ecdsa_signature0_init_gen_y,
+            // ecdsa_signature0_init_key_x,
+            // ecdsa_signature0_init_key_y,
+            // ecdsa_signature0_add_results_slope,
+            // ecdsa_signature0_add_results_x,
+            // ecdsa_signature0_add_results_y,
+            // ecdsa_signature0_add_results_x_diff_inv,
+            // ecdsa_signature0_extract_r_slope,
+            // ecdsa_signature0_extract_r_x,
+            // ecdsa_signature0_extract_r_x_diff_inv,
+            // ecdsa_signature0_z_nonzero,
+            // ecdsa_signature0_r_and_w_nonzero,
+            // ecdsa_signature0_q_on_curve_x_squared,
+            // ecdsa_signature0_q_on_curve_on_curve,
+            // ecdsa_init_addr,
+            // ecdsa_message_addr,
+            // ecdsa_pubkey_addr,
+            // ecdsa_message_value0,
+            // ecdsa_pubkey_value0,
+            bitwise_init_var_pool_addr,
+            bitwise_step_var_pool_addr,
+            bitwise_x_or_y_addr,
+            bitwise_next_var_pool_addr,
+            bitwise_partition,
+            bitwise_or_is_and_plus_xor,
+            bitwise_addition_is_xor_with_and,
+            // // TODO: bitwise/addition_is_xor_with_and
+            // // TODO: bitwise/unique_unpacking192
         ]
         .into_iter()
         .map(Constraint::new)
@@ -1487,11 +1761,13 @@ impl ministark::air::AirConfig for AirConfig {
             initial_pedersen_address,
             initial_rc_address,
             initial_ecdsa_address,
+            initial_bitwise_address,
         } = execution_info;
 
         let initial_pedersen_address = initial_pedersen_address.expect("layout6 requires Pedersen");
         let initial_rc_address = initial_rc_address.expect("layout6 requires range check");
         let initial_ecdsa_address = initial_ecdsa_address.expect("layout6 requires ecdsa");
+        let initial_bitwise_address = initial_bitwise_address.expect("layout6 requires bitwise");
 
         let memory_product = utils::compute_public_memory_quotient(
             challenges[MemoryPermutation::Z],
@@ -1501,6 +1777,17 @@ impl ministark::air::AirConfig for AirConfig {
             (*public_memory_padding_address as u64).into(),
             *public_memory_padding_value,
         );
+
+        let diluted_cumulative_val = Fp::ONE;
+        // let diluted_cumulative_val = compute_diluted_cumulative_value::<
+        //     Fp,
+        //     Fp,
+        //     DILUTED_CHECK_N_BITS,
+        //     DILUTED_CHECK_SPACING,
+        // >(
+        //     challenges[DilutedCheckAggregation::Z],
+        //     challenges[DilutedCheckAggregation::A],
+        // );
 
         assert!(range_check_min <= range_check_max);
 
@@ -1514,9 +1801,13 @@ impl ministark::air::AirConfig for AirConfig {
             (RangeCheckProduct.index(), Fp::ONE),
             (RangeCheckMin.index(), (*range_check_min as u64).into()),
             (RangeCheckMax.index(), (*range_check_max as u64).into()),
+            (DilutedCheckProduct.index(), Fp::ONE),
+            (DilutedCheckFirst.index(), Fp::ZERO),
+            (DilutedCheckCumulativeValue.index(), diluted_cumulative_val),
             (InitialPedersenAddr.index(), initial_pedersen_address.into()),
             (InitialRcAddr.index(), initial_rc_address.into()),
             (InitialEcdsaAddr.index(), initial_ecdsa_address.into()),
+            (InitialBitwiseAddr.index(), initial_bitwise_address.into()),
         ])
     }
 }
@@ -1712,11 +2003,65 @@ impl ExecutionTraceColumn for Ecdsa {
 }
 
 #[derive(Clone, Copy)]
+pub enum Bitwise {
+    /// for 1st chunk 64 bits
+    Bits16Chunk0Offset0 = 1,
+    Bits16Chunk0Offset1 = 17,
+    Bits16Chunk0Offset2 = 33,
+    Bits16Chunk0Offset3 = 49,
+    /// for 2nd chunk of 64 bits
+    Bits16Chunk1Offset0 = 65,
+    Bits16Chunk1Offset1 = 81,
+    Bits16Chunk1Offset2 = 97,
+    Bits16Chunk1Offset3 = 113,
+    /// for 3rd chunk of 64 bits
+    Bits16Chunk2Offset0 = 129,
+    Bits16Chunk2Offset1 = 145,
+    Bits16Chunk2Offset2 = 161,
+    Bits16Chunk2Offset3 = 177,
+    /// for 4th chunk of 64 bits
+    Bits16Chunk3Offset0 = 193,
+    Bits16Chunk3Offset1 = 209,
+    Bits16Chunk3Offset2 = 225,
+    Bits16Chunk3Offset3 = 241,
+}
+
+impl ExecutionTraceColumn for Bitwise {
+    fn index(&self) -> usize {
+        match self {
+            Self::Bits16Chunk0Offset0
+            | Self::Bits16Chunk0Offset1
+            | Self::Bits16Chunk0Offset2
+            | Self::Bits16Chunk0Offset3
+            | Self::Bits16Chunk1Offset0
+            | Self::Bits16Chunk1Offset1
+            | Self::Bits16Chunk1Offset2
+            | Self::Bits16Chunk1Offset3
+            | Self::Bits16Chunk2Offset0
+            | Self::Bits16Chunk2Offset1
+            | Self::Bits16Chunk2Offset2
+            | Self::Bits16Chunk2Offset3
+            | Self::Bits16Chunk3Offset0
+            | Self::Bits16Chunk3Offset1
+            | Self::Bits16Chunk3Offset2
+            | Self::Bits16Chunk3Offset3 => 7,
+        }
+    }
+
+    fn offset<T>(&self, offset: isize) -> Expr<AlgebraicItem<T>> {
+        let column = self.index();
+        AlgebraicItem::Trace(column, offset * 256 + *self as isize).into()
+    }
+}
+
+#[derive(Clone, Copy)]
 pub enum Pedersen {
     PartialSumX,
     PartialSumY,
     Suffix,
     Slope,
+    Bit251AndBit196AndBit192 = 86,
+    Bit251AndBit196 = 255,
 }
 
 impl ExecutionTraceColumn for Pedersen {
@@ -1725,7 +2070,8 @@ impl ExecutionTraceColumn for Pedersen {
             Self::PartialSumX => 1,
             Self::PartialSumY => 2,
             Self::Suffix => 3,
-            Self::Slope => 4,
+            Self::Slope | Self::Bit251AndBit196 => 4,
+            Self::Bit251AndBit196AndBit192 => 8,
         }
     }
 
@@ -1733,6 +2079,9 @@ impl ExecutionTraceColumn for Pedersen {
         let column = self.index();
         let trace_offset = match self {
             Self::PartialSumX | Self::PartialSumY | Self::Suffix | Self::Slope => offset,
+            Self::Bit251AndBit196AndBit192 | Self::Bit251AndBit196 => {
+                (PEDERSEN_BUILTIN_RATIO * CYCLE_HEIGHT) as isize * offset + *self as isize
+            }
         };
         AlgebraicItem::Trace(column, trace_offset).into()
     }
@@ -1779,6 +2128,16 @@ pub enum Npc {
     EcdsaMessageAddr = 16774,
     EcdsaMessageVal = 16775,
 
+    // 198 % 16 = 6
+    // 199 % 16 = 7
+    BitwisePoolAddr = 198,
+    BitwisePoolVal = 199,
+
+    // 902 % 16 = 6
+    // 903 % 16 = 7
+    BitwiseXOrYAddr = 902,
+    BitwiseXOrYVal = 903,
+
     // EcdsaMessageVal = todo!(),
     MemDstAddr = 8,
     MemDst = 9,
@@ -1817,6 +2176,8 @@ impl ExecutionTraceColumn for Npc {
             | Self::MemDst
             | Self::MemOp1Addr
             | Self::MemOp1 => CYCLE_HEIGHT,
+            Self::BitwisePoolAddr | Self::BitwisePoolVal => BITWISE_RATIO * CYCLE_HEIGHT / 4,
+            Self::BitwiseXOrYAddr | Self::BitwiseXOrYVal => BITWISE_RATIO * CYCLE_HEIGHT,
         } as isize;
         let column = self.index();
         let trace_offset = step * offset + *self as isize;
@@ -1841,6 +2202,27 @@ impl ExecutionTraceColumn for Mem {
         let column = self.index();
         let trace_offset = MEMORY_STEP as isize * mem_offset + *self as isize;
         AlgebraicItem::Trace(column, trace_offset).into()
+    }
+}
+
+#[derive(Clone, Copy)]
+pub enum DilutedCheck {
+    Unordered = 1,
+    Ordered = 5,
+    Aggregate = 3,
+}
+
+impl ExecutionTraceColumn for DilutedCheck {
+    fn index(&self) -> usize {
+        match self {
+            Self::Unordered | Self::Ordered => 7,
+            Self::Aggregate => 9,
+        }
+    }
+
+    fn offset<T>(&self, offset: isize) -> Expr<AlgebraicItem<T>> {
+        let column = self.index();
+        AlgebraicItem::Trace(column, 8 * offset + *self as isize).into()
     }
 }
 
@@ -1909,6 +2291,7 @@ pub enum Permutation {
     // TODO = 0,
     Memory = 0,
     RangeCheck = 1,
+    DilutedCheck = 7,
 }
 
 impl ExecutionTraceColumn for Permutation {
@@ -1919,8 +2302,9 @@ impl ExecutionTraceColumn for Permutation {
     fn offset<T>(&self, offset: isize) -> Expr<AlgebraicItem<T>> {
         let column = self.index();
         let trace_offset = match self {
-            Permutation::Memory => MEMORY_STEP as isize * offset + *self as isize,
-            Permutation::RangeCheck => 4 * offset + *self as isize,
+            Self::Memory => MEMORY_STEP as isize * offset + *self as isize,
+            Self::RangeCheck => 4 * offset + *self as isize,
+            Self::DilutedCheck => 8 * offset + *self as isize,
         };
         AlgebraicItem::Trace(column, trace_offset).into()
     }
@@ -1936,9 +2320,13 @@ pub enum PublicInputHint {
     RangeCheckProduct,
     RangeCheckMin,
     RangeCheckMax,
+    DilutedCheckProduct,
+    DilutedCheckFirst,
+    DilutedCheckCumulativeValue,
     InitialPedersenAddr,
     InitialRcAddr,
     InitialEcdsaAddr,
+    InitialBitwiseAddr,
 }
 
 impl Hint for PublicInputHint {
@@ -1971,6 +2359,33 @@ pub enum RangeCheckPermutation {
 }
 
 impl VerifierChallenge for RangeCheckPermutation {
+    fn index(&self) -> usize {
+        *self as usize
+    }
+}
+
+/// Symbolic diluted check permutation challenges
+/// (z − TODO1)
+#[derive(Clone, Copy)]
+pub enum DilutedCheckPermutation {
+    Z = 3, // =z
+}
+
+impl VerifierChallenge for DilutedCheckPermutation {
+    fn index(&self) -> usize {
+        *self as usize
+    }
+}
+
+/// Symbolic diluted check aggregation challenges
+/// (z − TODO1)
+#[derive(Clone, Copy)]
+pub enum DilutedCheckAggregation {
+    Z = 4, // =z
+    A = 5, // =α
+}
+
+impl VerifierChallenge for DilutedCheckAggregation {
     fn index(&self) -> usize {
         *self as usize
     }

@@ -23,42 +23,59 @@ use num_traits::Zero;
 #[macro_use]
 extern crate serde_json;
 
-fn main() {
-    let (ecdsa_generator_x_coeffs, ecdsa_generator_y_coeffs) = ecdsa::generator_points_poly();
-    let x_poly = DensePolynomial::from_coefficients_vec(
-        ecdsa_generator_x_coeffs
-            .into_iter()
-            .map(|v| match v {
-                FieldVariant::Fp(v) => v,
-                _ => unreachable!(),
-            })
-            .collect::<Vec<Fp>>(),
-    );
-    let y_poly = DensePolynomial::from_coefficients_vec(
-        ecdsa_generator_y_coeffs
-            .into_iter()
-            .map(|v| match v {
-                FieldVariant::Fp(v) => v,
-                _ => unreachable!(),
-            })
-            .collect::<Vec<Fp>>(),
-    );
-
-    let generator = Projective::from(Curve::GENERATOR);
-
-    let n = 32768;
-    let omega = Fp::get_root_of_unity(n).unwrap();
-    let mut acc = generator;
-    for i in 0..256 {
-        let expected = acc.into_affine();
-        let actual_x = x_poly.evaluate(&omega.pow([128 * i]));
-        let actual_y = y_poly.evaluate(&omega.pow([128 * i]));
-        let actual = Affine::new(actual_x, actual_y);
-        assert_eq!(actual, expected);
-        // println!("Actual: {}", );
-        // println!("Expected: {}", acc.into_affine().x);
-        acc.double_in_place();
+fn dilute<const BITS: usize, const SPACING: usize>(v: u32) -> u32 {
+    let mut res = 0;
+    for i in 0..BITS {
+        res = (res << SPACING) | ((v >> (BITS - i)) & 1)
     }
+    res
+}
+
+fn get_u<const BITS: usize, const SPACING: usize>(j: u32) -> u32 {
+    dilute::<BITS, SPACING>(j) - dilute::<BITS, SPACING>(j - 1)
+}
+
+fn main() {
+    for i in 0..16 {
+        // println!("yo: {:016b}", dilute::<16, 4>(i));
+        println!("BREH: {i:04b} {:016b}", get_u::<16, 4>(i + 1));
+    }
+
+    // let (ecdsa_generator_x_coeffs, ecdsa_generator_y_coeffs) =
+    // ecdsa::generator_points_poly(); let x_poly =
+    // DensePolynomial::from_coefficients_vec(     ecdsa_generator_x_coeffs
+    //         .into_iter()
+    //         .map(|v| match v {
+    //             FieldVariant::Fp(v) => v,
+    //             _ => unreachable!(),
+    //         })
+    //         .collect::<Vec<Fp>>(),
+    // );
+    // let y_poly = DensePolynomial::from_coefficients_vec(
+    //     ecdsa_generator_y_coeffs
+    //         .into_iter()
+    //         .map(|v| match v {
+    //             FieldVariant::Fp(v) => v,
+    //             _ => unreachable!(),
+    //         })
+    //         .collect::<Vec<Fp>>(),
+    // );
+
+    // let generator = Projective::from(Curve::GENERATOR);
+
+    // let n = 32768;
+    // let omega = Fp::get_root_of_unity(n).unwrap();
+    // let mut acc = generator;
+    // for i in 0..256 {
+    //     let expected = acc.into_affine();
+    //     let actual_x = x_poly.evaluate(&omega.pow([128 * i]));
+    //     let actual_y = y_poly.evaluate(&omega.pow([128 * i]));
+    //     let actual = Affine::new(actual_x, actual_y);
+    //     assert_eq!(actual, expected);
+    //     // println!("Actual: {}", );
+    //     // println!("Expected: {}", acc.into_affine().x);
+    //     acc.double_in_place();
+    // }
 
     // const PIE: &[u8] = include_bytes!("../example/as-pie.zip");
 

@@ -9,23 +9,26 @@ use super::NUM_EXTENSION_COLUMNS;
 use super::PUBLIC_MEMORY_STEP;
 use super::RANGE_CHECK_STEP;
 use ark_ff::Zero;
-use binary::EcdsaInstance;
+use binary::BitwiseInstance;
 use binary::PedersenInstance;
 use binary::RangeCheckInstance;
+use builtins::bitwise;
 use builtins::ecdsa;
-use builtins::ecdsa::DoublingStep;
 use builtins::pedersen;
 use ark_ff::One;
 use binary::AirPrivateInput;
 use binary::AirPublicInput;
 use builtins::range_check;
-use builtins::utils::starkware_curve::Curve;
 use num_bigint::BigUint;
 use ruint::aliases::U256;
 use crate::ExecutionInfo;
+use crate::layout6::BITWISE_RATIO;
+use crate::layout6::DILUTED_CHECK_SPACING;
 use crate::layout6::RANGE_CHECK_BUILTIN_PARTS;
 use crate::layout6::RANGE_CHECK_BUILTIN_RATIO;
+use crate::layout6::air::Bitwise;
 use crate::layout6::air::Ecdsa;
+use crate::layout6::air::Pedersen;
 use crate::layout6::air::RangeCheckBuiltin;
 use crate::utils::RangeCheckPool;
 use super::air::Permutation;
@@ -64,6 +67,7 @@ pub struct ExecutionTrace {
     pub initial_pedersen_address: u32,
     pub initial_rc_address: u32,
     pub initial_ecdsa_address: u32,
+    pub initial_bitwise_address: u32,
     _register_states: RegisterStates,
     _program: CompiledProgram,
     _mem: Memory<Fp>,
@@ -255,6 +259,15 @@ impl CairoExecutionTrace for ExecutionTrace {
         assert!(ordered_rc_padding_vals.next().is_none());
         assert!(ordered_rc_vals.next().is_none());
 
+        // Diluted check
+        // =============
+        let (dilution_check_steps, _) = range_check_column.as_chunks_mut::<8>();
+
+        ark_std::cfg_iter_mut!(dilution_check_steps).for_each(|dilution_check_step| {
+            dilution_check_step[1] = Fp::ZERO;
+            dilution_check_step[5] = Fp::ZERO;
+        });
+
         // Generate trace for pedersen hash
         // ================================
         let mut pedersen_partial_xs_column = Vec::new_in(GpuAllocator);
@@ -272,6 +285,7 @@ impl CairoExecutionTrace for ExecutionTrace {
         let (pedersen_suffixes_steps, _) = pedersen_suffixes_column.as_chunks_mut::<512>();
         let (pedersen_slopes_steps, _) = pedersen_slopes_column.as_chunks_mut::<512>();
         let (pedersen_npc_steps, _) = npc_column.as_chunks_mut::<512>();
+        let (pedersen_aux_steps, _) = auxiliary_column.as_chunks_mut::<512>();
 
         // Create dummy instances if there are cells that need to be filled
         let pedersen_instances = air_private_input.pedersen;
@@ -294,17 +308,18 @@ impl CairoExecutionTrace for ExecutionTrace {
             .zip(pedersen_suffixes_steps)
             .zip(pedersen_slopes_steps)
             .zip(pedersen_npc_steps)
+            .zip(pedersen_aux_steps)
             .zip(pedersen_traces)
             .for_each(
-                |(((((partial_xs, partial_ys), suffixes), slopes), npc), pedersen_trace)| {
+                |((((((partial_xs, partial_ys), suffixes), slopes), npc), aux), pedersen_trace)| {
                     let a_steps = pedersen_trace.a_steps;
                     let b_steps = pedersen_trace.b_steps;
                     let partial_steps = vec![a_steps, b_steps].concat();
 
                     for ((((suffix, partial_x), partial_y), slope), step) in
-                        zip(suffixes, partial_xs)
-                            .zip(partial_ys)
-                            .zip(slopes)
+                        zip(suffixes.iter_mut(), partial_xs.iter_mut())
+                            .zip(partial_ys.iter_mut())
+                            .zip(slopes.iter_mut())
                             .zip(partial_steps)
                     {
                         *suffix = step.suffix;
@@ -312,6 +327,18 @@ impl CairoExecutionTrace for ExecutionTrace {
                         *partial_y = step.point.y;
                         *slope = step.slope;
                     }
+
+                    // load fields for bit decomposition checks into the trace
+                    let (a_slopes, b_slopes) = slopes.split_at_mut(256);
+                    let (a_aux, b_aux) = aux.split_at_mut(256);
+                    a_slopes[Pedersen::Bit251AndBit196 as usize] =
+                        pedersen_trace.a_bit251_and_bit196.into();
+                    b_slopes[Pedersen::Bit251AndBit196 as usize] =
+                        pedersen_trace.b_bit251_and_bit196.into();
+                    a_aux[Pedersen::Bit251AndBit196AndBit192 as usize] =
+                        pedersen_trace.a_bit251_and_bit196_and_bit192.into();
+                    b_aux[Pedersen::Bit251AndBit196AndBit192 as usize] =
+                        pedersen_trace.b_bit251_and_bit196_and_bit192.into();
 
                     // add the hash to the memory pool
                     let instance = pedersen_trace.instance;
@@ -372,11 +399,11 @@ impl CairoExecutionTrace for ExecutionTrace {
         // Create dummy instances if there are cells that need to be filled
         let ecdsa_instances = air_private_input.ecdsa;
         let num_ecdsa_instances = ecdsa_instances.len() as u32;
-        let empty_ecdsa_instances = (num_ecdsa_instances..).map(EcdsaInstance::new_empty);
+        let ecdsa_dummy_traces = (num_ecdsa_instances..).map(ecdsa::InstanceTrace::new_dummy);
         let ecdsa_traces = ecdsa_instances
             .into_iter()
-            .chain(empty_ecdsa_instances)
-            .map(ecdsa::InstanceTrace::new);
+            .map(ecdsa::InstanceTrace::new)
+            .chain(ecdsa_dummy_traces);
 
         let (ecdsa_npc_steps, _) = npc_column.as_chunks_mut::<32768>();
         let (ecdsa_auxiliary_steps, _) = auxiliary_column.as_chunks_mut::<32768>();
@@ -454,6 +481,91 @@ impl CairoExecutionTrace for ExecutionTrace {
                 npc[Npc::EcdsaMessageVal as usize] = message;
             });
 
+        // Generate trace for bitwise builtin
+        // ==================================
+        let bitwise_memory_segment = air_public_input
+            .memory_segments
+            .bitwise
+            .expect("layout6 requires a bitwise memory segment");
+        let initial_bitwise_address = bitwise_memory_segment.begin_addr;
+
+        // Create dummy instances if there are cells that need to be filled
+        let bitwise_instances = air_private_input.bitwise;
+        let num_bitwise_instances = bitwise_instances.len() as u32;
+        let bitwise_dummy_instances = (num_bitwise_instances..).map(BitwiseInstance::new_empty);
+        let bitwise_traces = bitwise_instances
+            .into_iter()
+            .chain(bitwise_dummy_instances)
+            .map(bitwise::InstanceTrace::<DILUTED_CHECK_SPACING>::new);
+
+        let (bitwise_npc_steps, _) = npc_column.as_chunks_mut::<1024>();
+        let (bitwise_dilution_steps, _) = range_check_column.as_chunks_mut::<1024>();
+
+        ark_std::cfg_iter_mut!(bitwise_npc_steps)
+            .zip(bitwise_dilution_steps)
+            .zip(bitwise_traces)
+            .for_each(|((npc, dilution), bitwise_trace)| {
+                let instance = bitwise_trace.instance;
+
+                // NOTE: the order of these partitions matters
+                let partitions = [
+                    bitwise_trace.x_partition,
+                    bitwise_trace.y_partition,
+                    bitwise_trace.x_and_y_partition,
+                    bitwise_trace.x_xor_y_partition,
+                ];
+
+                // load diluted partitions into the execution trace
+                let (dilution_steps, _) = dilution.as_chunks_mut::<256>();
+                for (dilution_step, partition) in zip(dilution_steps, partitions) {
+                    let chunk0 = partition.low.low;
+                    dilution_step[Bitwise::Bits16Chunk0Offset0 as usize] = chunk0[0].into();
+                    dilution_step[Bitwise::Bits16Chunk0Offset1 as usize] = chunk0[1].into();
+                    dilution_step[Bitwise::Bits16Chunk0Offset2 as usize] = chunk0[2].into();
+                    dilution_step[Bitwise::Bits16Chunk0Offset3 as usize] = chunk0[3].into();
+
+                    let chunk1 = partition.low.high;
+                    dilution_step[Bitwise::Bits16Chunk1Offset0 as usize] = chunk1[0].into();
+                    dilution_step[Bitwise::Bits16Chunk1Offset1 as usize] = chunk1[1].into();
+                    dilution_step[Bitwise::Bits16Chunk1Offset2 as usize] = chunk1[2].into();
+                    dilution_step[Bitwise::Bits16Chunk1Offset3 as usize] = chunk1[3].into();
+
+                    let chunk2 = partition.low.high;
+                    dilution_step[Bitwise::Bits16Chunk2Offset0 as usize] = chunk2[0].into();
+                    dilution_step[Bitwise::Bits16Chunk2Offset1 as usize] = chunk2[1].into();
+                    dilution_step[Bitwise::Bits16Chunk2Offset2 as usize] = chunk2[2].into();
+                    dilution_step[Bitwise::Bits16Chunk2Offset3 as usize] = chunk2[3].into();
+
+                    let chunk3 = partition.low.high;
+                    dilution_step[Bitwise::Bits16Chunk3Offset0 as usize] = chunk3[0].into();
+                    dilution_step[Bitwise::Bits16Chunk3Offset1 as usize] = chunk3[1].into();
+                    dilution_step[Bitwise::Bits16Chunk3Offset2 as usize] = chunk3[2].into();
+                    dilution_step[Bitwise::Bits16Chunk3Offset3 as usize] = chunk3[3].into();
+                }
+
+                // load bitwise values into memory
+                let addr_step = BITWISE_RATIO * CYCLE_HEIGHT / 4;
+                let input_x_offset = Npc::BitwisePoolAddr as usize;
+                let input_y_offset = input_x_offset + addr_step;
+                let x_and_y_offset = input_y_offset + addr_step;
+                let x_xor_y_offset = x_and_y_offset + addr_step;
+                let x_or_y_offset = Npc::BitwiseXOrYAddr as usize;
+                let (input_x_addr, input_y_addr, x_and_y_addr, x_xor_y_addr, x_or_y_addr) =
+                    instance.mem_addr(initial_bitwise_address);
+                npc[input_x_offset] = input_x_addr.into();
+                npc[input_x_offset + 1] = bitwise_trace.x;
+                npc[input_y_offset] = input_y_addr.into();
+                npc[input_y_offset + 1] = bitwise_trace.y;
+                npc[x_and_y_offset] = x_and_y_addr.into();
+                npc[x_and_y_offset + 1] = bitwise_trace.x_and_y;
+                npc[x_xor_y_offset] = x_xor_y_addr.into();
+                npc[x_xor_y_offset + 1] = bitwise_trace.x_xor_y;
+                npc[x_or_y_offset] = x_or_y_addr.into();
+                npc[x_or_y_offset + 1] = bitwise_trace.x_or_y;
+            });
+
+        // VM Memory
+        // =========
         // generate the memory column by ordering memory accesses
         let memory_accesses: Vec<(Fp, Fp)> = npc_column
             .array_chunks()
@@ -497,6 +609,7 @@ impl CairoExecutionTrace for ExecutionTrace {
             initial_pedersen_address,
             initial_rc_address,
             initial_ecdsa_address,
+            initial_bitwise_address,
             _flags_column: flags_column,
             _auxiliary_column: auxiliary_column,
             _mem: mem,
@@ -521,6 +634,7 @@ impl CairoExecutionTrace for ExecutionTrace {
             initial_pedersen_address: Some(self.initial_pedersen_address),
             initial_rc_address: Some(self.initial_rc_address),
             initial_ecdsa_address: Some(self.initial_ecdsa_address),
+            initial_bitwise_address: Some(self.initial_bitwise_address),
         }
     }
 }

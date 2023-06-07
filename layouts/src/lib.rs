@@ -40,6 +40,7 @@ pub struct ExecutionInfo<Fp: Field> {
     pub initial_pedersen_address: Option<u32>,
     pub initial_rc_address: Option<u32>,
     pub initial_ecdsa_address: Option<u32>,
+    pub initial_bitwise_address: Option<u32>,
 }
 
 pub trait CairoAirConfig: AirConfig<PublicInputs = ExecutionInfo<<Self as AirConfig>::Fp>>

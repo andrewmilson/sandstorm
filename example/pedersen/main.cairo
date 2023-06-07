@@ -1,14 +1,15 @@
-%builtins output pedersen range_check ecdsa
+%builtins output pedersen range_check ecdsa bitwise
 
-from starkware.cairo.common.cairo_builtins import (HashBuiltin, SignatureBuiltin)
+from starkware.cairo.common.cairo_builtins import (HashBuiltin, SignatureBuiltin, BitwiseBuiltin)
 from starkware.cairo.common.hash import hash2
+from starkware.cairo.common.bitwise import bitwise_and
 from starkware.cairo.common.signature import (
     verify_ecdsa_signature,
 )
 
 // Implicit arguments: addresses of the output and pedersen
 // builtins.
-func main{output_ptr, pedersen_ptr: HashBuiltin*, range_check_ptr, ecdsa_ptr: SignatureBuiltin*}() {
+func main{output_ptr, pedersen_ptr: HashBuiltin*, range_check_ptr, ecdsa_ptr: SignatureBuiltin*, bitwise_ptr: BitwiseBuiltin*}() {
     // The following line implicitly updates the pedersen_ptr
     // reference to pedersen_ptr + 3.
     let (res) = hash2{hash_ptr=pedersen_ptr}(1, 2);
@@ -34,6 +35,9 @@ func main{output_ptr, pedersen_ptr: HashBuiltin*, range_check_ptr, ecdsa_ptr: Si
         signature_r=sig[0],
         signature_s=sig[1],
     );
+
+    let (prez) = bitwise_and(12, 10);  // Binary (1100, 1010).
+    assert prez = 8;  // Binary 1000.
 
     // output_ptr and pedersen_ptr will be implicitly returned.
     return ();

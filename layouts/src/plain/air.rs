@@ -551,6 +551,7 @@ impl<Fp: GpuFftField + PrimeField, Fq: StarkExtensionOf<Fp>> ministark::air::Air
             initial_pedersen_address: _,
             initial_rc_address: _,
             initial_ecdsa_address: _,
+            initial_bitwise_address: _,
         } = execution_info;
 
         let memory_product = utils::compute_public_memory_quotient(

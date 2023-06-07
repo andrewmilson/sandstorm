@@ -59,6 +59,10 @@ pub struct InstanceTrace {
     pub output: Fp,
     pub a_steps: Vec<ElementPartialStep>,
     pub b_steps: Vec<ElementPartialStep>,
+    pub a_bit251_and_bit196_and_bit192: bool,
+    pub a_bit251_and_bit196: bool,
+    pub b_bit251_and_bit196_and_bit192: bool,
+    pub b_bit251_and_bit196: bool,
 }
 
 impl InstanceTrace {
@@ -83,11 +87,27 @@ impl InstanceTrace {
         let output = pedersen_hash(a, b);
         assert_eq!(output, b_steps.last().unwrap().point.x);
 
+        let a_bit251 = instance.a.bit(251);
+        let a_bit196 = instance.a.bit(196);
+        let a_bit192 = instance.a.bit(192);
+        let a_bit251_and_bit196_and_bit192 = a_bit251 && a_bit196 && a_bit192;
+        let a_bit251_and_bit196 = a_bit251 && a_bit196;
+
+        let b_bit251 = instance.b.bit(251);
+        let b_bit196 = instance.b.bit(196);
+        let b_bit192 = instance.b.bit(192);
+        let b_bit251_and_bit196_and_bit192 = b_bit251 && b_bit196 && b_bit192;
+        let b_bit251_and_bit196 = b_bit251 && b_bit196;
+
         Self {
             instance,
             output,
             a_steps,
             b_steps,
+            a_bit251_and_bit196_and_bit192,
+            a_bit251_and_bit196,
+            b_bit251_and_bit196_and_bit192,
+            b_bit251_and_bit196,
         }
     }
 }

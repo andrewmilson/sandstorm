@@ -26,6 +26,11 @@ pub const RANGE_CHECK_BUILTIN_PARTS: usize = 8;
 pub const NUM_BASE_COLUMNS: usize = 9;
 pub const NUM_EXTENSION_COLUMNS: usize = 1;
 
+pub const DILUTED_CHECK_N_BITS: usize = 16;
+pub const DILUTED_CHECK_SPACING: usize = 4;
+
+pub const BITWISE_RATIO: usize = 64;
+
 pub const ECDSA_BUILTIN_RATIO: usize = 2048;
 pub const ECDSA_BUILTIN_REPETITIONS: usize = 1;
 pub const EC_OP_BUILTIN_RATIO: usize = 1024;

@@ -277,6 +277,7 @@ impl<Fp: GpuFftField + PrimeField, Fq: StarkExtensionOf<Fp>> CairoExecutionTrace
             initial_pedersen_address: None,
             initial_rc_address: None,
             initial_ecdsa_address: None,
+            initial_bitwise_address: None,
         }
     }
 }

@@ -145,6 +145,7 @@ pub struct MemorySegments {
     pub pedersen: Option<Segment>,
     pub range_check: Option<Segment>,
     pub ecdsa: Option<Segment>,
+    pub bitwise: Option<Segment>,
 }
 
 #[derive(Deserialize, Clone, Debug)]
@@ -178,10 +179,6 @@ pub struct EcdsaInstance {
 }
 
 impl EcdsaInstance {
-    pub fn new_empty(_index: u32) -> Self {
-        todo!()
-    }
-
     /// Get the memory address for this instance
     /// Output is of the form (pubkey_addr, msg_addr)
     pub fn mem_addr(&self, ecdsa_segment_addr: u32) -> (u32, u32) {
@@ -237,6 +234,39 @@ impl RangeCheckInstance {
     }
 }
 
+#[derive(Deserialize, Clone, Copy, Debug)]
+pub struct BitwiseInstance {
+    pub index: u32,
+    #[serde(deserialize_with = "deserialize_hex_str")]
+    pub x: U256,
+    #[serde(deserialize_with = "deserialize_hex_str")]
+    pub y: U256,
+}
+
+impl BitwiseInstance {
+    pub fn new_empty(index: u32) -> Self {
+        Self {
+            index,
+            x: U256::ZERO,
+            y: U256::ZERO,
+        }
+    }
+
+    /// Get the memory address for this instance
+    /// Output is of the form (x_addr, y_addr, x&y_addr, x^y_addr, x|y_addr)
+    // TODO: better to use struct. Could cause bug if user gets ordering wrong.
+    pub fn mem_addr(&self, bitwise_segment_addr: u32) -> (u32, u32, u32, u32, u32) {
+        let instance_offset = bitwise_segment_addr + self.index * 5;
+        (
+            instance_offset,
+            instance_offset + 1,
+            instance_offset + 2,
+            instance_offset + 3,
+            instance_offset + 4,
+        )
+    }
+}
+
 #[derive(Deserialize)]
 pub struct AirPrivateInput {
     pub trace_path: PathBuf,
@@ -244,6 +274,7 @@ pub struct AirPrivateInput {
     pub pedersen: Vec<PedersenInstance>,
     pub ecdsa: Vec<EcdsaInstance>,
     pub range_check: Vec<RangeCheckInstance>,
+    pub bitwise: Vec<BitwiseInstance>,
 }
 
 #[derive(Deserialize)]
