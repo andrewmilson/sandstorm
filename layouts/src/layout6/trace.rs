@@ -13,6 +13,7 @@ use binary::BitwiseInstance;
 use binary::PedersenInstance;
 use binary::RangeCheckInstance;
 use builtins::bitwise;
+use builtins::bitwise::dilute;
 use builtins::ecdsa;
 use builtins::pedersen;
 use ark_ff::One;
@@ -23,13 +24,19 @@ use num_bigint::BigUint;
 use ruint::aliases::U256;
 use crate::ExecutionInfo;
 use crate::layout6::BITWISE_RATIO;
+use crate::layout6::DILUTED_CHECK_N_BITS;
 use crate::layout6::DILUTED_CHECK_SPACING;
+use crate::layout6::DILUTED_CHECK_STEP;
 use crate::layout6::RANGE_CHECK_BUILTIN_PARTS;
 use crate::layout6::RANGE_CHECK_BUILTIN_RATIO;
 use crate::layout6::air::Bitwise;
+use crate::layout6::air::DilutedCheck;
+use crate::layout6::air::DilutedCheckAggregation;
+use crate::layout6::air::DilutedCheckPermutation;
 use crate::layout6::air::Ecdsa;
 use crate::layout6::air::Pedersen;
 use crate::layout6::air::RangeCheckBuiltin;
+use crate::utils::DilutedCheckPool;
 use crate::utils::RangeCheckPool;
 use super::air::Permutation;
 use super::air::RangeCheckPermutation;
@@ -135,7 +142,6 @@ impl CairoExecutionTrace for ExecutionTrace {
         let range_check_max = rc_pool.max().unwrap();
         let range_check_padding_value = Fp::from(range_check_max);
         let mut ordered_rc_padding_vals = ordered_rc_padding_vals.into_iter();
-        println!("original len: {}", ordered_rc_padding_vals.len());
         let mut ordered_rc_vals = ordered_rc_vals.into_iter();
         let mut range_check_column = Vec::new_in(GpuAllocator);
         range_check_column.resize(trace_len, range_check_padding_value);
@@ -261,11 +267,12 @@ impl CairoExecutionTrace for ExecutionTrace {
 
         // Diluted check
         // =============
-        let (dilution_check_steps, _) = range_check_column.as_chunks_mut::<8>();
-
+        // due to how the range-check/diluted-check column is initiated we need to clear
+        // all diluted check cells by setting them to `0`.
+        let (dilution_check_steps, _) = range_check_column.as_chunks_mut::<DILUTED_CHECK_STEP>();
         ark_std::cfg_iter_mut!(dilution_check_steps).for_each(|dilution_check_step| {
-            dilution_check_step[1] = Fp::ZERO;
-            dilution_check_step[5] = Fp::ZERO;
+            dilution_check_step[DilutedCheck::Unordered as usize] = Fp::ZERO;
+            dilution_check_step[DilutedCheck::Ordered as usize] = Fp::ZERO;
         });
 
         // Generate trace for pedersen hash
@@ -279,7 +286,7 @@ impl CairoExecutionTrace for ExecutionTrace {
         let mut pedersen_slopes_column = Vec::new_in(GpuAllocator);
         pedersen_slopes_column.resize(trace_len, Fp::zero());
 
-        // The trace for each hash spans 512 rows
+        // the trace for each hash spans 512 rows
         let (pedersen_partial_xs_steps, _) = pedersen_partial_xs_column.as_chunks_mut::<512>();
         let (pedersen_partial_ys_steps, _) = pedersen_partial_ys_column.as_chunks_mut::<512>();
         let (pedersen_suffixes_steps, _) = pedersen_suffixes_column.as_chunks_mut::<512>();
@@ -287,7 +294,7 @@ impl CairoExecutionTrace for ExecutionTrace {
         let (pedersen_npc_steps, _) = npc_column.as_chunks_mut::<512>();
         let (pedersen_aux_steps, _) = auxiliary_column.as_chunks_mut::<512>();
 
-        // Create dummy instances if there are cells that need to be filled
+        // create dummy instances if there are cells that need to be filled
         let pedersen_instances = air_private_input.pedersen;
         let num_pedersen_instances = pedersen_instances.len() as u32;
         let empty_pedersen_instances = (num_pedersen_instances..).map(PedersenInstance::new_empty);
@@ -302,7 +309,7 @@ impl CairoExecutionTrace for ExecutionTrace {
             .expect("layout6 requires a pedersen memory segment");
         let initial_pedersen_address = pedersen_memory_segment.begin_addr;
 
-        // Load individual hash traces into the global execution trace
+        // load individual hash traces into the global execution trace
         ark_std::cfg_iter_mut!(pedersen_partial_xs_steps)
             .zip(pedersen_partial_ys_steps)
             .zip(pedersen_suffixes_steps)
@@ -483,13 +490,15 @@ impl CairoExecutionTrace for ExecutionTrace {
 
         // Generate trace for bitwise builtin
         // ==================================
+        // TODO: clean up this section. make type for builtins that manages a lot of
+        // this logic. everything is a sprawled mess
         let bitwise_memory_segment = air_public_input
             .memory_segments
             .bitwise
             .expect("layout6 requires a bitwise memory segment");
         let initial_bitwise_address = bitwise_memory_segment.begin_addr;
 
-        // Create dummy instances if there are cells that need to be filled
+        // create dummy instances if there are cells that need to be filled
         let bitwise_instances = air_private_input.bitwise;
         let num_bitwise_instances = bitwise_instances.len() as u32;
         let bitwise_dummy_instances = (num_bitwise_instances..).map(BitwiseInstance::new_empty);
@@ -501,89 +510,164 @@ impl CairoExecutionTrace for ExecutionTrace {
         let (bitwise_npc_steps, _) = npc_column.as_chunks_mut::<1024>();
         let (bitwise_dilution_steps, _) = range_check_column.as_chunks_mut::<1024>();
 
-        ark_std::cfg_iter_mut!(bitwise_npc_steps)
+        // TODO: how does fold work with par_iter? Does it kill parallelism?
+        // might be better to map multiple pools and then fold into one if so.
+        let diluted_check_pool = ark_std::cfg_iter_mut!(bitwise_npc_steps)
             .zip(bitwise_dilution_steps)
             .zip(bitwise_traces)
-            .for_each(|((npc, dilution), bitwise_trace)| {
-                let instance = bitwise_trace.instance;
+            .fold(
+                DilutedCheckPool::<DILUTED_CHECK_N_BITS, DILUTED_CHECK_SPACING>::new(),
+                |mut diluted_pool, ((npc, dilution), bitwise_trace)| {
+                    let instance = bitwise_trace.instance;
 
+                    {
+                        // add shifts to ensure a unique unpacking
+                        let x_and_y_v0 = bitwise_trace.x_and_y_partition.high.high[0];
+                        let x_and_y_v1 = bitwise_trace.x_and_y_partition.high.high[1];
+                        let x_and_y_v2 = bitwise_trace.x_and_y_partition.high.high[2];
+                        let x_and_y_v3 = bitwise_trace.x_and_y_partition.high.high[3];
+                        let v0 = x_and_y_v0 + bitwise_trace.x_xor_y_partition.high.high[0];
+                        let v1 = x_and_y_v1 + bitwise_trace.x_xor_y_partition.high.high[1];
+                        let v2 = x_and_y_v2 + bitwise_trace.x_xor_y_partition.high.high[2];
+                        let v3 = x_and_y_v3 + bitwise_trace.x_xor_y_partition.high.high[3];
+                        // only fails if the AIR will error
+                        assert_eq!(v0, (v0 << 4) >> 4);
+                        assert_eq!(v1, (v1 << 4) >> 4);
+                        assert_eq!(v2, (v2 << 4) >> 4);
+                        assert_eq!(v3, (v3 << 8) >> 8);
+                        let s0 = v0 << 4;
+                        let s1 = v1 << 4;
+                        let s2 = v2 << 4;
+                        let s3 = v3 << 8;
+                        diluted_pool.push_diluted(U256::from(s0));
+                        diluted_pool.push_diluted(U256::from(s1));
+                        diluted_pool.push_diluted(U256::from(s2));
+                        diluted_pool.push_diluted(U256::from(s3));
+                        dilution[Bitwise::Bits16Chunk3Offset0ResShifted as usize] = s0.into();
+                        dilution[Bitwise::Bits16Chunk3Offset1ResShifted as usize] = s1.into();
+                        dilution[Bitwise::Bits16Chunk3Offset2ResShifted as usize] = s2.into();
+                        dilution[Bitwise::Bits16Chunk3Offset3ResShifted as usize] = s3.into();
+                    }
+
+                    // NOTE: the order of these partitions matters
+                    let partitions = [
+                        bitwise_trace.x_partition,
+                        bitwise_trace.y_partition,
+                        bitwise_trace.x_and_y_partition,
+                        bitwise_trace.x_xor_y_partition,
+                    ];
+
+                    // load diluted partitions into the execution trace
+                    let (dilution_steps, _) = dilution.as_chunks_mut::<256>();
+                    for (dilution_step, partition) in zip(dilution_steps, partitions) {
+                        let chunk0 = partition.low.low;
+                        dilution_step[Bitwise::Bits16Chunk0Offset0 as usize] = chunk0[0].into();
+                        dilution_step[Bitwise::Bits16Chunk0Offset1 as usize] = chunk0[1].into();
+                        dilution_step[Bitwise::Bits16Chunk0Offset2 as usize] = chunk0[2].into();
+                        dilution_step[Bitwise::Bits16Chunk0Offset3 as usize] = chunk0[3].into();
+
+                        let chunk1 = partition.low.high;
+                        dilution_step[Bitwise::Bits16Chunk1Offset0 as usize] = chunk1[0].into();
+                        dilution_step[Bitwise::Bits16Chunk1Offset1 as usize] = chunk1[1].into();
+                        dilution_step[Bitwise::Bits16Chunk1Offset2 as usize] = chunk1[2].into();
+                        dilution_step[Bitwise::Bits16Chunk1Offset3 as usize] = chunk1[3].into();
+
+                        let chunk2 = partition.high.low;
+                        dilution_step[Bitwise::Bits16Chunk2Offset0 as usize] = chunk2[0].into();
+                        dilution_step[Bitwise::Bits16Chunk2Offset1 as usize] = chunk2[1].into();
+                        dilution_step[Bitwise::Bits16Chunk2Offset2 as usize] = chunk2[2].into();
+                        dilution_step[Bitwise::Bits16Chunk2Offset3 as usize] = chunk2[3].into();
+
+                        let chunk3 = partition.high.high;
+                        dilution_step[Bitwise::Bits16Chunk3Offset0 as usize] = chunk3[0].into();
+                        dilution_step[Bitwise::Bits16Chunk3Offset1 as usize] = chunk3[1].into();
+                        dilution_step[Bitwise::Bits16Chunk3Offset2 as usize] = chunk3[2].into();
+                        dilution_step[Bitwise::Bits16Chunk3Offset3 as usize] = chunk3[3].into();
+
+                        for v in chunk0
+                            .into_iter()
+                            .chain(chunk1.into_iter())
+                            .chain(chunk2.into_iter())
+                            .chain(chunk3.into_iter())
+                        {
+                            diluted_pool.push_diluted(U256::from(v))
+                        }
+                    }
+
+                    // load bitwise values into memory
+                    let addr_step = BITWISE_RATIO * CYCLE_HEIGHT / 4;
+                    let input_x_offset = Npc::BitwisePoolAddr as usize;
+                    let input_y_offset = input_x_offset + addr_step;
+                    let x_and_y_offset = input_y_offset + addr_step;
+                    let x_xor_y_offset = x_and_y_offset + addr_step;
+                    let x_or_y_offset = Npc::BitwiseXOrYAddr as usize;
+                    let (input_x_addr, input_y_addr, x_and_y_addr, x_xor_y_addr, x_or_y_addr) =
+                        instance.mem_addr(initial_bitwise_address);
+                    npc[input_x_offset] = input_x_addr.into();
+                    npc[input_x_offset + 1] = bitwise_trace.x;
+                    npc[input_y_offset] = input_y_addr.into();
+                    npc[input_y_offset + 1] = bitwise_trace.y;
+                    npc[x_and_y_offset] = x_and_y_addr.into();
+                    npc[x_and_y_offset + 1] = bitwise_trace.x_and_y;
+                    npc[x_xor_y_offset] = x_xor_y_addr.into();
+                    npc[x_xor_y_offset + 1] = bitwise_trace.x_xor_y;
+                    npc[x_or_y_offset] = x_or_y_addr.into();
+                    npc[x_or_y_offset + 1] = bitwise_trace.x_or_y;
+
+                    // return the diluted pool
+                    diluted_pool
+                },
+            );
+
+        // make sure all diluted check values are encountered for
+        const DILUTED_MIN: u128 = 0;
+        const DILUTED_MAX: u128 = (1 << DILUTED_CHECK_N_BITS) - 1;
+        let (ordered_diluted_vals, ordered_diluted_padding_vals) =
+            diluted_check_pool.get_ordered_values_with_padding(DILUTED_MIN, DILUTED_MAX);
+        let mut ordered_diluted_vals = ordered_diluted_vals.into_iter();
+        let mut ordered_diluted_padding_vals = ordered_diluted_padding_vals.into_iter();
+
+        // add diluted padding values
+        // TODO: this is a strange way to do it. fix
+        let (bitwise_dilution_chunks, _) = range_check_column.as_chunks_mut::<1024>();
+        'outer: for bitwise_dilution_chunk in bitwise_dilution_chunks {
+            for (i, dilution_step) in bitwise_dilution_chunk
+                .array_chunks_mut::<DILUTED_CHECK_STEP>()
+                .enumerate()
+                .skip(1)
+                .step_by(2)
+            {
+                let offset = i * DILUTED_CHECK_STEP + DilutedCheck::Unordered as usize;
+                // NOTE: doing it this hacky way to ensure no conflict with the bitwise builtin
+                // CONTEXT: each cycle spans 16 steps, there are two stacked dilutions per cycle
+                if offset != Bitwise::Bits16Chunk3Offset0ResShifted as usize
+                    && offset != Bitwise::Bits16Chunk3Offset1ResShifted as usize
+                    && offset != Bitwise::Bits16Chunk3Offset2ResShifted as usize
+                    && offset != Bitwise::Bits16Chunk3Offset3ResShifted as usize
                 {
-                    // add shifts to ensure a unique unpacking
-                    let x_and_y_v0 = bitwise_trace.x_and_y_partition.high.high[0];
-                    let x_and_y_v1 = bitwise_trace.x_and_y_partition.high.high[1];
-                    let x_and_y_v2 = bitwise_trace.x_and_y_partition.high.high[2];
-                    let x_and_y_v3 = bitwise_trace.x_and_y_partition.high.high[3];
-                    let v0 = x_and_y_v0 + bitwise_trace.x_xor_y_partition.high.high[0];
-                    let v1 = x_and_y_v1 + bitwise_trace.x_xor_y_partition.high.high[1];
-                    let v2 = x_and_y_v2 + bitwise_trace.x_xor_y_partition.high.high[2];
-                    let v3 = x_and_y_v3 + bitwise_trace.x_xor_y_partition.high.high[3];
-                    // only fails if the AIR will error
-                    assert_eq!(v0, (v0 << 4) >> 4);
-                    assert_eq!(v1, (v1 << 4) >> 4);
-                    assert_eq!(v2, (v2 << 4) >> 4);
-                    assert_eq!(v3, (v3 << 8) >> 8);
-                    dilution[Bitwise::Bits16Chunk3Offset0ResShifted as usize] = (v0 << 4).into();
-                    dilution[Bitwise::Bits16Chunk3Offset1ResShifted as usize] = (v1 << 4).into();
-                    dilution[Bitwise::Bits16Chunk3Offset2ResShifted as usize] = (v2 << 4).into();
-                    dilution[Bitwise::Bits16Chunk3Offset3ResShifted as usize] = (v3 << 8).into();
+                    let padding_val = match ordered_diluted_padding_vals.next() {
+                        Some(v) => dilute::<DILUTED_CHECK_SPACING>(U256::from(v)),
+                        None => break 'outer,
+                    };
+
+                    dilution_step[DilutedCheck::Unordered as usize] =
+                        BigUint::from(padding_val).into();
                 }
+            }
+        }
 
-                // NOTE: the order of these partitions matters
-                let partitions = [
-                    bitwise_trace.x_partition,
-                    bitwise_trace.y_partition,
-                    bitwise_trace.x_and_y_partition,
-                    bitwise_trace.x_xor_y_partition,
-                ];
+        // add ordered diluted check values
+        let (diluted_check_steps, _) = range_check_column.as_chunks_mut::<DILUTED_CHECK_STEP>();
+        let padding_offset = diluted_check_steps.len() - ordered_diluted_vals.len();
+        for diluted_check_step in diluted_check_steps.iter_mut().skip(padding_offset) {
+            let val = ordered_diluted_vals.next().unwrap();
+            let diluted_val = dilute::<DILUTED_CHECK_SPACING>(U256::from(val));
+            diluted_check_step[DilutedCheck::Ordered as usize] = BigUint::from(diluted_val).into();
+        }
 
-                // load diluted partitions into the execution trace
-                let (dilution_steps, _) = dilution.as_chunks_mut::<256>();
-                for (dilution_step, partition) in zip(dilution_steps, partitions) {
-                    let chunk0 = partition.low.low;
-                    dilution_step[Bitwise::Bits16Chunk0Offset0 as usize] = chunk0[0].into();
-                    dilution_step[Bitwise::Bits16Chunk0Offset1 as usize] = chunk0[1].into();
-                    dilution_step[Bitwise::Bits16Chunk0Offset2 as usize] = chunk0[2].into();
-                    dilution_step[Bitwise::Bits16Chunk0Offset3 as usize] = chunk0[3].into();
-
-                    let chunk1 = partition.low.high;
-                    dilution_step[Bitwise::Bits16Chunk1Offset0 as usize] = chunk1[0].into();
-                    dilution_step[Bitwise::Bits16Chunk1Offset1 as usize] = chunk1[1].into();
-                    dilution_step[Bitwise::Bits16Chunk1Offset2 as usize] = chunk1[2].into();
-                    dilution_step[Bitwise::Bits16Chunk1Offset3 as usize] = chunk1[3].into();
-
-                    let chunk2 = partition.high.low;
-                    dilution_step[Bitwise::Bits16Chunk2Offset0 as usize] = chunk2[0].into();
-                    dilution_step[Bitwise::Bits16Chunk2Offset1 as usize] = chunk2[1].into();
-                    dilution_step[Bitwise::Bits16Chunk2Offset2 as usize] = chunk2[2].into();
-                    dilution_step[Bitwise::Bits16Chunk2Offset3 as usize] = chunk2[3].into();
-
-                    let chunk3 = partition.high.high;
-                    dilution_step[Bitwise::Bits16Chunk3Offset0 as usize] = chunk3[0].into();
-                    dilution_step[Bitwise::Bits16Chunk3Offset1 as usize] = chunk3[1].into();
-                    dilution_step[Bitwise::Bits16Chunk3Offset2 as usize] = chunk3[2].into();
-                    dilution_step[Bitwise::Bits16Chunk3Offset3 as usize] = chunk3[3].into();
-                }
-
-                // load bitwise values into memory
-                let addr_step = BITWISE_RATIO * CYCLE_HEIGHT / 4;
-                let input_x_offset = Npc::BitwisePoolAddr as usize;
-                let input_y_offset = input_x_offset + addr_step;
-                let x_and_y_offset = input_y_offset + addr_step;
-                let x_xor_y_offset = x_and_y_offset + addr_step;
-                let x_or_y_offset = Npc::BitwiseXOrYAddr as usize;
-                let (input_x_addr, input_y_addr, x_and_y_addr, x_xor_y_addr, x_or_y_addr) =
-                    instance.mem_addr(initial_bitwise_address);
-                npc[input_x_offset] = input_x_addr.into();
-                npc[input_x_offset + 1] = bitwise_trace.x;
-                npc[input_y_offset] = input_y_addr.into();
-                npc[input_y_offset + 1] = bitwise_trace.y;
-                npc[x_and_y_offset] = x_and_y_addr.into();
-                npc[x_and_y_offset + 1] = bitwise_trace.x_and_y;
-                npc[x_xor_y_offset] = x_xor_y_addr.into();
-                npc[x_xor_y_offset + 1] = bitwise_trace.x_xor_y;
-                npc[x_or_y_offset] = x_or_y_addr.into();
-                npc[x_or_y_offset + 1] = bitwise_trace.x_or_y;
-            });
+        // ensure dilution check values have been fully consumed
+        assert!(ordered_diluted_padding_vals.next().is_none());
+        assert!(ordered_diluted_vals.next().is_none());
 
         // VM Memory
         // =========
@@ -672,7 +756,7 @@ impl Trace for ExecutionTrace {
 
     fn build_extension_columns(&self, challenges: &Challenges<Fp>) -> Option<Matrix<Fp>> {
         // TODO: multithread
-        // Generate memory permutation product
+        // generate memory permutation product
         // ===================================
         // see distinction between (a', v') and (a, v) in the Cairo paper.
         let z = challenges[MemoryPermutation::Z];
@@ -690,8 +774,9 @@ impl Trace for ExecutionTrace {
             mem_perm_denominators.push(denominator_acc);
         }
         batch_inversion(&mut mem_perm_denominators);
+        let mem_perm_denominators_inv = mem_perm_denominators;
 
-        // Generate range check permutation product
+        // generate range check permutation product
         // ========================================
         let z = challenges[RangeCheckPermutation::Z];
         let range_check_chunks = self.range_check_column.array_chunks::<RANGE_CHECK_STEP>();
@@ -705,20 +790,65 @@ impl Trace for ExecutionTrace {
             rc_perm_numerators.push(numerator_acc);
             rc_perm_denominators.push(denominator_acc);
         }
+        assert!((numerator_acc / denominator_acc).is_one());
         batch_inversion(&mut rc_perm_denominators);
-        debug_assert!((numerator_acc / denominator_acc).is_one());
+        let rc_perm_denominators_inv = rc_perm_denominators;
+
+        // generate diluted check permutation product
+        // ==========================================
+        let z = challenges[DilutedCheckPermutation::Z];
+        let diluted_check_chunks = self.range_check_column.array_chunks::<DILUTED_CHECK_STEP>();
+        let mut dc_perm_numerators = Vec::new();
+        let mut dc_perm_denominators = Vec::new();
+        let mut numerator_acc = Fp::one();
+        let mut denominator_acc = Fp::one();
+        for chunk in diluted_check_chunks {
+            numerator_acc *= z - chunk[DilutedCheck::Unordered as usize];
+            denominator_acc *= z - chunk[DilutedCheck::Ordered as usize];
+            dc_perm_numerators.push(numerator_acc);
+            dc_perm_denominators.push(denominator_acc);
+        }
+        assert!((numerator_acc / denominator_acc).is_one());
+        batch_inversion(&mut dc_perm_denominators);
+        let dc_perm_denominators_inv = dc_perm_denominators;
 
         let mut permutation_column = Vec::new_in(GpuAllocator);
         permutation_column.resize(self.base_columns().num_rows(), Fp::zero());
 
-        // Insert intermediate memory permutation results
-        for (i, (n, d)) in zip(mem_perm_numerators, mem_perm_denominators).enumerate() {
-            permutation_column[i * MEMORY_STEP + Permutation::Memory as usize] = n * d;
+        // insert intermediate memory permutation results
+        for (i, (n, d_inv)) in zip(mem_perm_numerators, mem_perm_denominators_inv).enumerate() {
+            permutation_column[i * MEMORY_STEP + Permutation::Memory as usize] = n * d_inv;
         }
 
-        // Insert intermediate range check results
-        for (i, (n, d)) in zip(rc_perm_numerators, rc_perm_denominators).enumerate() {
-            permutation_column[i * RANGE_CHECK_STEP + Permutation::RangeCheck as usize] = n * d;
+        // insert intermediate range check results
+        for (i, (n, d_inv)) in zip(rc_perm_numerators, rc_perm_denominators_inv).enumerate() {
+            permutation_column[i * RANGE_CHECK_STEP + Permutation::RangeCheck as usize] = n * d_inv;
+        }
+
+        // insert intermediate diluted check results
+        for (i, (n, d_inv)) in zip(dc_perm_numerators, dc_perm_denominators_inv).enumerate() {
+            permutation_column[i * DILUTED_CHECK_STEP + Permutation::DilutedCheck as usize] =
+                n * d_inv;
+        }
+
+        // generate aggregation of diluted checks
+        // ======================================
+        let z = challenges[DilutedCheckAggregation::Z];
+        let alpha = challenges[DilutedCheckAggregation::A];
+        let (diluted_check_chunks, _) = self.range_check_column.as_chunks::<DILUTED_CHECK_STEP>();
+
+        // insert initial value
+        let initial = Fp::one();
+        permutation_column[DilutedCheck::Aggregate as usize] = initial;
+
+        // insert intermediate aggregation results
+        let mut acc = initial;
+        for (i, [prev_step, curr_step]) in zip(1.., diluted_check_chunks.array_windows()) {
+            let prev = prev_step[DilutedCheck::Ordered as usize];
+            let curr = curr_step[DilutedCheck::Ordered as usize];
+            let u = curr - prev;
+            acc = acc * (Fp::ONE + z * u) + alpha * u.square();
+            permutation_column[i * DILUTED_CHECK_STEP + DilutedCheck::Aggregate as usize] = acc;
         }
 
         Some(Matrix::new(vec![permutation_column]))

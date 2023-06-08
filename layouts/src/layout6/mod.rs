@@ -15,6 +15,7 @@ pub const CYCLE_HEIGHT: usize = 16;
 pub const PUBLIC_MEMORY_STEP: usize = 8;
 pub const MEMORY_STEP: usize = 2;
 pub const RANGE_CHECK_STEP: usize = 4;
+pub const DILUTED_CHECK_STEP: usize = 8;
 
 /// How many cycles per pedersen hash
 pub const PEDERSEN_BUILTIN_RATIO: usize = 32;

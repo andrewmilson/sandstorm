@@ -125,11 +125,24 @@ impl<const SPACING: usize> InstanceTrace<SPACING> {
 }
 
 /// Dilutes input v by interspersing `SPACING - 1` many 0s between bits
-/// E.g. `SPACING=4, BITS=4, v=0b1111, diluted_v=0001000100010001`
-fn dilute<const N_BITS: usize, const SPACING: usize>(v: U256) -> U256 {
+/// E.g. `SPACING=4, v=0b1111, diluted_v=0001000100010001`
+pub fn dilute<const SPACING: usize>(v: U256) -> U256 {
     let mut res = U256::ZERO;
-    for i in 0..N_BITS {
-        res = (res << SPACING) | ((v >> (N_BITS - i)) & uint!(1_U256))
+    for i in 1..=U256::BITS {
+        res = (res << SPACING) | ((v >> (U256::BITS - i)) & uint!(1_U256))
     }
     res
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::bitwise::dilute;
+    use ruint::aliases::U256;
+
+    #[test]
+    fn dilute_works() {
+        let input = U256::from(0b101u32);
+
+        assert_eq!(U256::from(0b0001_0000_0001u32), dilute::<4>(input))
+    }
 }

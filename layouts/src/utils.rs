@@ -1,8 +1,10 @@
 use crate::layout6::PUBLIC_MEMORY_STEP;
 use ark_ff::PrimeField;
 use binary::CompiledProgram;
+use builtins::bitwise::dilute;
 use ministark::StarkExtensionOf;
 use ministark_gpu::GpuFftField;
+use num_bigint::BigUint;
 use ruint::aliases::U256;
 use ruint::uint;
 
@@ -36,7 +38,7 @@ pub fn compute_public_memory_quotient<Fp: GpuFftField + PrimeField, Fq: StarkExt
     numerator / (denominator * padding)
 }
 
-/// Adapted from https://github.com/starkware-libs/starkex-contracts
+/// Source: https://github.com/starkware-libs/starkex-contracts
 ///
 /// # Context
 /// The cumulative value is defined using the following recursive formula:
@@ -85,16 +87,16 @@ pub fn compute_diluted_cumulative_value<
     let diff_multiplier = Fp::from(1u64 << SPACING);
     let mut diff_x = Fp::from((1u64 << SPACING) - 2);
     // Initialize p, q and x to p_1, q_1 and x_0 respectively.
-    let mut p = z + Fp::ONE;
+    let mut p = z + Fq::ONE;
     let mut q = Fq::ONE;
     let mut x = Fq::ONE;
-    for _ in 0..N_BITS {
+    for _ in 1..N_BITS {
         x += diff_x;
         diff_x *= diff_multiplier;
         // To save multiplications, store intermediate values.
-        let x_p = x * p;
-        let y = p + z * x_p;
-        q = q * y + x * x_p + q;
+        let xp = x * p;
+        let y = p + z * xp;
+        q += q * y + x * xp;
         p *= y;
     }
     p + q * alpha
@@ -205,20 +207,21 @@ pub struct DilutedCheckPool<const N_BITS: usize, const SPACING: usize>(Vec<u128>
 
 impl<const N_BITS: usize, const SPACING: usize> DilutedCheckPool<N_BITS, SPACING> {
     pub fn new() -> Self {
-        assert!(N_BITS <= 128);
+        assert!(N_BITS > 0 && N_BITS <= 128);
         assert!(SPACING * N_BITS <= 256);
         Self(Vec::new())
     }
 
     /// Pushes a binary value without dilution to the pool
     pub fn push(&mut self, v: u128) {
-        assert!(v.ilog2() < N_BITS as u32);
+        let bit_len = u128::BITS - v.leading_zeros();
+        assert!(bit_len <= N_BITS as u32);
         self.0.push(v)
     }
 
     /// Pushes a binary value with dilution to the pool
     pub fn push_diluted(&mut self, v: U256) {
-        assert!(v.log2() <= (N_BITS - 1) * SPACING);
+        assert!(v.bit_len() <= (N_BITS - 1) * SPACING + 1);
         debug_assert!({
             // check all non diluted bits are zero
             let mut res = v;
@@ -256,17 +259,31 @@ impl<const N_BITS: usize, const SPACING: usize> DilutedCheckPool<N_BITS, SPACING
     /// as padding. This padding is added to the ordered list of values and the
     /// padding used is also provided. Output is of the form `(ordered_vals,
     /// padding_vals)` in their regular form without dilution.
-    pub fn get_ordered_values_with_padding(&self) -> (Vec<u128>, Vec<u128>) {
+    pub fn get_ordered_values_with_padding(&self, min: u128, max: u128) -> (Vec<u128>, Vec<u128>) {
+        if self.0.is_empty() {
+            return (Vec::new(), (min..=max).collect());
+        }
+
         let mut ordered_vals = self.0.clone();
         ordered_vals.sort();
 
         // range check values need to be continuos therefore any gaps
         // e.g. [..., 3, 4, 7, 8, ...] need to be filled with [5, 6] as padding.
         let mut padding_vals = Vec::new();
+
+        let first = *ordered_vals.first().unwrap();
+        assert!(first >= min);
+        for v in min..first {
+            padding_vals.push(v);
+        }
+
+        let last = *ordered_vals.last().unwrap();
+        assert!(last <= max);
+        for v in last + 1..=max {
+            padding_vals.push(v);
+        }
+
         for &[a, b] in ordered_vals.array_windows() {
-            // if u16::saturating_add(a, 1) != b && a != b {
-            //     println!("gap: {a}->{b}");
-            // }
             for v in u128::saturating_add(a, 1)..b {
                 padding_vals.push(v);
             }
@@ -282,6 +299,14 @@ impl<const N_BITS: usize, const SPACING: usize> DilutedCheckPool<N_BITS, SPACING
         ordered_vals.sort();
 
         (ordered_vals, padding_vals)
+    }
+
+    pub fn min(&self) -> Option<u128> {
+        self.0.iter().min().copied()
+    }
+
+    pub fn max(&self) -> Option<u128> {
+        self.0.iter().max().copied()
     }
 }
 
@@ -310,9 +335,6 @@ impl RangeCheckPool {
         // e.g. [..., 3, 4, 7, 8, ...] need to be filled with [5, 6] as padding.
         let mut padding_vals = Vec::new();
         for &[a, b] in ordered_vals.array_windows() {
-            // if u16::saturating_add(a, 1) != b && a != b {
-            //     println!("gap: {a}->{b}");
-            // }
             for v in u16::saturating_add(a, 1)..b {
                 padding_vals.push(v);
             }

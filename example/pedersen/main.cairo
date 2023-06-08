@@ -45,6 +45,20 @@ func main{output_ptr, pedersen_ptr: HashBuiltin*, range_check_ptr, ecdsa_ptr: Si
     );
     assert yoyo = 1190020890442526208725573243584847930292605552660038159110459769316048045408;
 
+
+
+
+    let (yo1) = bitwise_and(0, 0);
+    assert yo1 = 0;
+    let (yo2) = bitwise_and(0, 0);
+    assert yo2 = 0;
+    let (yo3) = bitwise_and(0, 0);
+    assert yo3 = 0;
+    let (yo4) = bitwise_and(0, 0);
+    assert yo4 = 0;
+    let (yo5) = bitwise_and(0, 0);
+    assert yo5 = 0;
+
     // output_ptr and pedersen_ptr will be implicitly returned.
     return ();
 }

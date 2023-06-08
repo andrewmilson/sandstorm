@@ -9,10 +9,13 @@ use super::PUBLIC_MEMORY_STEP;
 use super::RANGE_CHECK_BUILTIN_PARTS;
 use super::RANGE_CHECK_BUILTIN_RATIO;
 use super::RANGE_CHECK_STEP;
+use crate::layout6::DILUTED_CHECK_N_BITS;
+use crate::layout6::DILUTED_CHECK_SPACING;
 use crate::layout6::ECDSA_SIG_CONFIG_ALPHA;
 use crate::layout6::ECDSA_SIG_CONFIG_BETA;
 use crate::utils;
 use crate::ExecutionInfo;
+use crate::utils::compute_diluted_cumulative_value;
 use ark_poly::EvaluationDomain;
 use ark_poly::Radix2EvaluationDomain;
 use builtins::ecdsa;
@@ -556,8 +559,7 @@ impl ministark::air::AirConfig for AirConfig {
             * &first_row_zerofier_inv;
 
         // Diluted checks operate every 8 rows (twice per cycle)
-        let zerofier_8th_last_row =
-            X - Constant(FieldVariant::Fp(g.pow([512 * (n as u64 / 512 - 1)])));
+        let zerofier_8th_last_row = X - Constant(FieldVariant::Fp(g.pow([8 * (n as u64 / 8 - 1)])));
         let zerofier_8th_last_row_inv = &one / &zerofier_8th_last_row;
         let every_8_row_zerofier = X.pow(8) - &one;
         let every_8_row_zerofier_inv = &one / &every_8_row_zerofier;
@@ -577,7 +579,7 @@ impl ministark::air::AirConfig for AirConfig {
             * &zerofier_8th_last_row_inv;
 
         // Initial aggregate value should be =1
-        let diluted_check_init = DilutedCheck::Aggregate.curr() * &first_row_zerofier_inv;
+        let diluted_check_init = (DilutedCheck::Aggregate.curr() - &one) * &first_row_zerofier_inv;
 
         // Check first, in-order, diluted value
         let diluted_check_first_element =
@@ -1677,13 +1679,13 @@ impl ministark::air::AirConfig for AirConfig {
             rc16_diff_is_bit,
             rc16_minimum,
             rc16_maximum,
-            // diluted_check_permutation_init0,
-            // diluted_check_permutation_step0,
-            // diluted_check_permutation_last,
-            // diluted_check_init,
-            // diluted_check_first_element,
-            // diluted_check_step,
-            // diluted_check_last,
+            diluted_check_permutation_init0,
+            diluted_check_permutation_step0,
+            diluted_check_permutation_last,
+            diluted_check_init,
+            diluted_check_first_element,
+            diluted_check_step,
+            diluted_check_last,
             // // TODO: understand these constraints
             // pedersen_hash0_ec_subset_sub_bit_unpacking_last_one_is_zero,
             // pedersen_hash0_ec_subset_sub_bit_unpacking_zeros_between_ones,
@@ -1810,16 +1812,15 @@ impl ministark::air::AirConfig for AirConfig {
             *public_memory_padding_value,
         );
 
-        let diluted_cumulative_val = Fp::ONE;
-        // let diluted_cumulative_val = compute_diluted_cumulative_value::<
-        //     Fp,
-        //     Fp,
-        //     DILUTED_CHECK_N_BITS,
-        //     DILUTED_CHECK_SPACING,
-        // >(
-        //     challenges[DilutedCheckAggregation::Z],
-        //     challenges[DilutedCheckAggregation::A],
-        // );
+        let diluted_cumulative_val = compute_diluted_cumulative_value::<
+            Fp,
+            Fp,
+            DILUTED_CHECK_N_BITS,
+            DILUTED_CHECK_SPACING,
+        >(
+            challenges[DilutedCheckAggregation::Z],
+            challenges[DilutedCheckAggregation::A],
+        );
 
         assert!(range_check_min <= range_check_max);
 
