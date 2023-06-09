@@ -342,7 +342,7 @@ impl CairoExecutionTrace for ExecutionTrace {
                         *slope = step.slope;
                     }
 
-                    // load fields for bit decomposition checks into the trace
+                    // load fields for unique bit decomposition checks into the trace
                     let (a_slopes, b_slopes) = slopes.split_at_mut(256);
                     let (a_aux, b_aux) = aux.split_at_mut(256);
                     a_slopes[Pedersen::Bit251AndBit196 as usize] =
@@ -713,20 +713,28 @@ impl CairoExecutionTrace for ExecutionTrace {
                 let (aux_steps, _) = aux.as_chunks_mut::<DOUBLING_STEP_ROWS>();
 
                 // #1 load in the scalar multiplication `m * Q`
-                for (aux_step, q_doubling_step) in zip(aux_steps, ec_op_trace.q_doubling_steps) {
+                for (i, ((aux_step, q_doubling_step), r_step)) in
+                    zip(aux_steps, ec_op_trace.q_doubling_steps)
+                        .zip(ec_op_trace.r_steps)
+                        .enumerate()
+                {
                     aux_step[EcOp::QDoublingX as usize] = q_doubling_step.point.x;
                     aux_step[EcOp::QDoublingY as usize] = q_doubling_step.point.y;
                     aux_step[EcOp::QDoublingSlope as usize] = q_doubling_step.slope;
-                    // aux_step[Ecdsa::PubkeyPartialSumX as usize] =
-                    // rq_step.partial_sum.x;
-                    // aux_step[Ecdsa::PubkeyPartialSumY as usize] =
-                    // rq_step.partial_sum.y;
-                    // aux_step[Ecdsa::PubkeyPartialSumSlope as usize] =
-                    // rq_step.slope;
-                    // aux_step[Ecdsa::PubkeyPartialSumXDiffInv as usize] =
-                    // rq_step.x_diff_inv;
-                    // aux_step[Ecdsa::RSuffix as usize] = rq_step.suffix;
+                    aux_step[EcOp::RPartialSumX as usize] = r_step.partial_sum.x;
+                    aux_step[EcOp::RPartialSumY as usize] = r_step.partial_sum.y;
+                    aux_step[EcOp::MSuffix as usize] = r_step.suffix;
+                    // don't add if last (these fields might be used by other builtins)
+                    if i != EC_OP_SCALAR_HEIGHT - 1 {
+                        aux_step[EcOp::RPartialSumSlope as usize] = r_step.slope;
+                        aux_step[EcOp::RPartialSumXDiffInv as usize] = r_step.x_diff_inv;
+                    }
                 }
+
+                // load fields for unique bit decomposition checks into the trace
+                aux[EcOp::MBit251AndBit196 as usize] = ec_op_trace.m_bit251_and_bit196.into();
+                aux[EcOp::MBit251AndBit196AndBit192 as usize] =
+                    ec_op_trace.m_bit251_and_bit196_and_bit192.into();
 
                 // load EC op values into memory
                 let instance = ec_op_trace.instance;

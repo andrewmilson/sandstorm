@@ -1,12 +1,21 @@
 use std::sync::OnceLock;
 
-use crate::{utils::curve::{StarkwareCurve, calculate_slope}, ecdsa::{doubling_steps, DoublingStep, EcMadPartialStep}, pedersen};
-use ark_ec::{short_weierstrass::{Affine, SWCurveConfig, Projective}, CurveGroup, Group};
+use crate::utils::curve::StarkwareCurve;
+use crate::utils::curve::calculate_slope;
+use crate::ecdsa::doubling_steps;
+use crate::ecdsa::DoublingStep;
+use crate::ecdsa::EcMadPartialStep;
+use ark_ec::short_weierstrass::Affine;
+use ark_ec::short_weierstrass::SWCurveConfig;
+use ark_ec::short_weierstrass::Projective; 
+use ark_ec::CurveGroup;
+use ark_ec::Group;
 use binary::EcOpInstance;
 use ark_ff::Field;
 use ministark_gpu::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481::ark::Fp;
 use num_bigint::BigUint;
-use ruint::{aliases::U256, uint};
+use ruint::aliases::U256;
+use ruint::uint;
 
 /// An ECDSA trace for a dummy instance
 /// Created once since creating new instance traces each time is expensive.
@@ -78,7 +87,7 @@ impl InstanceTrace {
 
 /// Generates a dummy EC op instance using `private_key = 1`
 fn gen_dummy_instance(index: u32) -> EcOpInstance {
-    let p = pedersen::constants::P0;
+    let p = crate::pedersen::constants::P0;
     let q = StarkwareCurve::GENERATOR;
     EcOpInstance {
         index,

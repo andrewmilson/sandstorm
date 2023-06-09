@@ -166,6 +166,7 @@ impl<F: PrimeField> MemoryPool<F> {
         self.memory.push((address, value));
     }
 
+    #[allow(clippy::type_complexity)]
     pub fn get_ordered_accesses_with_padding(
         &self,
         trace_len: usize,

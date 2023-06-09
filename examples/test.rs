@@ -1,23 +1,5 @@
-use ark_ec::CurveGroup;
-use ark_ec::Group;
-use ark_ec::short_weierstrass::Affine;
-use ark_ec::short_weierstrass::Projective;
-use ark_ec::short_weierstrass::SWCurveConfig;
 use ark_ff::FftField;
 use ark_ff::Field;
-use ark_ff::One;
-use ark_ff::MontFp as Fp;
-use ark_poly::DenseUVPolynomial;
-use ark_ff::PrimeField;
-use ark_poly::univariate::DensePolynomial;
-use ark_poly::Polynomial;
-use builtins::ecdsa;
-use builtins::utils::curve::StarkwareCurve;
-use builtins::utils::curve::Fr;
-use ministark::utils::FieldVariant;
-use ministark_gpu::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481::ark::Fp;
-use num_bigint::BigUint;
-use std::io::Cursor;
 use num_traits::Zero;
 
 #[macro_use]

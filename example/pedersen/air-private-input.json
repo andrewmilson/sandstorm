@@ -30,7 +30,43 @@
             }
         }
     ],
-    "bitwise": [],
+    "bitwise": [
+        {
+            "index": 0,
+            "x": "0xc",
+            "y": "0xa"
+        },
+        {
+            "index": 1,
+            "x": "0x2b5a729dad1940dcd89abe05e6755a92dc322758cf962eff13c943f9a9b056c",
+            "y": "0x7e3dfe8113341ad16dfbb9e5e4d425cee0685adcd4697d4364c746107077d63"
+        },
+        {
+            "index": 2,
+            "x": "0x0",
+            "y": "0x0"
+        },
+        {
+            "index": 3,
+            "x": "0x0",
+            "y": "0x0"
+        },
+        {
+            "index": 4,
+            "x": "0x0",
+            "y": "0x0"
+        },
+        {
+            "index": 5,
+            "x": "0x0",
+            "y": "0x0"
+        },
+        {
+            "index": 6,
+            "x": "0x0",
+            "y": "0x0"
+        }
+    ],
     "ec_op": [
         {
             "index": 0,
