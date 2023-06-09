@@ -99,7 +99,7 @@ impl InstanceTrace {
         let b = (zg + qr).into_affine();
         let b_slope = calculate_slope(zg, qr).unwrap();
         let b_x_diff_inv = (zg.x - qr.x).inverse().unwrap();
-        let b_doubling_steps = doubling_steps(b.into());
+        let b_doubling_steps = doubling_steps(256, b.into());
         let wb = Affine::from(mimic_ec_mult_air(w.into(), b.into(), shift_point).unwrap());
 
         let zg_steps = gen_ec_mult_steps(message.into(), generator, -shift_point);
@@ -115,7 +115,7 @@ impl InstanceTrace {
         let r_inv = r.inverse().unwrap();
         let message_inv = message.inverse().unwrap();
 
-        let pubkey_doubling_steps = doubling_steps(pubkey.into());
+        let pubkey_doubling_steps = doubling_steps(256, pubkey.into());
 
         let shift_point = Affine::from(shift_point);
         let r_point_slope = calculate_slope(wb, -shift_point).unwrap();
@@ -197,10 +197,10 @@ fn gen_ec_mult_steps(
     res
 }
 
-fn doubling_steps(mut p: Projective<StarkwareCurve>) -> Vec<DoublingStep> {
+pub fn doubling_steps(num_steps: usize, mut p: Projective<StarkwareCurve>) -> Vec<DoublingStep> {
     let mut res = Vec::new();
     #[allow(clippy::needless_range_loop)]
-    for _ in 0..256 {
+    for _ in 0..num_steps {
         let p_affine = p.into_affine();
         let slope = calculate_slope(p_affine, p_affine).unwrap();
         res.push(DoublingStep {

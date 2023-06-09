@@ -1,6 +1,6 @@
 use std::sync::OnceLock;
 
-use crate::{utils::curve::StarkwareCurve, ecdsa::mimic_ec_mult_air, pedersen};
+use crate::{utils::curve::StarkwareCurve, ecdsa::{mimic_ec_mult_air, doubling_steps, DoublingStep}, pedersen};
 use ark_ec::short_weierstrass::{Affine, SWCurveConfig};
 use binary::EcOpInstance;
 use ministark_gpu::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481::ark::Fp;
@@ -18,6 +18,7 @@ pub struct InstanceTrace {
     pub instance: EcOpInstance,
     pub p: Affine<StarkwareCurve>,
     pub q: Affine<StarkwareCurve>,
+    pub q_doubling_steps: Vec<DoublingStep>,
     // pub q_doubling_steps: Vec<DoublingStep>,
     pub r: Affine<StarkwareCurve>,
     pub m: Fp,
@@ -32,9 +33,9 @@ impl InstanceTrace {
         let q_x = BigUint::from(instance.q_x).into();
         let q_y = BigUint::from(instance.q_y).into();
         let q = Affine::new(q_x, q_y);
+        let q_doubling_steps = doubling_steps(256, q.into());
 
         let m = Fp::from(BigUint::from(instance.m));
-        println!("m: {m}");
 
         let r = mimic_ec_mult_air(m.into(), q.into(), p.into())
             .unwrap()
@@ -44,6 +45,7 @@ impl InstanceTrace {
             instance,
             p,
             q,
+            q_doubling_steps,
             m,
             r,
         }

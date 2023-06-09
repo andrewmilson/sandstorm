@@ -137,6 +137,8 @@ impl ministark::air::AirConfig for AirConfig {
                 + Bitwise::Bits16Chunk3Offset2.curr() * (&two).pow(194)
                 + Bitwise::Bits16Chunk3Offset3.curr() * (&two).pow(195);
 
+        let ec_op_doubling_q_x_squared_0 = EcOp::QDoublingX.curr() * EcOp::QDoublingX.curr();
+
         // example for trace length n=64
         // =============================
         // x^(n/16)                 = (x - ω_0)(x - ω_16)(x - ω_32)(x - ω_48)
@@ -1522,6 +1524,62 @@ impl ministark::air::AirConfig for AirConfig {
             - Bitwise::Bits16Chunk3Offset3ResShifted.curr())
             * &all_bitwise_zerofier_inv;
 
+        // Elliptic Curve operations builtin
+        // =================================
+        let ec_op_init_addr =
+            (Npc::EcOpPXAddr.curr() - InitialEcOpAddr.hint()) * &first_row_zerofier_inv;
+
+        let last_ec_op_zerofier =
+            X - Constant(FieldVariant::Fp(g.pow([16384 * (n / 16384 - 1) as u64])));
+        let all_ec_op_except_last_zerofier_inv = &last_ec_op_zerofier * &all_ec_op_zerofier_inv;
+
+        // check ec op memory addresses
+        let ec_op_num_memory_items = Constant(FieldVariant::Fp(Fp::from(7u8)));
+        let ec_op_p_x_addr = (Npc::EcOpPXAddr.next()
+            - (Npc::EcOpPXAddr.curr() + ec_op_num_memory_items))
+            * &all_ec_op_except_last_zerofier_inv;
+        // `p_y`'s address follows `p_x`'s address
+        let ec_op_p_y_addr =
+            (Npc::EcOpPYAddr.curr() - (Npc::EcOpPXAddr.curr() + &one)) * &all_ec_op_zerofier_inv;
+        // `q_x`'s address follows `p_y`'s address
+        let ec_op_q_x_addr =
+            (Npc::EcOpQXAddr.curr() - (Npc::EcOpPYAddr.curr() + &one)) * &all_ec_op_zerofier_inv;
+        // `q_y`'s address follows `q_x`'s address
+        let ec_op_q_y_addr =
+            (Npc::EcOpQYAddr.curr() - (Npc::EcOpQXAddr.curr() + &one)) * &all_ec_op_zerofier_inv;
+        // `m`'s address follows `q_y`'s address
+        let ec_op_m_addr =
+            (Npc::EcOpMAddr.curr() - (Npc::EcOpQYAddr.curr() + &one)) * &all_ec_op_zerofier_inv;
+        // `r_x`'s address follows `m`'s address
+        let ec_op_r_x_addr =
+            (Npc::EcOpRXAddr.curr() - (Npc::EcOpMAddr.curr() + &one)) * &all_ec_op_zerofier_inv;
+        // `r_y`'s address follows `r_x`'s address
+        let ec_op_r_y_addr =
+            (Npc::EcOpRYAddr.curr() - (Npc::EcOpRXAddr.curr() + &one)) * &all_ec_op_zerofier_inv;
+
+        // These constraint maps to the curve point doubling equation:
+        // https://en.wikipedia.org/wiki/Elliptic_curve_point_multiplication#Point_doubling
+        // ```text
+        // curve eq: y^2 = x^3 + a*x + b
+        // Q_i = elliptic curve point
+        // Q_(i+1) = Q_i + Q_i
+        // slope = (3 * Q_i.x^2 + a) / (2*Q_i.y)
+        // Q_(i+1).x = slope^2 - 2*Q_i.x
+        // Q_(i+1).y = slope*(Q_i.x - Q_(i+1).x) - Q_i.y
+        // ```
+        let ec_op_doubling_q_slope = (&ec_op_doubling_q_x_squared_0
+            + &ec_op_doubling_q_x_squared_0
+            + &ec_op_doubling_q_x_squared_0
+            + ecdsa_sig_config_alpha
+            - (EcOp::QDoublingY.curr() + EcOp::QDoublingY.curr()) * EcOp::QDoublingSlope.curr())
+            * &ec_op_transition_zerofier_inv;
+        let ec_op_doubling_q_x = (EcOp::QDoublingSlope.curr() * EcOp::QDoublingSlope.curr()
+            - (EcOp::QDoublingX.curr() + EcOp::QDoublingX.curr() + EcOp::QDoublingX.next()))
+            * &ec_op_transition_zerofier_inv;
+        let ec_op_doubling_q_y = (EcOp::QDoublingY.curr() + EcOp::QDoublingY.next()
+            - EcOp::QDoublingSlope.curr() * (EcOp::QDoublingX.curr() - EcOp::QDoublingX.next()))
+            * &ec_op_transition_zerofier_inv;
+
         // Constraint expression for bitwise/unique_unpacking193: (column7_row721 +
         // column7_row977) * 16 - column7_row521
 
@@ -1768,6 +1826,17 @@ impl ministark::air::AirConfig for AirConfig {
             bitwise_unique_unpacking193,
             bitwise_unique_unpacking194,
             bitwise_unique_unpacking195,
+            ec_op_init_addr,
+            ec_op_p_x_addr,
+            ec_op_p_y_addr,
+            ec_op_q_x_addr,
+            ec_op_q_y_addr,
+            ec_op_m_addr,
+            ec_op_r_x_addr,
+            ec_op_r_y_addr,
+            ec_op_doubling_q_slope,
+            ec_op_doubling_q_x,
+            ec_op_doubling_q_y,
         ]
         .into_iter()
         .map(Constraint::new)
@@ -1938,6 +2007,32 @@ impl ExecutionTraceColumn for RangeCheckBuiltin {
         let trace_offset = match self {
             Self::Rc16Component => step as isize * offset + *self as isize,
         };
+        AlgebraicItem::Trace(column, trace_offset).into()
+    }
+}
+
+#[derive(Clone, Copy)]
+pub enum EcOp {
+    QDoublingX = 44,
+    QDoublingY = 28,
+    QDoublingSlope = 60,
+}
+
+impl ExecutionTraceColumn for EcOp {
+    fn index(&self) -> usize {
+        match self {
+            Self::QDoublingX | Self::QDoublingY | Self::QDoublingSlope => 8,
+        }
+    }
+
+    fn offset<T>(&self, offset: isize) -> Expr<AlgebraicItem<T>> {
+        let column = self.index();
+        let step = match self {
+            Self::QDoublingX | Self::QDoublingY | Self::QDoublingSlope => {
+                EC_OP_BUILTIN_RATIO * CYCLE_HEIGHT / EC_OP_SCALAR_HEIGHT
+            }
+        } as isize;
+        let trace_offset = step * offset + *self as isize;
         AlgebraicItem::Trace(column, trace_offset).into()
     }
 }
