@@ -615,7 +615,7 @@ impl ministark::air::AirConfig for AirConfig {
         // 251                                                     196  191
         // ```
 
-        // Use knowledge of bits 251,196,192 to determine if there is overflow
+        // Use knowledge of bits 251,196,192 to determine if there is a unique unpacking
         let pedersen_hash0_ec_subset_sub_bit_unpacking_last_one_is_zero =
             (Pedersen::Bit251AndBit196AndBit192.curr()
                 * (Pedersen::Suffix.curr() - (Pedersen::Suffix.next() + Pedersen::Suffix.next())))
@@ -1768,8 +1768,6 @@ impl ministark::air::AirConfig for AirConfig {
             bitwise_unique_unpacking193,
             bitwise_unique_unpacking194,
             bitwise_unique_unpacking195,
-            // // TODO: bitwise/addition_is_xor_with_and
-            // // TODO: bitwise/unique_unpacking192
         ]
         .into_iter()
         .map(Constraint::new)
@@ -1796,12 +1794,14 @@ impl ministark::air::AirConfig for AirConfig {
             initial_rc_address,
             initial_ecdsa_address,
             initial_bitwise_address,
+            initial_ec_op_address,
         } = execution_info;
 
         let initial_pedersen_address = initial_pedersen_address.expect("layout6 requires Pedersen");
         let initial_rc_address = initial_rc_address.expect("layout6 requires range check");
-        let initial_ecdsa_address = initial_ecdsa_address.expect("layout6 requires ecdsa");
+        let initial_ecdsa_address = initial_ecdsa_address.expect("layout6 requires ECDSA");
         let initial_bitwise_address = initial_bitwise_address.expect("layout6 requires bitwise");
+        let initial_ec_op_address = initial_ec_op_address.expect("layout6 requires EC op");
 
         let memory_product = utils::compute_public_memory_quotient(
             challenges[MemoryPermutation::Z],
@@ -1841,6 +1841,7 @@ impl ministark::air::AirConfig for AirConfig {
             (InitialRcAddr.index(), initial_rc_address.into()),
             (InitialEcdsaAddr.index(), initial_ecdsa_address.into()),
             (InitialBitwiseAddr.index(), initial_bitwise_address.into()),
+            (InitialEcOpAddr.index(), initial_ec_op_address.into()),
         ])
     }
 }
@@ -2212,13 +2213,50 @@ pub enum Npc {
     BitwiseXOrYAddr = 902,
     BitwiseXOrYVal = 903,
 
-    // EcdsaMessageVal = todo!(),
+    // 8582 % 16 = 6
+    // 8583 % 16 = 7
+    EcOpPXAddr = 8582,
+    EcOpPXVal = 8583,
+
+    // 4486 % 16 = 6
+    // 4487 % 16 = 7
+    EcOpPYAddr = 4486,
+    EcOpPYVal = 4487,
+
+    // 12678 % 16 = 6
+    // 12679 % 16 = 7
+    EcOpQXAddr = 12678,
+    EcOpQXVal = 12679,
+
+    // 2438 % 16 = 6
+    // 2439 % 16 = 7
+    EcOpQYAddr = 2438,
+    EcOpQYVal = 2439,
+
+    // 10630 % 16 = 6
+    // 10631 % 16 = 7
+    EcOpMAddr = 10630,
+    EcOpMVal = 10631,
+
+    // 6534 % 16 = 6
+    // 6535 % 16 = 7
+    EcOpRXAddr = 6534,
+    EcOpRXVal = 6535,
+
+    // 14726 % 16 = 6
+    // 14727 % 16 = 7
+    EcOpRYAddr = 14726,
+    EcOpRYVal = 14727,
+
     MemDstAddr = 8,
     MemDst = 9,
     // NOTE: cycle cells 10 and 11 is occupied by PubMemAddr since the public memory step is 8.
     // This means it applies twice (2, 3) then (8+2, 8+3) within a single 16 row cycle.
     MemOp1Addr = 12,
     MemOp1 = 13,
+
+    UnusedAddr = 14,
+    UnusedVal = 15,
 }
 
 impl ExecutionTraceColumn for Npc {
@@ -2249,9 +2287,25 @@ impl ExecutionTraceColumn for Npc {
             | Self::MemDstAddr
             | Self::MemDst
             | Self::MemOp1Addr
+            | Self::UnusedAddr
+            | Self::UnusedVal
             | Self::MemOp1 => CYCLE_HEIGHT,
             Self::BitwisePoolAddr | Self::BitwisePoolVal => BITWISE_RATIO * CYCLE_HEIGHT / 4,
             Self::BitwiseXOrYAddr | Self::BitwiseXOrYVal => BITWISE_RATIO * CYCLE_HEIGHT,
+            Self::EcOpPXAddr
+            | Self::EcOpPXVal
+            | Self::EcOpPYAddr
+            | Self::EcOpPYVal
+            | Self::EcOpQXAddr
+            | Self::EcOpQXVal
+            | Self::EcOpQYAddr
+            | Self::EcOpQYVal
+            | Self::EcOpMAddr
+            | Self::EcOpMVal
+            | Self::EcOpRXAddr
+            | Self::EcOpRXVal
+            | Self::EcOpRYAddr
+            | Self::EcOpRYVal => EC_OP_BUILTIN_RATIO * CYCLE_HEIGHT,
         } as isize;
         let column = self.index();
         let trace_offset = step * offset + *self as isize;
@@ -2401,6 +2455,7 @@ pub enum PublicInputHint {
     InitialRcAddr,
     InitialEcdsaAddr,
     InitialBitwiseAddr,
+    InitialEcOpAddr,
 }
 
 impl Hint for PublicInputHint {
@@ -2439,7 +2494,6 @@ impl VerifierChallenge for RangeCheckPermutation {
 }
 
 /// Symbolic diluted check permutation challenges
-/// (z − TODO1)
 #[derive(Clone, Copy)]
 pub enum DilutedCheckPermutation {
     Z = 3, // =z
@@ -2452,7 +2506,6 @@ impl VerifierChallenge for DilutedCheckPermutation {
 }
 
 /// Symbolic diluted check aggregation challenges
-/// (z − TODO1)
 #[derive(Clone, Copy)]
 pub enum DilutedCheckAggregation {
     Z = 4, // =z

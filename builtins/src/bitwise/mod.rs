@@ -1,11 +1,57 @@
 use std::ops::Deref;
 
-use ark_ff::{Zero, One};
 use binary::BitwiseInstance;
 use ministark_gpu::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481::ark::Fp;
 use num_bigint::BigUint;
 use ruint::aliases::U256;
 use ruint::uint;
+
+#[derive(Clone, Debug)]
+pub struct InstanceTrace<const SPACING: usize> {
+    pub instance: BitwiseInstance,
+    pub x: Fp,
+    pub y: Fp,
+    pub x_and_y: Fp,
+    pub x_xor_y: Fp,
+    pub x_or_y: Fp,
+    pub x_partition: Partition256<SPACING>,
+    pub y_partition: Partition256<SPACING>,
+    pub x_and_y_partition: Partition256<SPACING>,
+    pub x_xor_y_partition: Partition256<SPACING>,
+}
+
+impl<const SPACING: usize> InstanceTrace<SPACING> {
+    pub fn new(instance: BitwiseInstance) -> Self {
+        let BitwiseInstance { x, y, .. } = instance;
+        let x_and_y = x & y;
+        let x_xor_y = x ^ y;
+        let x_or_y = x | y;
+
+        let x_partition = Partition256::new(x);
+        let y_partition = Partition256::new(y);
+        let x_and_y_partition = Partition256::new(x_and_y);
+        let x_xor_y_partition = Partition256::new(x_xor_y);
+
+        let x = BigUint::from(x).into();
+        let y = BigUint::from(y).into();
+        let x_and_y = BigUint::from(x_and_y).into();
+        let x_xor_y = BigUint::from(x_xor_y).into();
+        let x_or_y = BigUint::from(x_or_y).into();
+
+        Self {
+            instance,
+            x,
+            y,
+            x_and_y,
+            x_xor_y,
+            x_or_y,
+            x_partition,
+            y_partition,
+            x_and_y_partition,
+            x_xor_y_partition,
+        }
+    }
+}
 
 /// Partitions of a 64 bit integer
 /// For example to break up the 64 bit binary integer `v` with spacing 4:
@@ -73,53 +119,6 @@ impl<const SPACING: usize> Partition256<SPACING> {
         Self {
             low: Partition128::new(((l1 as u128) << 64) + l0 as u128),
             high: Partition128::new(((l3 as u128) << 64) + l2 as u128),
-        }
-    }
-}
-
-#[derive(Clone, Debug)]
-pub struct InstanceTrace<const SPACING: usize> {
-    pub instance: BitwiseInstance,
-    pub x: Fp,
-    pub y: Fp,
-    pub x_and_y: Fp,
-    pub x_xor_y: Fp,
-    pub x_or_y: Fp,
-    pub x_partition: Partition256<SPACING>,
-    pub y_partition: Partition256<SPACING>,
-    pub x_and_y_partition: Partition256<SPACING>,
-    pub x_xor_y_partition: Partition256<SPACING>,
-}
-
-impl<const SPACING: usize> InstanceTrace<SPACING> {
-    pub fn new(instance: BitwiseInstance) -> Self {
-        let BitwiseInstance { x, y, .. } = instance;
-        let x_and_y = x & y;
-        let x_xor_y = x ^ y;
-        let x_or_y = x | y;
-
-        let x_partition = Partition256::new(x);
-        let y_partition = Partition256::new(y);
-        let x_and_y_partition = Partition256::new(x_and_y);
-        let x_xor_y_partition = Partition256::new(x_xor_y);
-
-        let x = BigUint::from(x).into();
-        let y = BigUint::from(y).into();
-        let x_and_y = BigUint::from(x_and_y).into();
-        let x_xor_y = BigUint::from(x_xor_y).into();
-        let x_or_y = BigUint::from(x_or_y).into();
-
-        Self {
-            instance,
-            x,
-            y,
-            x_and_y,
-            x_xor_y,
-            x_or_y,
-            x_partition,
-            y_partition,
-            x_and_y_partition,
-            x_xor_y_partition,
         }
     }
 }

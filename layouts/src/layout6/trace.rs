@@ -14,6 +14,7 @@ use binary::PedersenInstance;
 use binary::RangeCheckInstance;
 use builtins::bitwise;
 use builtins::bitwise::dilute;
+use builtins::ec_op;
 use builtins::ecdsa;
 use builtins::pedersen;
 use ark_ff::One;
@@ -27,6 +28,9 @@ use crate::layout6::BITWISE_RATIO;
 use crate::layout6::DILUTED_CHECK_N_BITS;
 use crate::layout6::DILUTED_CHECK_SPACING;
 use crate::layout6::DILUTED_CHECK_STEP;
+use crate::layout6::ECDSA_BUILTIN_RATIO;
+use crate::layout6::EC_OP_BUILTIN_RATIO;
+use crate::layout6::EC_OP_SCALAR_HEIGHT;
 use crate::layout6::RANGE_CHECK_BUILTIN_PARTS;
 use crate::layout6::RANGE_CHECK_BUILTIN_RATIO;
 use crate::layout6::air::Bitwise;
@@ -37,6 +41,7 @@ use crate::layout6::air::Ecdsa;
 use crate::layout6::air::Pedersen;
 use crate::layout6::air::RangeCheckBuiltin;
 use crate::utils::DilutedCheckPool;
+use crate::utils::MemoryPool;
 use crate::utils::RangeCheckPool;
 use super::air::Permutation;
 use super::air::RangeCheckPermutation;
@@ -75,6 +80,7 @@ pub struct ExecutionTrace {
     pub initial_rc_address: u32,
     pub initial_ecdsa_address: u32,
     pub initial_bitwise_address: u32,
+    pub initial_ec_op_address: u32,
     _register_states: RegisterStates,
     _program: CompiledProgram,
     _mem: Memory<Fp>,
@@ -113,6 +119,8 @@ impl CairoExecutionTrace for ExecutionTrace {
             program.get_padding_address_and_value();
         let mut npc_column = Vec::new_in(GpuAllocator);
         npc_column.resize(trace_len, public_memory_padding_value);
+
+        let memory_pool = MemoryPool::new(&program);
 
         // Keep trace of all 16-bit range check values
         let mut rc_pool = RangeCheckPool::new();
@@ -154,45 +162,52 @@ impl CairoExecutionTrace for ExecutionTrace {
         let (npc_cycles, _) = npc_column.as_chunks_mut::<CYCLE_HEIGHT>();
         let (flag_cycles, _) = flags_column.as_chunks_mut::<CYCLE_HEIGHT>();
 
-        ark_std::cfg_iter_mut!(range_check_cycles)
+        let memory_pool = ark_std::cfg_iter_mut!(range_check_cycles)
             .zip(auxiliary_cycles)
             .zip(npc_cycles)
             .zip(flag_cycles)
             .zip(&*register_states)
-            .for_each(
-                |((((rc_cycle, aux_cycle), npc_cycle), flag_cycle), registers)| {
+            .fold(
+                memory_pool,
+                |mut memory_pool, ((((rc_cycle, aux_cycle), npc_cycle), flag_cycle), registers)| {
                     let &RegisterState { pc, ap, fp } = registers;
-                    let word = mem[pc].unwrap();
-                    debug_assert!(!word.get_flag(Flag::Zero.into()));
+                    let instruction = mem[pc].unwrap();
+                    let instruction_felt = instruction.into_felt();
+                    debug_assert!(!instruction.get_flag(Flag::Zero.into()));
 
                     // range check all offset values
-                    let off_dst = (word.get_off_dst() as u64).into();
-                    let off_op0 = (word.get_off_op0() as u64).into();
-                    let off_op1 = (word.get_off_op1() as u64).into();
-                    let dst_addr = (word.get_dst_addr(ap, fp) as u64).into();
-                    let op0_addr = (word.get_op0_addr(ap, fp) as u64).into();
-                    let op1_addr = (word.get_op1_addr(pc, ap, fp, &mem) as u64).into();
-                    let dst = word.get_dst(ap, fp, &mem);
-                    let op0 = word.get_op0(ap, fp, &mem);
-                    let op1 = word.get_op1(pc, ap, fp, &mem);
-                    let res = word.get_res(pc, ap, fp, &mem);
-                    let tmp0 = word.get_tmp0(ap, fp, &mem);
-                    let tmp1 = word.get_tmp1(pc, ap, fp, &mem);
+                    let off_dst = instruction.get_off_dst() as u32;
+                    let off_op0 = instruction.get_off_op0() as u32;
+                    let off_op1 = instruction.get_off_op1() as u32;
+                    let dst_addr = instruction.get_dst_addr(ap, fp) as u32;
+                    let op0_addr = instruction.get_op0_addr(ap, fp) as u32;
+                    let op1_addr = instruction.get_op1_addr(pc, ap, fp, &mem) as u32;
+                    let dst = instruction.get_dst(ap, fp, &mem);
+                    let op0 = instruction.get_op0(ap, fp, &mem);
+                    let op1 = instruction.get_op1(pc, ap, fp, &mem);
+                    let res = instruction.get_res(pc, ap, fp, &mem);
+                    let tmp0 = instruction.get_tmp0(ap, fp, &mem);
+                    let tmp1 = instruction.get_tmp1(pc, ap, fp, &mem);
 
                     // FLAGS
                     for flag in Flag::iter() {
-                        flag_cycle[flag as usize] = word.get_flag_prefix(flag.into()).into();
+                        flag_cycle[flag as usize] = instruction.get_flag_prefix(flag.into()).into();
                     }
 
                     // NPC
-                    npc_cycle[Npc::Pc as usize] = (pc as u64).into();
-                    npc_cycle[Npc::Instruction as usize] = word.into_felt();
-                    npc_cycle[Npc::MemOp0Addr as usize] = op0_addr;
+                    npc_cycle[Npc::Pc as usize] = (pc as u32).into();
+                    npc_cycle[Npc::Instruction as usize] = instruction_felt;
+                    memory_pool.push(pc as u32, instruction_felt);
+                    npc_cycle[Npc::MemOp0Addr as usize] = op0_addr.into();
                     npc_cycle[Npc::MemOp0 as usize] = op0;
-                    npc_cycle[Npc::MemDstAddr as usize] = dst_addr;
+                    memory_pool.push(op0_addr, op0);
+                    npc_cycle[Npc::MemDstAddr as usize] = dst_addr.into();
                     npc_cycle[Npc::MemDst as usize] = dst;
-                    npc_cycle[Npc::MemOp1Addr as usize] = op1_addr;
+                    memory_pool.push(dst_addr, dst);
+                    npc_cycle[Npc::MemOp1Addr as usize] = op1_addr.into();
                     npc_cycle[Npc::MemOp1 as usize] = op1;
+                    memory_pool.push(op1_addr, op1);
+                    // address 0 is special in Cairo (reserved for public memory)
                     for offset in (0..CYCLE_HEIGHT).step_by(PUBLIC_MEMORY_STEP) {
                         npc_cycle[offset + Npc::PubMemAddr as usize] = Fp::zero();
                         npc_cycle[offset + Npc::PubMemVal as usize] = Fp::zero();
@@ -202,11 +217,11 @@ impl CairoExecutionTrace for ExecutionTrace {
                     // handled after this loop
 
                     // RANGE CHECK
-                    rc_cycle[RangeCheck::OffDst as usize] = off_dst;
+                    rc_cycle[RangeCheck::OffDst as usize] = off_dst.into();
                     rc_cycle[RangeCheck::Ap as usize] = (ap as u64).into();
-                    rc_cycle[RangeCheck::OffOp1 as usize] = off_op1;
+                    rc_cycle[RangeCheck::OffOp1 as usize] = off_op1.into();
                     rc_cycle[RangeCheck::Op0MulOp1 as usize] = op0 * op1;
-                    rc_cycle[RangeCheck::OffOp0 as usize] = off_op0;
+                    rc_cycle[RangeCheck::OffOp0 as usize] = off_op0.into();
                     rc_cycle[RangeCheck::Fp as usize] = (fp as u64).into();
                     rc_cycle[RangeCheck::Res as usize] = res;
                     // RangeCheck::Ordered and RangeCheck::Unused are handled after cycle padding
@@ -214,6 +229,8 @@ impl CairoExecutionTrace for ExecutionTrace {
                     // COL8 - TODO: better name
                     aux_cycle[Auxiliary::Tmp0 as usize] = tmp0;
                     aux_cycle[Auxiliary::Tmp1 as usize] = tmp1;
+
+                    memory_pool
                 },
             );
 
@@ -310,59 +327,72 @@ impl CairoExecutionTrace for ExecutionTrace {
         let initial_pedersen_address = pedersen_memory_segment.begin_addr;
 
         // load individual hash traces into the global execution trace
-        ark_std::cfg_iter_mut!(pedersen_partial_xs_steps)
-            .zip(pedersen_partial_ys_steps)
-            .zip(pedersen_suffixes_steps)
-            .zip(pedersen_slopes_steps)
-            .zip(pedersen_npc_steps)
-            .zip(pedersen_aux_steps)
-            .zip(pedersen_traces)
-            .for_each(
-                |((((((partial_xs, partial_ys), suffixes), slopes), npc), aux), pedersen_trace)| {
-                    let a_steps = pedersen_trace.a_steps;
-                    let b_steps = pedersen_trace.b_steps;
-                    let partial_steps = vec![a_steps, b_steps].concat();
+        let memory_pool =
+            ark_std::cfg_iter_mut!(pedersen_partial_xs_steps)
+                .zip(pedersen_partial_ys_steps)
+                .zip(pedersen_suffixes_steps)
+                .zip(pedersen_slopes_steps)
+                .zip(pedersen_npc_steps)
+                .zip(pedersen_aux_steps)
+                .zip(pedersen_traces)
+                .fold(
+                    memory_pool,
+                    |mut memory_pool,
+                     (
+                        (((((partial_xs, partial_ys), suffixes), slopes), npc), aux),
+                        pedersen_trace,
+                    )| {
+                        let a_steps = pedersen_trace.a_steps;
+                        let b_steps = pedersen_trace.b_steps;
+                        let partial_steps = vec![a_steps, b_steps].concat();
 
-                    for ((((suffix, partial_x), partial_y), slope), step) in
-                        zip(suffixes.iter_mut(), partial_xs.iter_mut())
-                            .zip(partial_ys.iter_mut())
-                            .zip(slopes.iter_mut())
-                            .zip(partial_steps)
-                    {
-                        *suffix = step.suffix;
-                        *partial_x = step.point.x;
-                        *partial_y = step.point.y;
-                        *slope = step.slope;
-                    }
+                        for ((((suffix, partial_x), partial_y), slope), step) in
+                            zip(suffixes.iter_mut(), partial_xs.iter_mut())
+                                .zip(partial_ys.iter_mut())
+                                .zip(slopes.iter_mut())
+                                .zip(partial_steps)
+                        {
+                            *suffix = step.suffix;
+                            *partial_x = step.point.x;
+                            *partial_y = step.point.y;
+                            *slope = step.slope;
+                        }
 
-                    // load fields for bit decomposition checks into the trace
-                    let (a_slopes, b_slopes) = slopes.split_at_mut(256);
-                    let (a_aux, b_aux) = aux.split_at_mut(256);
-                    a_slopes[Pedersen::Bit251AndBit196 as usize] =
-                        pedersen_trace.a_bit251_and_bit196.into();
-                    b_slopes[Pedersen::Bit251AndBit196 as usize] =
-                        pedersen_trace.b_bit251_and_bit196.into();
-                    a_aux[Pedersen::Bit251AndBit196AndBit192 as usize] =
-                        pedersen_trace.a_bit251_and_bit196_and_bit192.into();
-                    b_aux[Pedersen::Bit251AndBit196AndBit192 as usize] =
-                        pedersen_trace.b_bit251_and_bit196_and_bit192.into();
+                        // load fields for bit decomposition checks into the trace
+                        let (a_slopes, b_slopes) = slopes.split_at_mut(256);
+                        let (a_aux, b_aux) = aux.split_at_mut(256);
+                        a_slopes[Pedersen::Bit251AndBit196 as usize] =
+                            pedersen_trace.a_bit251_and_bit196.into();
+                        b_slopes[Pedersen::Bit251AndBit196 as usize] =
+                            pedersen_trace.b_bit251_and_bit196.into();
+                        a_aux[Pedersen::Bit251AndBit196AndBit192 as usize] =
+                            pedersen_trace.a_bit251_and_bit196_and_bit192.into();
+                        b_aux[Pedersen::Bit251AndBit196AndBit192 as usize] =
+                            pedersen_trace.b_bit251_and_bit196_and_bit192.into();
 
-                    // add the hash to the memory pool
-                    let instance = pedersen_trace.instance;
-                    let (a_addr, b_addr, output_addr) = instance.mem_addr(initial_pedersen_address);
-                    npc[Npc::PedersenInput0Addr as usize] = a_addr.into();
-                    npc[Npc::PedersenInput0Val as usize] = Fp::from(BigUint::from(instance.a));
-                    npc[Npc::PedersenInput1Addr as usize] = b_addr.into();
-                    npc[Npc::PedersenInput1Val as usize] = Fp::from(BigUint::from(instance.b));
-                    npc[Npc::PedersenOutputAddr as usize] = output_addr.into();
-                    npc[Npc::PedersenOutputVal as usize] = pedersen_trace.output;
-                },
-            );
+                        // add the hash to the memory pool
+                        let instance = pedersen_trace.instance;
+                        let (a_addr, b_addr, output_addr) =
+                            instance.mem_addr(initial_pedersen_address);
+                        npc[Npc::PedersenInput0Addr as usize] = a_addr.into();
+                        npc[Npc::PedersenInput0Val as usize] = Fp::from(BigUint::from(instance.a));
+                        memory_pool.push(a_addr, npc[Npc::PedersenInput0Val as usize]);
+                        npc[Npc::PedersenInput1Addr as usize] = b_addr.into();
+                        npc[Npc::PedersenInput1Val as usize] = Fp::from(BigUint::from(instance.b));
+                        memory_pool.push(b_addr, npc[Npc::PedersenInput1Val as usize]);
+                        npc[Npc::PedersenOutputAddr as usize] = output_addr.into();
+                        npc[Npc::PedersenOutputVal as usize] = pedersen_trace.output;
+                        memory_pool.push(output_addr, npc[Npc::PedersenOutputVal as usize]);
+
+                        memory_pool
+                    },
+                );
 
         // Generate trace for range check builtin
         // ======================================
-        let (rc_range_check_steps, _) = range_check_column.as_chunks_mut::<256>();
-        let (rc_npc_steps, _) = npc_column.as_chunks_mut::<256>();
+        const RC_STEP_ROWS: usize = RANGE_CHECK_BUILTIN_RATIO * CYCLE_HEIGHT;
+        let (rc_range_check_steps, _) = range_check_column.as_chunks_mut::<RC_STEP_ROWS>();
+        let (rc_npc_steps, _) = npc_column.as_chunks_mut::<RC_STEP_ROWS>();
 
         let rc_memory_segment = air_public_input
             .memory_segments
@@ -370,29 +400,35 @@ impl CairoExecutionTrace for ExecutionTrace {
             .expect("layout6 requires a range check memory segment");
         let initial_rc_address = rc_memory_segment.begin_addr;
 
-        let rc_offset = RangeCheckBuiltin::Rc16Component as usize;
-        let rc_step = RANGE_CHECK_BUILTIN_RATIO * CYCLE_HEIGHT / RANGE_CHECK_BUILTIN_PARTS;
-
-        ark_std::cfg_iter_mut!(rc_range_check_steps)
+        let memory_pool = ark_std::cfg_iter_mut!(rc_range_check_steps)
             .zip(rc_npc_steps)
             .zip(rc128_traces.into_iter().chain(rc128_dummy_traces))
-            .for_each(|((range_check, npc), rc_trace)| {
+            .fold(memory_pool, |mut memory_pool, ((rc, npc), rc_trace)| {
                 // add the 128-bit range check to the 16-bit range check pool
                 let parts = rc_trace.parts;
-                range_check[rc_offset] = parts[0].into();
-                range_check[rc_offset + rc_step] = parts[1].into();
-                range_check[rc_offset + rc_step * 2] = parts[2].into();
-                range_check[rc_offset + rc_step * 3] = parts[3].into();
-                range_check[rc_offset + rc_step * 4] = parts[4].into();
-                range_check[rc_offset + rc_step * 5] = parts[5].into();
-                range_check[rc_offset + rc_step * 6] = parts[6].into();
-                range_check[rc_offset + rc_step * 7] = parts[7].into();
+                const RC_PART_ROWS: usize = RC_STEP_ROWS / RANGE_CHECK_BUILTIN_PARTS;
+                rc[RangeCheckBuiltin::Rc16Component as usize] = parts[0].into();
+                rc[RangeCheckBuiltin::Rc16Component as usize + RC_PART_ROWS] = parts[1].into();
+                rc[RangeCheckBuiltin::Rc16Component as usize + RC_PART_ROWS * 2] = parts[2].into();
+                rc[RangeCheckBuiltin::Rc16Component as usize + RC_PART_ROWS * 3] = parts[3].into();
+                rc[RangeCheckBuiltin::Rc16Component as usize + RC_PART_ROWS * 4] = parts[4].into();
+                rc[RangeCheckBuiltin::Rc16Component as usize + RC_PART_ROWS * 5] = parts[5].into();
+                rc[RangeCheckBuiltin::Rc16Component as usize + RC_PART_ROWS * 6] = parts[6].into();
+                rc[RangeCheckBuiltin::Rc16Component as usize + RC_PART_ROWS * 7] = parts[7].into();
+
+                // TODO: could turn above into loop
+                // for (dst, val) in zip(range_check.chunks_mut(RC_PART_ROWS), rc_trace.parts) {
+                //     dst[RangeCheckBuiltin::Rc16Component as usize] = val.into();
+                // }
 
                 // add the range check to the memory pool
                 let instance = rc_trace.instance;
                 let addr = instance.mem_addr(initial_rc_address);
                 npc[Npc::RangeCheck128Addr as usize] = addr.into();
                 npc[Npc::RangeCheck128Val as usize] = Fp::from(BigUint::from(instance.value));
+                memory_pool.push(addr, npc[Npc::RangeCheck128Val as usize]);
+
+                memory_pool
             });
 
         // Generate trace for ECDSA builtin
@@ -412,13 +448,15 @@ impl CairoExecutionTrace for ExecutionTrace {
             .map(ecdsa::InstanceTrace::new)
             .chain(ecdsa_dummy_traces);
 
-        let (ecdsa_npc_steps, _) = npc_column.as_chunks_mut::<32768>();
-        let (ecdsa_auxiliary_steps, _) = auxiliary_column.as_chunks_mut::<32768>();
+        const ECDSA_STEP_ROWS: usize = ECDSA_BUILTIN_RATIO * CYCLE_HEIGHT;
+        assert_eq!(ECDSA_BUILTIN_RATIO, EC_OP_BUILTIN_RATIO * 2);
+        let (ecdsa_npc_steps, _) = npc_column.as_chunks_mut::<ECDSA_STEP_ROWS>();
+        let (ecdsa_auxiliary_steps, _) = auxiliary_column.as_chunks_mut::<ECDSA_STEP_ROWS>();
 
-        ark_std::cfg_iter_mut!(ecdsa_npc_steps)
+        let memory_pool = ark_std::cfg_iter_mut!(ecdsa_npc_steps)
             .zip(ecdsa_auxiliary_steps)
             .zip(ecdsa_traces)
-            .for_each(|((npc, aux), ecdsa_trace)| {
+            .fold(memory_pool, |mut memory_pool, ((npc, aux), ecdsa_trace)| {
                 let instance = ecdsa_trace.instance;
                 let message = Fp::from(BigUint::from(instance.message));
                 let pubkey = ecdsa_trace.pubkey;
@@ -428,7 +466,9 @@ impl CairoExecutionTrace for ExecutionTrace {
                 // 1st is for public key scalar multiplication `r * Q`
                 // 2nd is for `B` scalar multiplication `w * B` where `B = z * G + r * Q`
                 let (aux_steps, _) = aux.as_chunks_mut::<64>();
-                let (rq_aux_steps, wb_aux_steps) = aux_steps.split_at_mut(256);
+                let (rq_aux_steps, wb_aux_steps) = aux_steps.split_at_mut(EC_OP_SCALAR_HEIGHT);
+                assert_eq!(EC_OP_SCALAR_HEIGHT, rq_aux_steps.len());
+                assert_eq!(EC_OP_SCALAR_HEIGHT, wb_aux_steps.len());
 
                 // #1 load in public key scalar multiplication `r * Q`
                 for ((aux_step, rq_step), pubkey_doubling_step) in
@@ -484,8 +524,12 @@ impl CairoExecutionTrace for ExecutionTrace {
                 let (pubkey_addr, message_addr) = instance.mem_addr(initial_ecdsa_address);
                 npc[Npc::EcdsaPubkeyAddr as usize] = pubkey_addr.into();
                 npc[Npc::EcdsaPubkeyVal as usize] = pubkey.x;
+                memory_pool.push(pubkey_addr, pubkey.x);
                 npc[Npc::EcdsaMessageAddr as usize] = message_addr.into();
                 npc[Npc::EcdsaMessageVal as usize] = message;
+                memory_pool.push(message_addr, message);
+
+                memory_pool
             });
 
         // Generate trace for bitwise builtin
@@ -510,14 +554,16 @@ impl CairoExecutionTrace for ExecutionTrace {
         let (bitwise_npc_steps, _) = npc_column.as_chunks_mut::<1024>();
         let (bitwise_dilution_steps, _) = range_check_column.as_chunks_mut::<1024>();
 
+        let diluted_check_pool =
+            DilutedCheckPool::<DILUTED_CHECK_N_BITS, DILUTED_CHECK_SPACING>::new();
         // TODO: how does fold work with par_iter? Does it kill parallelism?
         // might be better to map multiple pools and then fold into one if so.
-        let diluted_check_pool = ark_std::cfg_iter_mut!(bitwise_npc_steps)
+        let (diluted_check_pool, memory_pool) = ark_std::cfg_iter_mut!(bitwise_npc_steps)
             .zip(bitwise_dilution_steps)
             .zip(bitwise_traces)
             .fold(
-                DilutedCheckPool::<DILUTED_CHECK_N_BITS, DILUTED_CHECK_SPACING>::new(),
-                |mut diluted_pool, ((npc, dilution), bitwise_trace)| {
+                (diluted_check_pool, memory_pool),
+                |(mut diluted_pool, mut memory_pool), ((npc, dilution), bitwise_trace)| {
                     let instance = bitwise_trace.instance;
 
                     {
@@ -605,17 +651,22 @@ impl CairoExecutionTrace for ExecutionTrace {
                         instance.mem_addr(initial_bitwise_address);
                     npc[input_x_offset] = input_x_addr.into();
                     npc[input_x_offset + 1] = bitwise_trace.x;
+                    memory_pool.push(input_x_addr, bitwise_trace.x);
                     npc[input_y_offset] = input_y_addr.into();
                     npc[input_y_offset + 1] = bitwise_trace.y;
+                    memory_pool.push(input_y_addr, bitwise_trace.y);
                     npc[x_and_y_offset] = x_and_y_addr.into();
                     npc[x_and_y_offset + 1] = bitwise_trace.x_and_y;
+                    memory_pool.push(x_and_y_addr, bitwise_trace.x_and_y);
                     npc[x_xor_y_offset] = x_xor_y_addr.into();
                     npc[x_xor_y_offset + 1] = bitwise_trace.x_xor_y;
+                    memory_pool.push(x_xor_y_addr, bitwise_trace.x_xor_y);
                     npc[x_or_y_offset] = x_or_y_addr.into();
                     npc[x_or_y_offset + 1] = bitwise_trace.x_or_y;
+                    memory_pool.push(x_or_y_addr, bitwise_trace.x_or_y);
 
                     // return the diluted pool
-                    diluted_pool
+                    (diluted_pool, memory_pool)
                 },
             );
 
@@ -669,6 +720,60 @@ impl CairoExecutionTrace for ExecutionTrace {
         assert!(ordered_diluted_padding_vals.next().is_none());
         assert!(ordered_diluted_vals.next().is_none());
 
+        // Elliptic Curve operations builtin
+        // =================================
+        let ec_op_memory_segment = air_public_input
+            .memory_segments
+            .ec_op
+            .expect("layout6 requires a EC op memory segment");
+        let initial_ec_op_address = ec_op_memory_segment.begin_addr;
+
+        // Create dummy instances if there are cells that need to be filled
+        let ec_op_instances = air_private_input.ec_op;
+        let num_ec_op_instances = ec_op_instances.len() as u32;
+        let ec_op_dummy_traces = (num_ec_op_instances..).map(ec_op::InstanceTrace::new_dummy);
+        let ecdsa_traces = ec_op_instances
+            .into_iter()
+            .map(ec_op::InstanceTrace::new)
+            .chain(ec_op_dummy_traces);
+
+        const EC_OP_STEP_ROWS: usize = EC_OP_BUILTIN_RATIO * CYCLE_HEIGHT;
+        let (ec_op_npc_steps, _) = npc_column.as_chunks_mut::<EC_OP_STEP_ROWS>();
+
+        let memory_pool = ark_std::cfg_iter_mut!(ec_op_npc_steps)
+            .zip(ecdsa_traces)
+            .fold(memory_pool, |mut memory_pool, (npc, ec_op_trace)| {
+                // load EC op values into memory
+                let instance = ec_op_trace.instance;
+                let (p_x_addr, p_y_addr, q_x_addr, q_y_addr, m_addr, r_x_addr, r_y_addr) =
+                    instance.mem_addr(initial_ec_op_address);
+                npc[Npc::EcOpPXAddr as usize] = p_x_addr.into();
+                npc[Npc::EcOpPXVal as usize] = ec_op_trace.p.x;
+                memory_pool.push(p_x_addr, ec_op_trace.p.x);
+                npc[Npc::EcOpPYAddr as usize] = p_y_addr.into();
+                npc[Npc::EcOpPYVal as usize] = ec_op_trace.p.y;
+                memory_pool.push(p_y_addr, ec_op_trace.p.y);
+                npc[Npc::EcOpQXAddr as usize] = q_x_addr.into();
+                npc[Npc::EcOpQXVal as usize] = ec_op_trace.q.x;
+                memory_pool.push(q_x_addr, ec_op_trace.q.x);
+                npc[Npc::EcOpQYAddr as usize] = q_y_addr.into();
+                npc[Npc::EcOpQYVal as usize] = ec_op_trace.q.y;
+                memory_pool.push(q_y_addr, ec_op_trace.q.y);
+                npc[Npc::EcOpMAddr as usize] = m_addr.into();
+                npc[Npc::EcOpMVal as usize] = ec_op_trace.m;
+                memory_pool.push(m_addr, ec_op_trace.m);
+                npc[Npc::EcOpRXAddr as usize] = r_x_addr.into();
+                npc[Npc::EcOpRXVal as usize] = ec_op_trace.r.x;
+                memory_pool.push(r_x_addr, ec_op_trace.r.x);
+                npc[Npc::EcOpRYAddr as usize] = r_y_addr.into();
+                npc[Npc::EcOpRYVal as usize] = ec_op_trace.r.y;
+                memory_pool.push(r_y_addr, ec_op_trace.r.y);
+
+                memory_pool
+            });
+
+        let _yo = memory_pool.get_ordered_accesses_with_padding(trace_len);
+
         // VM Memory
         // =========
         // generate the memory column by ordering memory accesses
@@ -715,6 +820,7 @@ impl CairoExecutionTrace for ExecutionTrace {
             initial_rc_address,
             initial_ecdsa_address,
             initial_bitwise_address,
+            initial_ec_op_address,
             _flags_column: flags_column,
             _auxiliary_column: auxiliary_column,
             _mem: mem,
@@ -740,6 +846,7 @@ impl CairoExecutionTrace for ExecutionTrace {
             initial_rc_address: Some(self.initial_rc_address),
             initial_ecdsa_address: Some(self.initial_ecdsa_address),
             initial_bitwise_address: Some(self.initial_bitwise_address),
+            initial_ec_op_address: Some(self.initial_ec_op_address),
         }
     }
 }

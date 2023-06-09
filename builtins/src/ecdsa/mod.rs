@@ -14,14 +14,14 @@ use ruint::uint;
 use ark_ff::Field;
 use crate::pedersen::pedersen_hash;
 use crate::utils::gen_periodic_table;
-use crate::utils::starkware_curve::Fr;
-use crate::utils::starkware_curve::Curve;
-use crate::utils::starkware_curve::calculate_slope;
+use crate::utils::curve::Fr;
+use crate::utils::curve::StarkwareCurve;
+use crate::utils::curve::calculate_slope;
 use ministark_gpu::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481::ark::Fp;
 use ark_ec::short_weierstrass::Affine;
 use ark_ff::PrimeField;
 
-pub const SHIFT_POINT: Affine<Curve> = super::pedersen::constants::P0;
+pub const SHIFT_POINT: Affine<StarkwareCurve> = super::pedersen::constants::P0;
 
 /// An ECDSA trace for a dummy instance
 /// Created once since creating new instance traces each time is expensive.
@@ -29,8 +29,8 @@ static DUMMY_INSTANCE_TRACE: OnceLock<InstanceTrace> = OnceLock::new();
 
 #[derive(Clone, Debug)]
 pub struct EcMultPartialStep {
-    pub partial_sum: Affine<Curve>,
-    pub fixed_point: Affine<Curve>,
+    pub partial_sum: Affine<StarkwareCurve>,
+    pub fixed_point: Affine<StarkwareCurve>,
     pub suffix: Fp,
     pub slope: Fp,
     pub x_diff_inv: Fp,
@@ -38,7 +38,7 @@ pub struct EcMultPartialStep {
 
 #[derive(Clone, Copy, Debug)]
 pub struct DoublingStep {
-    pub point: Affine<Curve>,
+    pub point: Affine<StarkwareCurve>,
     pub slope: Fp,
 }
 
@@ -46,7 +46,7 @@ pub struct DoublingStep {
 pub struct InstanceTrace {
     pub instance: EcdsaInstance,
     /// pubkey `Q`
-    pub pubkey: Affine<Curve>,
+    pub pubkey: Affine<StarkwareCurve>,
     pub pubkey_doubling_steps: Vec<DoublingStep>,
     pub w: Fp,
     /// Inverse of `w` in the base field
@@ -60,7 +60,7 @@ pub struct InstanceTrace {
     pub message: Fp,
     pub message_inv: Fp,
     /// Point `B = z * G + r * Q`
-    pub b: Affine<Curve>,
+    pub b: Affine<StarkwareCurve>,
     /// Slope between points `z * G` and `r * Q`
     pub b_slope: Fp,
     pub b_x_diff_inv: Fp,
@@ -91,7 +91,7 @@ impl InstanceTrace {
         let pubkey = verify(message, r, s, pubkey_x).expect("signature is invalid");
 
         let shift_point = Projective::from(SHIFT_POINT);
-        let generator = Projective::from(Curve::GENERATOR);
+        let generator = Projective::from(StarkwareCurve::GENERATOR);
 
         let zg = Affine::from(mimic_ec_mult_air(message.into(), generator, -shift_point).unwrap());
         let qr = Affine::from(mimic_ec_mult_air(r.into(), pubkey.into(), shift_point).unwrap());
@@ -161,8 +161,8 @@ impl InstanceTrace {
 /// Generates a list of the steps involved with an elliptic curve multiply
 fn gen_ec_mult_steps(
     x: BigUint,
-    mut point: Projective<Curve>,
-    shift_point: Projective<Curve>,
+    mut point: Projective<StarkwareCurve>,
+    shift_point: Projective<StarkwareCurve>,
 ) -> Vec<EcMultPartialStep> {
     let x = U256::from(x);
     // Assertions fail if the AIR will error
@@ -197,7 +197,7 @@ fn gen_ec_mult_steps(
     res
 }
 
-fn doubling_steps(mut p: Projective<Curve>) -> Vec<DoublingStep> {
+fn doubling_steps(mut p: Projective<StarkwareCurve>) -> Vec<DoublingStep> {
     let mut res = Vec::new();
     #[allow(clippy::needless_range_loop)]
     for _ in 0..256 {
@@ -224,7 +224,7 @@ fn gen_dummy_instance(index: u32) -> EcdsaInstance {
         let k = Fr::from(i);
 
         // Cannot fail because 0 < k < EC_ORDER and EC_ORDER is prime.
-        let x = (Curve::GENERATOR * k).into_affine().x;
+        let x = (StarkwareCurve::GENERATOR * k).into_affine().x;
 
         let r = BigUint::from(x);
         if r.is_zero() || r >= BigUint::from(2u32).pow(251) {
@@ -245,7 +245,7 @@ fn gen_dummy_instance(index: u32) -> EcdsaInstance {
             continue;
         }
 
-        let pubkey = (Curve::GENERATOR * privkey).into_affine();
+        let pubkey = (StarkwareCurve::GENERATOR * privkey).into_affine();
 
         return EcdsaInstance {
             index,
@@ -265,12 +265,13 @@ fn gen_dummy_instance(index: u32) -> EcdsaInstance {
 /// Returns the associated public key if the signature is valid
 /// Returns None if the signature is invalid
 /// based on: https://github.com/starkware-libs/starkex-resources/blob/844ac3dcb1f735451457f7eecc6e37cd96d1cb2d/crypto/starkware/crypto/signature/signature.py#L192
-fn verify(msg_hash: Fp, r: Fp, s: Fr, pubkey_x: Fp) -> Option<Affine<Curve>> {
+fn verify(msg_hash: Fp, r: Fp, s: Fr, pubkey_x: Fp) -> Option<Affine<StarkwareCurve>> {
     let w = s.inverse().unwrap();
-    let (y1, y0) = Affine::<Curve>::get_ys_from_x_unchecked(pubkey_x).expect("not on the curve");
+    let (y1, y0) =
+        Affine::<StarkwareCurve>::get_ys_from_x_unchecked(pubkey_x).expect("not on the curve");
 
     for pubkey_y in [y1, y0] {
-        let pubkey = Affine::<Curve>::new_unchecked(pubkey_x, pubkey_y);
+        let pubkey = Affine::<StarkwareCurve>::new_unchecked(pubkey_x, pubkey_y);
         // Signature validation.
         // DIFF: original formula is:
         // x = (w*msg_hash)*EC_GEN + (w*r)*public_key
@@ -281,7 +282,7 @@ fn verify(msg_hash: Fp, r: Fp, s: Fr, pubkey_x: Fp) -> Option<Affine<Curve>> {
         // This formula ensures that if the verification errors in our AIR, it
         // errors here as well.
         let shift_point = Projective::from(SHIFT_POINT);
-        let generator = Curve::GENERATOR.into();
+        let generator = StarkwareCurve::GENERATOR.into();
         let zg = mimic_ec_mult_air(msg_hash.into(), generator, -shift_point).unwrap();
         let rq = mimic_ec_mult_air(r.into(), pubkey.into(), shift_point).unwrap();
         let wb = mimic_ec_mult_air(w.into(), zg + rq, shift_point).unwrap();
@@ -296,11 +297,11 @@ fn verify(msg_hash: Fp, r: Fp, s: Fr, pubkey_x: Fp) -> Option<Affine<Curve>> {
 
 /// Computes `m * point + shift_point` using the same steps like the AIR and
 /// Returns None if and only if the AIR errors.
-fn mimic_ec_mult_air(
+pub(crate) fn mimic_ec_mult_air(
     m: BigUint,
-    mut point: Projective<Curve>,
-    shift_point: Projective<Curve>,
-) -> Option<Projective<Curve>> {
+    mut point: Projective<StarkwareCurve>,
+    shift_point: Projective<StarkwareCurve>,
+) -> Option<Projective<StarkwareCurve>> {
     if !(1..Fp::MODULUS_BIT_SIZE).contains(&(m.bits() as u32)) {
         return None;
     }
@@ -327,7 +328,7 @@ fn mimic_ec_mult_air(
 pub fn generator_points_poly() -> (Vec<FieldVariant<Fp, Fp>>, Vec<FieldVariant<Fp, Fp>>) {
     let mut evals = Vec::new();
 
-    let mut acc = Projective::from(Curve::GENERATOR);
+    let mut acc = Projective::from(StarkwareCurve::GENERATOR);
     for _ in 0..256 {
         let p = acc.into_affine();
         evals.push((p.x, p.y));

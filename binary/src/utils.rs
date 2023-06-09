@@ -1,4 +1,5 @@
 use alloc::vec::Vec;
+use ark_ff::PrimeField;
 use ruint::aliases::U256;
 use serde::de;
 use serde::Deserialize;
@@ -49,4 +50,10 @@ pub fn deserialize_vec_big_uint<'de, D: Deserializer<'de>>(
     struct Wrapper(#[serde(deserialize_with = "deserialize_big_uint")] U256);
     let v = Vec::deserialize(deserializer)?;
     Ok(v.into_iter().map(|Wrapper(a)| a).collect())
+}
+
+/// Calculates the number of bytes per field element the
+/// same way as StarkWare's runner
+pub const fn field_bytes<F: PrimeField>() -> usize {
+    F::MODULUS_BIT_SIZE.next_multiple_of(8) as usize / 8
 }

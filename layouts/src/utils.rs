@@ -1,10 +1,8 @@
 use crate::layout6::PUBLIC_MEMORY_STEP;
 use ark_ff::PrimeField;
 use binary::CompiledProgram;
-use builtins::bitwise::dilute;
 use ministark::StarkExtensionOf;
 use ministark_gpu::GpuFftField;
-use num_bigint::BigUint;
 use ruint::aliases::U256;
 use ruint::uint;
 
@@ -93,7 +91,7 @@ pub fn compute_diluted_cumulative_value<
     for _ in 1..N_BITS {
         x += diff_x;
         diff_x *= diff_multiplier;
-        // To save multiplications, store intermediate values.
+        // store intermediate values to save multiplications
         let xp = x * p;
         let y = p + z * xp;
         q += q * y + x * xp;
@@ -149,58 +147,85 @@ pub fn get_ordered_memory_accesses<F: PrimeField>(
     ordered_accesses.to_vec()
 }
 
-// pub struct MemoryPool<F: Field>(Vec<(u32, F)>);
+pub struct MemoryPool<F> {
+    program: CompiledProgram,
+    memory: Vec<(u32, F)>,
+}
 
-// impl<F: Field> MemoryPool<F> {
-//     pub fn new() -> Self {
-//         Self(Vec::new())
-//     }
+impl<F: PrimeField> MemoryPool<F> {
+    pub fn new(program: &CompiledProgram) -> Self {
+        Self {
+            // TODO: improve later
+            program: program.clone(),
+            memory: Vec::new(),
+        }
+    }
 
-//     pub fn push(&mut self, address: u32, value: F) {
-//         self.0.push((address, value));
-//     }
+    /// Pushes a memory access to the pool
+    pub fn push(&mut self, address: u32, value: F) {
+        self.memory.push((address, value));
+    }
 
-//     pub fn get_ordered_accesses() -> {
-//         // the number of cells allocated for the public memory
-//         let num_pub_mem_cells = trace_len / PUBLIC_MEMORY_STEP;
-//         let pub_mem = program.get_public_memory::<F>();
-//         let pub_mem_accesses = pub_mem.iter().map(|&(a, v)| ((a as
-// u64).into(), v));         let (padding_address, padding_value) =
-// program.get_padding_address_and_value();         let padding_entry =
-// ((padding_address as u64).into(), padding_value);
+    pub fn get_ordered_accesses_with_padding(
+        &self,
+        trace_len: usize,
+    ) -> (Vec<(u32, F)>, Vec<(u32, F)>) {
+        let public_memory = self.program.get_public_memory();
+        let padding_access = self.program.get_padding_address_and_value();
 
-//         // order all memory accesses by address
-//         // memory accesses are of the form [address, value]
-//         let mut ordered_accesses = accesses
-//             .iter()
-//             .copied()
-//             .chain((0..num_pub_mem_cells - pub_mem_accesses.len()).map(|_|
-// padding_entry))             .chain(pub_mem_accesses)
-//             .collect::<Vec<(F, F)>>();
+        // order all memory accesses by address
+        // memory accesses are of the form (address, value)
+        let mut ordered_accesses = self
+            .memory
+            .iter()
+            .copied()
+            .chain(public_memory)
+            .collect::<Vec<(u32, F)>>();
+        ordered_accesses.sort_by_key(|a| a.0);
 
-//         ordered_accesses.sort();
+        // memory values need to be continuos therefore any gaps
+        // e.g. [..., (a:4, v:..), (a:7, v:..), ...] need to
+        // be filled with [(a:5, v:..), (a:6, v:..)] as padding.
+        let mut padding_accesses = Vec::new();
+        for &[(a_addr, _), (b_addr, _)] in ordered_accesses.array_windows() {
+            for padding_addr in a_addr.saturating_add(1)..b_addr {
+                padding_accesses.push(if padding_addr == padding_access.0 {
+                    padding_access
+                } else {
+                    (padding_addr, F::ZERO)
+                })
+            }
+        }
 
-//         // justification for this is explained in section 9.8 of the Cairo paper https://eprint.iacr.org/2021/1063.pdf.
-//         // SHARP starts the first address at address 1
-//         let (zeros, ordered_accesses) =
-// ordered_accesses.split_at(num_pub_mem_cells);         assert!(zeros.iter().
-// all(|(a, v)| a.is_zero() && v.is_zero()));         assert!
-// (ordered_accesses[0].0.is_one());
+        while padding_accesses.len() + ordered_accesses.len() != trace_len {
+            padding_accesses.push(padding_access);
+        }
 
-//         // check memory is "continuous" and "single valued"
-//         ordered_accesses
-//             .array_windows()
-//             .enumerate()
-//             .for_each(|(i, &[(a, v), (a_next, v_next)])| {
-//                 assert!(
-//                     (a == a_next && v == v_next) || a == a_next - F::one(),
-//                     "mismatch at {i}: a={a}, v={v}, a_next={a_next},
-// v_next={v_next}"                 );
-//             });
+        // Add padding to the ordered vals
+        for v in &padding_accesses {
+            ordered_accesses.push(*v);
+        }
 
-//         ordered_accesses.to_vec()
-//     }
-// }
+        // re-sort the accesses.
+        ordered_accesses.sort();
+        // assert_eq!(trace_len, ordered_accesses.len());
+        println!("ol: {}", ordered_accesses.len());
+        println!("ol: {}", padding_accesses.len());
+        // assert_eq!(trace_len / 8, padding_accesses.len());
+
+        // double check memory is "continuous" and "single valued"
+        ordered_accesses.array_windows().enumerate().for_each(
+            |(i, &[(a, v), (a_next, v_next)])| {
+                assert!(
+                    (a == a_next && v == v_next) || a == a_next - 1,
+                    "mismatch at {i}: curr=(addr:{a}, val:{v}), next=(addr:{a_next}, val:{v_next})"
+                );
+            },
+        );
+
+        (ordered_accesses, padding_accesses)
+    }
+}
 
 #[derive(Default, Debug, Clone)]
 pub struct DilutedCheckPool<const N_BITS: usize, const SPACING: usize>(Vec<u128>);
@@ -295,7 +320,6 @@ impl<const N_BITS: usize, const SPACING: usize> DilutedCheckPool<N_BITS, SPACING
         }
 
         // re-sort the values.
-        // padding is already sorted.
         ordered_vals.sort();
 
         (ordered_vals, padding_vals)
@@ -346,7 +370,6 @@ impl RangeCheckPool {
         }
 
         // re-sort the values.
-        // padding is already sorted.
         ordered_vals.sort();
 
         (ordered_vals, padding_vals)

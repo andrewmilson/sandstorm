@@ -42,7 +42,7 @@ pub fn gen_periodic_table<F: FftField>(matrix: Vec<Vec<F>>) -> Vec<DensePolynomi
         .collect()
 }
 
-pub mod starkware_curve {
+pub mod curve {
     use ark_ec::CurveConfig;
     use ark_ec::short_weierstrass::SWCurveConfig;
     use ark_ff::Fp256;
@@ -60,9 +60,9 @@ pub mod starkware_curve {
     pub type Fr = Fp256<MontBackend<FrConfig, 4>>;
 
     // StarkWare's Cairo curve params: https://docs.starkware.co/starkex/crypto/pedersen-hash-function.html
-    pub struct Curve;
+    pub struct StarkwareCurve;
 
-    impl CurveConfig for Curve {
+    impl CurveConfig for StarkwareCurve {
         type BaseField = Fp;
         type ScalarField = Fr;
 
@@ -70,7 +70,7 @@ pub mod starkware_curve {
         const COFACTOR_INV: Self::ScalarField = Fr::ONE;
     }
 
-    impl SWCurveConfig for Curve {
+    impl SWCurveConfig for StarkwareCurve {
         const COEFF_A: Self::BaseField = Fp::ONE;
         const COEFF_B: Self::BaseField =
             Fp!("3141592653589793238462643383279502884197169399375105820974944592307816406665");
@@ -83,7 +83,7 @@ pub mod starkware_curve {
 
     /// calculates the slope between points `p1` and `p2`
     /// Returns None if one of the points is the point at infinity
-    pub fn calculate_slope(p1: Affine<Curve>, p2: Affine<Curve>) -> Option<Fp> {
+    pub fn calculate_slope(p1: Affine<StarkwareCurve>, p2: Affine<StarkwareCurve>) -> Option<Fp> {
         if p1.infinity || p2.infinity || (p1.x == p2.x && p1.y != p2.y) {
             return None;
         }
@@ -97,7 +97,7 @@ pub mod starkware_curve {
             // use tangent line
             assert_eq!(y1, y2);
             let xx = x1.square();
-            (xx + xx + xx + Curve::COEFF_A) / (y1 + y1)
+            (xx + xx + xx + StarkwareCurve::COEFF_A) / (y1 + y1)
         } else {
             // use slope
             (y2 - y1) / (x2 - x1)

@@ -1,4 +1,4 @@
-#![feature(buf_read_has_data_left)]
+#![feature(buf_read_has_data_left, int_roundings)]
 
 extern crate alloc;
 
@@ -18,6 +18,7 @@ use std::ops::Deref;
 use std::path::PathBuf;
 use utils::deserialize_hex_str;
 use utils::deserialize_vec_hex_str;
+use utils::field_bytes;
 
 mod utils;
 
@@ -93,14 +94,13 @@ impl<F: Field> Memory<F> {
         let mut reader = BufReader::new(r);
         let mut partial_memory = Vec::new();
         let mut max_address = 0;
+        let mut word_bytes = Vec::new();
+        word_bytes.resize(field_bytes::<F>(), 0);
         while reader.has_data_left().unwrap() {
             // TODO: ensure always deserializes u64 and both are always little-endian
             let address = bincode::deserialize_from(&mut reader).unwrap();
-            // TODO: U256 bincode has memory overallocation bug
-            // let word_bytes: [u8; size_of::<F>()] = bincode::deserialize_from(&mut
-            // reader).unwrap();
-            let value = F::deserialize_uncompressed(&mut reader).unwrap();
-            let word = U256::from::<BigUint>(value.into_bigint().into());
+            reader.read_exact(&mut word_bytes).unwrap();
+            let word = U256::try_from_le_slice(&word_bytes).unwrap();
             partial_memory.push((address, Word::new(word)));
             max_address = std::cmp::max(max_address, address);
         }
@@ -146,6 +146,7 @@ pub struct MemorySegments {
     pub range_check: Option<Segment>,
     pub ecdsa: Option<Segment>,
     pub bitwise: Option<Segment>,
+    pub ec_op: Option<Segment>,
 }
 
 #[derive(Deserialize, Clone, Debug)]
@@ -267,6 +268,40 @@ impl BitwiseInstance {
     }
 }
 
+/// Elliptic Curve operation instance for `p + m * q` on an elliptic curve
+#[derive(Deserialize, Clone, Copy, Debug)]
+pub struct EcOpInstance {
+    pub index: u32,
+    #[serde(deserialize_with = "deserialize_hex_str")]
+    pub p_x: U256,
+    #[serde(deserialize_with = "deserialize_hex_str")]
+    pub p_y: U256,
+    #[serde(deserialize_with = "deserialize_hex_str")]
+    pub q_x: U256,
+    #[serde(deserialize_with = "deserialize_hex_str")]
+    pub q_y: U256,
+    #[serde(deserialize_with = "deserialize_hex_str")]
+    pub m: U256,
+}
+
+impl EcOpInstance {
+    /// Get the memory address for this instance
+    /// Output is of the form (p_x_addr, p_y_addr, q_x_addr, q_y_addr, m_addr,
+    /// r_x_addr, r_y_addr)
+    pub fn mem_addr(&self, ec_op_segment_addr: u32) -> (u32, u32, u32, u32, u32, u32, u32) {
+        let instance_offset = ec_op_segment_addr + self.index * 7;
+        (
+            instance_offset,
+            instance_offset + 1,
+            instance_offset + 2,
+            instance_offset + 3,
+            instance_offset + 4,
+            instance_offset + 5,
+            instance_offset + 6,
+        )
+    }
+}
+
 #[derive(Deserialize)]
 pub struct AirPrivateInput {
     pub trace_path: PathBuf,
@@ -275,9 +310,10 @@ pub struct AirPrivateInput {
     pub ecdsa: Vec<EcdsaInstance>,
     pub range_check: Vec<RangeCheckInstance>,
     pub bitwise: Vec<BitwiseInstance>,
+    pub ec_op: Vec<EcOpInstance>,
 }
 
-#[derive(Deserialize)]
+#[derive(Clone, Deserialize, Debug)]
 pub struct CompiledProgram {
     #[serde(deserialize_with = "deserialize_vec_hex_str")]
     pub data: Vec<U256>,

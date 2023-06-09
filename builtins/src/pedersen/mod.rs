@@ -15,10 +15,10 @@ use ministark_gpu::fields::p3618502788666131213697322783095070105623107215331596
 use num_bigint::BigUint;
 use ruint::aliases::U256;
 use ruint::uint;
-use crate::utils::starkware_curve::Fr;
-use crate::utils::starkware_curve::Curve;
+use crate::utils::curve::Fr;
+use crate::utils::curve::StarkwareCurve;
 use crate::utils::gen_periodic_table;
-use crate::utils::starkware_curve::calculate_slope;
+use crate::utils::curve::calculate_slope;
 
 pub mod constants;
 
@@ -35,7 +35,11 @@ pub fn pedersen_hash(a: Fp, b: Fp) -> Fp {
     (P0 + processed_a + processed_b).into_affine().x
 }
 
-fn process_element(x: Fp, p1: Projective<Curve>, p2: Projective<Curve>) -> Projective<Curve> {
+fn process_element(
+    x: Fp,
+    p1: Projective<StarkwareCurve>,
+    p2: Projective<StarkwareCurve>,
+) -> Projective<StarkwareCurve> {
     assert_eq!(252, Fp::MODULUS_BIT_SIZE);
     let x: BigUint = x.into_bigint().into();
     let shift = 252 - 4;
@@ -48,7 +52,7 @@ fn process_element(x: Fp, p1: Projective<Curve>, p2: Projective<Curve>) -> Proje
 
 #[derive(Clone, Copy, Debug)]
 pub struct ElementPartialStep {
-    pub point: Affine<Curve>,
+    pub point: Affine<StarkwareCurve>,
     pub suffix: Fp,
     pub slope: Fp,
 }
@@ -114,9 +118,9 @@ impl InstanceTrace {
 
 fn gen_element_steps(
     x: Fp,
-    p0: Affine<Curve>,
-    p1: Affine<Curve>,
-    p2: Affine<Curve>,
+    p0: Affine<StarkwareCurve>,
+    p1: Affine<StarkwareCurve>,
+    p2: Affine<StarkwareCurve>,
 ) -> Vec<ElementPartialStep> {
     // generate our constant points
     let mut constant_points = Vec::new();

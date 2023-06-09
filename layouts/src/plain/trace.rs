@@ -91,7 +91,7 @@ impl<Fp: GpuFftField + PrimeField, Fq: StarkExtensionOf<Fp>> CairoExecutionTrace
         // fill memory gaps to make memory "continuous"
         // skip the memory at address 0 - this is a special memory address in Cairo
         // TODO: a little brittle. investigate more.
-        let mut npc_gap_iter = npc_column.array_chunks_mut().skip(3).step_by(4);
+        let mut npc_gap_iter = npc_column.array_chunks_mut().skip(7).step_by(8);
         for (a, v) in mem.iter().enumerate().skip(1) {
             if v.is_none() {
                 *npc_gap_iter.next().unwrap() = [(a as u64).into(), Fp::zero()];
@@ -278,6 +278,7 @@ impl<Fp: GpuFftField + PrimeField, Fq: StarkExtensionOf<Fp>> CairoExecutionTrace
             initial_rc_address: None,
             initial_ecdsa_address: None,
             initial_bitwise_address: None,
+            initial_ec_op_address: None,
         }
     }
 }
