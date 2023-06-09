@@ -32,7 +32,7 @@ struct SandstormOptions {
     #[structopt(
         long, 
         possible_values = Layout::VARIANTS, 
-        case_insensitive = true, 
+        case_insensitive = true,
         default_value = "plain"
     )]
     layout: Layout,
@@ -96,7 +96,7 @@ fn main() {
                     type A = layouts::plain::AirConfig<Fp, Fp>;
                     type T = layouts::plain::ExecutionTrace<Fp, Fp>;
                     execute_command::<A, T>(command, options, program);
-                },
+                }
                 Layout::Layout6 => {
                     type A = layouts::layout6::AirConfig;
                     type T = layouts::layout6::ExecutionTrace;
@@ -113,7 +113,7 @@ fn main() {
                     type A = layouts::plain::AirConfig<Fp, Fq3>;
                     type T = layouts::plain::ExecutionTrace<Fp, Fq3>;
                     execute_command::<A, T>(command, options, program);
-                },
+                }
                 Layout::Layout6 => unimplemented!("layout6 does not support Goldilocks field"),
             }
         }
@@ -121,14 +121,25 @@ fn main() {
     }
 }
 
-fn execute_command<A: CairoAirConfig, T: CairoExecutionTrace<Fp = A::Fp, Fq = A::Fq>>(command: Command, options: ProofOptions, program: CompiledProgram)where
-A::Fp: PrimeField, {
+fn execute_command<A: CairoAirConfig, T: CairoExecutionTrace<Fp = A::Fp, Fq = A::Fq>>(
+    command: Command,
+    options: ProofOptions,
+    program: CompiledProgram,
+) where
+    A::Fp: PrimeField,
+{
     match command {
         Command::Prove {
             output,
             air_private_input,
             air_public_input,
-        } => prove::<A, T>(options, program, &air_private_input, &air_public_input, &output),
+        } => prove::<A, T>(
+            options,
+            program,
+            &air_private_input,
+            &air_public_input,
+            &output,
+        ),
         Command::Verify { proof } => verify::<A>(options, program, &proof),
     }
 }
@@ -159,8 +170,10 @@ fn prove<A: CairoAirConfig, T: CairoExecutionTrace<Fp = A::Fp, Fq = A::Fq>>(
 {
     let now = Instant::now();
 
-    let air_private_input_file = File::open(air_private_input_path).expect("could not open the air private input file");
-    let air_private_input: AirPrivateInput = serde_json::from_reader(air_private_input_file).unwrap();
+    let air_private_input_file =
+        File::open(air_private_input_path).expect("could not open the air private input file");
+    let air_private_input: AirPrivateInput =
+        serde_json::from_reader(air_private_input_file).unwrap();
 
     let trace_path = &air_private_input.trace_path;
     let trace_file = File::open(trace_path).expect("could not open trace file");
@@ -170,10 +183,17 @@ fn prove<A: CairoAirConfig, T: CairoExecutionTrace<Fp = A::Fp, Fq = A::Fq>>(
     let memory_file = File::open(memory_path).expect("could not open memory file {}");
     let memory = Memory::from_reader(memory_file);
 
-    let air_public_input_file = File::open(air_public_input_path).expect("could not open the air public input file");
+    let air_public_input_file =
+        File::open(air_public_input_path).expect("could not open the air public input file");
     let air_public_input: AirPublicInput = serde_json::from_reader(air_public_input_file).unwrap();
 
-    let execution_trace = T::new(program, air_public_input, air_private_input, memory, register_states);
+    let execution_trace = T::new(
+        program,
+        air_public_input,
+        air_private_input,
+        memory,
+        register_states,
+    );
     println!(
         "Generated execution trace (cols={}, rows={}) in {:.0?}",
         execution_trace.base_columns().num_cols(),

@@ -27,8 +27,9 @@ pub const SHIFT_POINT: Affine<StarkwareCurve> = super::pedersen::constants::P0;
 /// Created once since creating new instance traces each time is expensive.
 static DUMMY_INSTANCE_TRACE: OnceLock<InstanceTrace> = OnceLock::new();
 
+/// Elliptic Curve multilpy-add (MAD) partial step
 #[derive(Clone, Debug)]
-pub struct EcMultPartialStep {
+pub struct EcMadPartialStep {
     pub partial_sum: Affine<StarkwareCurve>,
     pub fixed_point: Affine<StarkwareCurve>,
     pub suffix: Fp,
@@ -68,16 +69,16 @@ pub struct InstanceTrace {
     /// steps for `z * G` where
     /// `G` is the elliptic curve generator point and
     /// `z` is the message hash
-    pub zg_steps: Vec<EcMultPartialStep>,
+    pub zg_steps: Vec<EcMadPartialStep>,
     /// steps for the scalar multiplication `r * Q` where
     /// `Q` is the pubkey point and
     /// `r` is the signature's `r` value
-    pub rq_steps: Vec<EcMultPartialStep>,
+    pub rq_steps: Vec<EcMadPartialStep>,
     /// steps for the scalar multiplication `w * B` where
     /// `B = z * G + r * Q` and
     /// `w` is the inverse of the signature's `s` value (NOTE: that's the
     /// inverse in the curve's scalar field)
-    pub wb_steps: Vec<EcMultPartialStep>,
+    pub wb_steps: Vec<EcMadPartialStep>,
 }
 
 impl InstanceTrace {
@@ -93,18 +94,18 @@ impl InstanceTrace {
         let shift_point = Projective::from(SHIFT_POINT);
         let generator = Projective::from(StarkwareCurve::GENERATOR);
 
-        let zg = Affine::from(mimic_ec_mult_air(message.into(), generator, -shift_point).unwrap());
-        let qr = Affine::from(mimic_ec_mult_air(r.into(), pubkey.into(), shift_point).unwrap());
+        let zg = Affine::from(mimic_ec_mad_air(message.into(), generator, -shift_point).unwrap());
+        let qr = Affine::from(mimic_ec_mad_air(r.into(), pubkey.into(), shift_point).unwrap());
 
         let b = (zg + qr).into_affine();
         let b_slope = calculate_slope(zg, qr).unwrap();
         let b_x_diff_inv = (zg.x - qr.x).inverse().unwrap();
         let b_doubling_steps = doubling_steps(256, b.into());
-        let wb = Affine::from(mimic_ec_mult_air(w.into(), b.into(), shift_point).unwrap());
+        let wb = Affine::from(mimic_ec_mad_air(w.into(), b.into(), shift_point).unwrap());
 
-        let zg_steps = gen_ec_mult_steps(message.into(), generator, -shift_point);
-        let rq_steps = gen_ec_mult_steps(r.into(), pubkey.into(), shift_point);
-        let wb_steps = gen_ec_mult_steps(w.into(), b.into(), shift_point);
+        let zg_steps = gen_ec_mad_steps(message.into(), generator, -shift_point);
+        let rq_steps = gen_ec_mad_steps(r.into(), pubkey.into(), shift_point);
+        let wb_steps = gen_ec_mad_steps(w.into(), b.into(), shift_point);
 
         assert_eq!(zg, zg_steps.last().unwrap().partial_sum);
         assert_eq!(qr, rq_steps.last().unwrap().partial_sum);
@@ -158,12 +159,12 @@ impl InstanceTrace {
     }
 }
 
-/// Generates a list of the steps involved with an elliptic curve multiply
-fn gen_ec_mult_steps(
+/// Generates a list of the steps involved with an EC multiply-add
+fn gen_ec_mad_steps(
     x: BigUint,
     mut point: Projective<StarkwareCurve>,
     shift_point: Projective<StarkwareCurve>,
-) -> Vec<EcMultPartialStep> {
+) -> Vec<EcMadPartialStep> {
     let x = U256::from(x);
     // Assertions fail if the AIR will error
     assert!(x != U256::ZERO);
@@ -174,7 +175,7 @@ fn gen_ec_mult_steps(
         let suffix = x >> i;
         let bit = suffix & uint!(1_U256);
 
-        let mut slope: Fp = Fp::ZERO;
+        let mut slope = Fp::ZERO;
         let mut partial_sum_next = partial_sum;
         let partial_sum_affine = partial_sum.into_affine();
         let point_affine = point.into_affine();
@@ -183,7 +184,7 @@ fn gen_ec_mult_steps(
             partial_sum_next += point;
         }
 
-        res.push(EcMultPartialStep {
+        res.push(EcMadPartialStep {
             partial_sum: partial_sum_affine,
             fixed_point: point_affine,
             suffix: Fp::from(BigUint::from(suffix)),
@@ -283,9 +284,9 @@ fn verify(msg_hash: Fp, r: Fp, s: Fr, pubkey_x: Fp) -> Option<Affine<StarkwareCu
         // errors here as well.
         let shift_point = Projective::from(SHIFT_POINT);
         let generator = StarkwareCurve::GENERATOR.into();
-        let zg = mimic_ec_mult_air(msg_hash.into(), generator, -shift_point).unwrap();
-        let rq = mimic_ec_mult_air(r.into(), pubkey.into(), shift_point).unwrap();
-        let wb = mimic_ec_mult_air(w.into(), zg + rq, shift_point).unwrap();
+        let zg = mimic_ec_mad_air(msg_hash.into(), generator, -shift_point).unwrap();
+        let rq = mimic_ec_mad_air(r.into(), pubkey.into(), shift_point).unwrap();
+        let wb = mimic_ec_mad_air(w.into(), zg + rq, shift_point).unwrap();
         let x = (wb - shift_point).into_affine().x;
         if r == x {
             return Some(pubkey);
@@ -297,7 +298,7 @@ fn verify(msg_hash: Fp, r: Fp, s: Fr, pubkey_x: Fp) -> Option<Affine<StarkwareCu
 
 /// Computes `m * point + shift_point` using the same steps like the AIR and
 /// Returns None if and only if the AIR errors.
-pub(crate) fn mimic_ec_mult_air(
+pub(crate) fn mimic_ec_mad_air(
     m: BigUint,
     mut point: Projective<StarkwareCurve>,
     shift_point: Projective<StarkwareCurve>,

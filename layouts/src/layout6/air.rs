@@ -9,10 +9,10 @@ use super::PUBLIC_MEMORY_STEP;
 use super::RANGE_CHECK_BUILTIN_PARTS;
 use super::RANGE_CHECK_BUILTIN_RATIO;
 use super::RANGE_CHECK_STEP;
-use crate::layout6::DILUTED_CHECK_N_BITS;
-use crate::layout6::DILUTED_CHECK_SPACING;
-use crate::layout6::ECDSA_SIG_CONFIG_ALPHA;
-use crate::layout6::ECDSA_SIG_CONFIG_BETA;
+use super::DILUTED_CHECK_N_BITS;
+use super::DILUTED_CHECK_SPACING;
+use super::ECDSA_SIG_CONFIG_ALPHA;
+use super::ECDSA_SIG_CONFIG_BETA;
 use crate::utils;
 use crate::ExecutionInfo;
 use crate::utils::compute_diluted_cumulative_value;
@@ -138,6 +138,9 @@ impl ministark::air::AirConfig for AirConfig {
                 + Bitwise::Bits16Chunk3Offset3.curr() * (&two).pow(195);
 
         let ec_op_doubling_q_x_squared_0 = EcOp::QDoublingX.curr() * EcOp::QDoublingX.curr();
+        let ec_op_ec_subset_sum_bit_0 =
+            EcOp::MSuffix.curr() - (EcOp::MSuffix.next() + EcOp::MSuffix.next());
+        let ec_op_ec_subset_sum_bit_0_neg = &one - &ec_op_ec_subset_sum_bit_0;
 
         // example for trace length n=64
         // =============================
@@ -625,7 +628,7 @@ impl ministark::air::AirConfig for AirConfig {
         let shift191 = Constant(FieldVariant::Fp(Fp::from(BigUint::from(2u32).pow(191u32))));
         let pedersen_hash0_ec_subset_sub_bit_unpacking_zeros_between_ones =
             (Pedersen::Bit251AndBit196AndBit192.curr()
-                * (Pedersen::Suffix.next() - Pedersen::Suffix.offset(192) * shift191))
+                * (Pedersen::Suffix.offset(1) - Pedersen::Suffix.offset(192) * shift191))
                 * &every_256_row_zerofier_inv;
         let pedersen_hash0_ec_subset_sum_bit_unpacking_cumulative_bit192 =
             (Pedersen::Bit251AndBit196AndBit192.curr()
@@ -1580,15 +1583,145 @@ impl ministark::air::AirConfig for AirConfig {
             - EcOp::QDoublingSlope.curr() * (EcOp::QDoublingX.curr() - EcOp::QDoublingX.next()))
             * &ec_op_transition_zerofier_inv;
 
-        // Constraint expression for bitwise/unique_unpacking193: (column7_row721 +
-        // column7_row977) * 16 - column7_row521
+        // check the correct `Q` point is loaded in
+        let ec_op_get_q_x =
+            (Npc::EcOpQXVal.curr() - EcOp::QDoublingX.curr()) * &all_ec_op_zerofier_inv;
+        let ec_op_get_q_y =
+            (Npc::EcOpQYVal.curr() - EcOp::QDoublingY.curr()) * &all_ec_op_zerofier_inv;
 
-        // new
-        // let bitwise_partition =
-        // let bitwise_or_is_and_plus_xor =
-        // new
+        // Use knowledge of bits 251,196,192 to determine if there is a unique unpacking
+        let ec_op_ec_subset_sum_bit_unpacking_last_one_is_zero = (EcOp::MBit251AndBit196AndBit192
+            .curr()
+            * (EcOp::MSuffix.curr() - (EcOp::MSuffix.next() + EcOp::MSuffix.next())))
+            * &all_ec_op_zerofier_inv;
+        let ec_op_ec_subset_sum_bit_unpacking_zeroes_between_ones0 =
+            (EcOp::MBit251AndBit196AndBit192.curr()
+                * (EcOp::MSuffix.offset(1) - EcOp::MSuffix.offset(192) * shift191))
+                * &all_ec_op_zerofier_inv;
+        let ec_op_ec_subset_sum_bit_unpacking_cumulative_bit192 = (EcOp::MBit251AndBit196AndBit192
+            .curr()
+            - EcOp::MBit251AndBit196.curr()
+                * (EcOp::MSuffix.offset(192)
+                    - (EcOp::MSuffix.offset(193) + EcOp::MSuffix.offset(193))))
+            * &all_ec_op_zerofier_inv;
+        let ec_op_ec_subset_sum_bit_unpacking_zeroes_between_ones192 = (EcOp::MBit251AndBit196
+            .curr()
+            * (EcOp::MSuffix.offset(193) - EcOp::MSuffix.offset(196) * shift3))
+            * &all_ec_op_zerofier_inv;
+        let ec_op_ec_subset_sum_bit_unpacking_cumulative_bit196 = (EcOp::MBit251AndBit196.curr()
+            - (EcOp::MSuffix.offset(251)
+                - (EcOp::MSuffix.offset(252) + EcOp::MSuffix.offset(252)))
+                * (EcOp::MSuffix.offset(196)
+                    - (EcOp::MSuffix.offset(197) + EcOp::MSuffix.offset(197))))
+            * &all_ec_op_zerofier_inv;
+        let ec_op_ec_subset_sum_bit_unpacking_zeroes_between_ones196 =
+            ((EcOp::MSuffix.offset(251) - (EcOp::MSuffix.offset(252) + EcOp::MSuffix.offset(252)))
+                * (EcOp::MSuffix.offset(197) - EcOp::MSuffix.offset(251) * shift54))
+                * &all_ec_op_zerofier_inv;
 
-        // let ecdsa_signature0_doubling_key_x =
+        // Constraint operates 256 times in steps of 64 rows
+        // Each row shifts the message hash to the right. E.g.
+        // ```text
+        // row(64 * 0 + 18):    10101...10001 <- constraint applied
+        // row(64 * 1 + 18):     1010...11000 <- constraint applied
+        // ...                                <- constraint applied
+        // row(64 * 255 + 18):              0 <- constraint disabled
+        // row(64 * 256 + 18):  11101...10001 <- constraint applied
+        // row(64 * 257 + 18):   1110...01000 <- constraint applied
+        // ...                                <- constraint applied
+        // row(64 * 511 + 18):              0 <- constraint disabled
+        // ...
+        // ```
+        let ec_op_ec_subset_sum_booleanity_test = (&ec_op_ec_subset_sum_bit_0
+            * (&ec_op_ec_subset_sum_bit_0 - &one))
+            * &ec_op_transition_zerofier_inv;
+
+        // Note that with Cairo's default field each element is 252 bits.
+        // Therefore we are decomposing 252 bit numbers to do pedersen hash.
+        // Since we have a column that right shifts a number each row we check that the
+        // suffix of row 252 (of every 256 row group) equals 0 e.g.
+        // ```text
+        // row0:   10101...10001
+        // row1:    1010...11000
+        // ...               ...
+        // row250:            10
+        // row251:             1
+        // row252:             0 <- check zero
+        // row253:             0
+        // row254:             0
+        // row255:             0 <- check zero
+        // row256: 11101...10001
+        // row257:  1110...01000
+        // ...               ...
+        // row506:            11
+        // row507:             1
+        // row508:             0 <- check zero
+        // row509:             0
+        // ...               ...
+        // ```
+        let ec_op_zero_suffix_zerofier_inv =
+            &one / (X.pow(n / 16384) - Constant(FieldVariant::Fp(g.pow([(63 * n / 64) as u64]))));
+        let ec_op_ec_subset_sum_bit_extraction_end =
+            EcOp::MSuffix.curr() * &ec_op_zero_suffix_zerofier_inv;
+        let ec_op_ec_subset_sum_zeros_tail = EcOp::MSuffix.curr()
+            / (X.pow(n / 16384) - Constant(FieldVariant::Fp(g.pow([255 * n as u64 / 256]))));
+
+        // let `H = (Hx, Hy)` be the doubled point to be added
+        // let `K = (Kx, Ky)` be the partial result
+        // note that the slope = dy/dx with dy = Ky - Hy, dx = Kx - Hx
+        // this constraint is equivalent to: bit * dy = dy/dx * dx
+        // NOTE: slope is 0 if bit is 0
+        let ec_op_ec_subset_sum_add_points_slope = (&ec_op_ec_subset_sum_bit_0
+            * (EcOp::RPartialSumY.curr() - EcOp::QDoublingY.curr())
+            - EcOp::RPartialSumSlope.curr()
+                * (EcOp::RPartialSumX.curr() - EcOp::QDoublingX.curr()))
+            * &ec_op_transition_zerofier_inv;
+
+        // These two constraint check classic short Weierstrass curve point addition.
+        // Constraint is equivalent to:
+        // - `Kx_next = m^2 - Kx - Hx, m = dy/dx`
+        // - `Ky_next = m*(Kx - Kx_next) - Ky, m = dy/dx`
+        let ec_op_ec_subset_sum_add_points_x = (EcOp::RPartialSumSlope.curr()
+            * EcOp::RPartialSumSlope.curr()
+            - &ec_op_ec_subset_sum_bit_0
+                * (EcOp::RPartialSumX.curr()
+                    + EcOp::QDoublingX.curr()
+                    + EcOp::RPartialSumX.next()))
+            * &ec_op_transition_zerofier_inv;
+        let ec_op_ec_subset_sum_add_points_y = (&ec_op_ec_subset_sum_bit_0
+            * (EcOp::RPartialSumY.curr() + EcOp::RPartialSumY.next())
+            - EcOp::RPartialSumSlope.curr()
+                * (EcOp::RPartialSumX.curr() - EcOp::RPartialSumX.next()))
+            * &ec_op_transition_zerofier_inv;
+        // constraint checks that the cell contains 1/(Kx - Hx)
+        // Why this constraint? it checks that the Kx and Hx are not equal
+        // with Hx the x-coordinate of the doubled point Q
+        // and Kx the x-coordinate of the partial sum of R
+        // if this where the case we may be dividing by 0
+        let ec_op_ec_subset_sum_add_points_x_diff_inv = (EcOp::RPartialSumXDiffInv.curr()
+            * (EcOp::RPartialSumX.curr() - EcOp::QDoublingX.curr())
+            - &one)
+            * &ec_op_transition_zerofier_inv;
+        // if the bit is 0 then just copy the previous point
+        let ec_op_ec_subset_sum_copy_point_x = (&ec_op_ec_subset_sum_bit_0_neg
+            * (EcOp::RPartialSumX.next() - EcOp::RPartialSumX.curr()))
+            * &ec_op_transition_zerofier_inv;
+        let ec_op_ec_subset_sum_copy_point_y = (&ec_op_ec_subset_sum_bit_0_neg
+            * (EcOp::RPartialSumY.next() - EcOp::RPartialSumY.curr()))
+            * &ec_op_transition_zerofier_inv;
+
+        // check the correct scalar `m` is loaded in
+        let ec_op_get_m = (EcOp::MSuffix.curr() - Npc::EcOpMVal.curr()) * &all_ec_op_zerofier_inv;
+        // check the correct point `p` is loaded in
+        let ec_op_get_p_x =
+            (Npc::EcOpPXVal.curr() - EcOp::RPartialSumX.curr()) * &all_ec_op_zerofier_inv;
+        let ec_op_get_p_y =
+            (Npc::EcOpPYVal.curr() - EcOp::RPartialSumY.curr()) * &all_ec_op_zerofier_inv;
+        // check the point `r` is set correctly in memory
+        let ec_op_set_r_x =
+            (Npc::EcOpRXVal.curr() - EcOp::RPartialSumX.offset(255)) * &all_ec_op_zerofier_inv;
+        let ec_op_set_r_y =
+            (Npc::EcOpRYVal.curr() - EcOp::RPartialSumY.offset(255)) * &all_ec_op_zerofier_inv;
 
         // X^(n/512) - ω^(n/2)    = (x-ω^255)(x-ω^511)
         // (x-ω^255)(x-ω^511) / (X^n-1) = 1/(x-ω^0)..(x-ω^254)(x-ω^256)..(x-ω^510)
@@ -1837,6 +1970,28 @@ impl ministark::air::AirConfig for AirConfig {
             ec_op_doubling_q_slope,
             ec_op_doubling_q_x,
             ec_op_doubling_q_y,
+            ec_op_get_q_x,
+            ec_op_get_q_y,
+            ec_op_ec_subset_sum_bit_unpacking_last_one_is_zero,
+            ec_op_ec_subset_sum_bit_unpacking_zeroes_between_ones0,
+            ec_op_ec_subset_sum_bit_unpacking_cumulative_bit192,
+            ec_op_ec_subset_sum_bit_unpacking_zeroes_between_ones192,
+            ec_op_ec_subset_sum_bit_unpacking_cumulative_bit196,
+            ec_op_ec_subset_sum_bit_unpacking_zeroes_between_ones196,
+            ec_op_ec_subset_sum_booleanity_test,
+            ec_op_ec_subset_sum_bit_extraction_end,
+            ec_op_ec_subset_sum_zeros_tail,
+            ec_op_ec_subset_sum_add_points_slope,
+            ec_op_ec_subset_sum_add_points_x,
+            ec_op_ec_subset_sum_add_points_y,
+            ec_op_ec_subset_sum_add_points_x_diff_inv,
+            ec_op_ec_subset_sum_copy_point_x,
+            ec_op_ec_subset_sum_copy_point_y,
+            ec_op_get_m,
+            ec_op_get_p_x,
+            ec_op_get_p_y,
+            ec_op_set_r_x,
+            ec_op_set_r_y,
         ]
         .into_iter()
         .map(Constraint::new)
@@ -2016,21 +2171,48 @@ pub enum EcOp {
     QDoublingX = 44,
     QDoublingY = 28,
     QDoublingSlope = 60,
+    RPartialSumX = 2,
+    RPartialSumY = 34,
+    RPartialSumSlope = 26,
+    RPartialSumXDiffInv = 58,
+    MSuffix = 18,
+    /// Repurposes the last [Ecdsa::PubkeyPartialSumXDiffInv]
+    /// (which doesn't have a constraint)
+    MBit251AndBit196AndBit192 = 16362,
+    /// Repurposes the last [Ecdsa::PubkeyPartialSumSlope]
+    /// (which doesn't have a constraint)
+    MBit251AndBit196 = 16330,
 }
 
 impl ExecutionTraceColumn for EcOp {
     fn index(&self) -> usize {
         match self {
-            Self::QDoublingX | Self::QDoublingY | Self::QDoublingSlope => 8,
+            Self::QDoublingX
+            | Self::QDoublingY
+            | Self::QDoublingSlope
+            | Self::MSuffix
+            | Self::MBit251AndBit196AndBit192
+            | Self::MBit251AndBit196
+            | Self::RPartialSumX
+            | Self::RPartialSumY
+            | Self::RPartialSumSlope
+            | Self::RPartialSumXDiffInv => 8,
         }
     }
 
     fn offset<T>(&self, offset: isize) -> Expr<AlgebraicItem<T>> {
         let column = self.index();
         let step = match self {
-            Self::QDoublingX | Self::QDoublingY | Self::QDoublingSlope => {
-                EC_OP_BUILTIN_RATIO * CYCLE_HEIGHT / EC_OP_SCALAR_HEIGHT
-            }
+            Self::QDoublingX
+            | Self::QDoublingY
+            | Self::QDoublingSlope
+            | Self::MSuffix
+            | Self::MBit251AndBit196AndBit192
+            | Self::MBit251AndBit196
+            | Self::RPartialSumX
+            | Self::RPartialSumY
+            | Self::RPartialSumSlope
+            | Self::RPartialSumXDiffInv => EC_OP_BUILTIN_RATIO * CYCLE_HEIGHT / EC_OP_SCALAR_HEIGHT,
         } as isize;
         let trace_offset = step * offset + *self as isize;
         AlgebraicItem::Trace(column, trace_offset).into()
