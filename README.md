@@ -62,13 +62,15 @@ cargo +nightly run -r -F parallel,asm -- \
 source ~/cairo_venv/bin/activate
 
 # 2. (optional) compile and run the Cairo program
-cairo-compile example/array-sum.cairo --proof_mode --output example/array-sum.json
-cairo-run --program example/array-sum.json \
-          --trace_file example/trace.bin \
-          --memory_file example/memory.bin \
-          --layout layout6 \
-          --print_info \
-          --cairo_pie_output example/as-pie.bin
+cairo-compile example/pedersen/main.cairo --proof_mode --output example/pedersen/main_compiled.json
+cairo-run --program example/pedersen/main_compiled.json \
+          --air_private_input example/pedersen/air-private-input.json \
+          --air_public_input example/pedersen/air-public-input.json \
+          --trace_file example/pedersen/trace.bin \
+          --memory_file example/pedersen/memory.bin \
+          --layout starknet \
+          --min_steps 128 \
+          --proof_mode --print_info
 
 # 3. generate the proof
 # use `-F parallel,asm` if not using an M1 Mac

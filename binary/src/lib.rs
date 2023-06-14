@@ -71,7 +71,7 @@ impl Layout {
     // Returns the unique code used by SHARP associated to this layout
     pub fn sharp_code(&self) -> u64 {
         match self {
-            Self::AllSolidity => 8319381555716711796,
+            Self::Starknet => 8319381555716711796,
             _ => unimplemented!(),
         }
     }

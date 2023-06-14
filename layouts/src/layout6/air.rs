@@ -142,6 +142,40 @@ impl ministark::air::AirConfig for AirConfig {
             EcOp::MSuffix.curr() - (EcOp::MSuffix.next() + EcOp::MSuffix.next());
         let ec_op_ec_subset_sum_bit_0_neg = &one - &ec_op_ec_subset_sum_bit_0;
 
+        // let poseidon_poseidon_full_rounds_state0_cubed_0 = Expr::from(Trace(8, 53)) *
+        // Trace(8, 29); let poseidon_poseidon_full_rounds_state1_cubed_0 =
+        // Expr::from(Trace(8, 13)) * Trace(8, 61);
+        // let poseidon_poseidon_full_rounds_state2_cubed_0 = Expr::from(Trace(8, 45)) *
+        // Trace(8, 3); let poseidon_poseidon_full_rounds_state0_cubed_7 =
+        //     Expr::from(Trace(8, 501)) * Trace(8, 477);
+        // let poseidon_poseidon_full_rounds_state1_cubed_7 =
+        //     Expr::from(Trace(8, 461)) * Trace(8, 509);
+        // let poseidon_poseidon_full_rounds_state2_cubed_7 =
+        //     Expr::from(Trace(8, 493)) * Trace(8, 451);
+        // let poseidon_poseidon_full_rounds_state0_cubed_3 =
+        //     Expr::from(Trace(8, 245)) * Trace(8, 221);
+        // let poseidon_poseidon_full_rounds_state1_cubed_3 =
+        //     Expr::from(Trace(8, 205)) * Trace(8, 253);
+        // let poseidon_poseidon_full_rounds_state2_cubed_3 =
+        //     Expr::from(Trace(8, 237)) * Trace(8, 195);
+        // let poseidon_poseidon_partial_rounds_state0_cubed_0 = Expr::from(Trace(7, 3))
+        // * Trace(7, 7); let poseidon_poseidon_partial_rounds_state0_cubed_1 =
+        //     Expr::from(Trace(7, 11)) * Trace(7, 15);
+        // let poseidon_poseidon_partial_rounds_state0_cubed_2 =
+        //     Expr::from(Trace(7, 19)) * Trace(7, 23);
+        // let poseidon_poseidon_partial_rounds_state1_cubed_0 =
+        //     Expr::from(Trace(8, 6)) * Trace(8, 14);
+        // let poseidon_poseidon_partial_rounds_state1_cubed_1 =
+        //     Expr::from(Trace(8, 22)) * Trace(8, 30);
+        // let poseidon_poseidon_partial_rounds_state1_cubed_2 =
+        //     Expr::from(Trace(8, 38)) * Trace(8, 46);
+        // let poseidon_poseidon_partial_rounds_state1_cubed_19 =
+        //     Expr::from(Trace(8, 310)) * Trace(8, 318);
+        // let poseidon_poseidon_partial_rounds_state1_cubed_20 =
+        //     Expr::from(Trace(8, 326)) * Trace(8, 334);
+        // let poseidon_poseidon_partial_rounds_state1_cubed_21 =
+        //     Expr::from(Trace(8, 342)) * Trace(8, 350);
+
         // example for trace length n=64
         // =============================
         // x^(n/16)                 = (x - ω_0)(x - ω_16)(x - ω_32)(x - ω_48)
@@ -1722,6 +1756,9 @@ impl ministark::air::AirConfig for AirConfig {
             (Npc::EcOpRXVal.curr() - EcOp::RPartialSumX.offset(255)) * &all_ec_op_zerofier_inv;
         let ec_op_set_r_y =
             (Npc::EcOpRYVal.curr() - EcOp::RPartialSumY.offset(255)) * &all_ec_op_zerofier_inv;
+
+        // Poseidon operations builtin
+        // ===========================
 
         // NOTE: for composition OODs only seem to involve one random per constraint
         vec![

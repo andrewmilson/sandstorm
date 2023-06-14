@@ -863,7 +863,7 @@ impl CairoExecutionTrace for ExecutionTrace {
             final_pc: (self.final_registers.pc as u64).into(),
             public_memory: self.public_memory.clone(),
             log_n_steps: public_input.n_steps.ilog2(),
-            layout_code: Layout::AllSolidity.sharp_code(),
+            layout_code: Layout::Starknet.sharp_code(),
             range_check_min: public_input.rc_min,
             range_check_max: public_input.rc_max,
             public_memory_padding: self.program.get_public_memory_padding(),

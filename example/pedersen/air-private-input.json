@@ -92,5 +92,6 @@
             "q_x": "0x2b5a729dad1940dcd89abe05e6755a92dc322758cf962eff13c943f9a9b056c",
             "q_y": "0x3e6442a66525965a4ecf83be433a68f21068e1954c33170c0ba0cad14337ce8"
         }
-    ]
+    ],
+    "poseidon": []
 }
