@@ -14,7 +14,7 @@ use super::DILUTED_CHECK_SPACING;
 use super::ECDSA_SIG_CONFIG_ALPHA;
 use super::ECDSA_SIG_CONFIG_BETA;
 use crate::utils;
-use crate::ExecutionInfo;
+use crate::CairoAuxInput;
 use crate::utils::compute_diluted_cumulative_value;
 use ark_poly::EvaluationDomain;
 use ark_poly::Radix2EvaluationDomain;
@@ -46,7 +46,7 @@ impl ministark::air::AirConfig for AirConfig {
     const NUM_EXTENSION_COLUMNS: usize = 1;
     type Fp = Fp;
     type Fq = Fp;
-    type PublicInputs = ExecutionInfo<Fp>;
+    type PublicInputs = CairoAuxInput<Fp>;
 
     fn constraints(trace_len: usize) -> Vec<Constraint<FieldVariant<Fp, Fp>>> {
         use AlgebraicItem::*;
@@ -1900,11 +1900,11 @@ impl ministark::air::AirConfig for AirConfig {
 
     fn gen_hints(
         trace_len: usize,
-        execution_info: &ExecutionInfo<Self::Fp>,
+        execution_info: &CairoAuxInput<Self::Fp>,
         challenges: &Challenges<Self::Fq>,
     ) -> Hints<Self::Fq> {
         use PublicInputHint::*;
-        let ExecutionInfo {
+        let CairoAuxInput {
             initial_ap,
             initial_pc,
             final_ap,
@@ -1912,28 +1912,40 @@ impl ministark::air::AirConfig for AirConfig {
             range_check_min,
             range_check_max,
             public_memory,
-            public_memory_padding_address,
-            public_memory_padding_value,
-            initial_pedersen_address,
-            initial_rc_address,
-            initial_ecdsa_address,
-            initial_bitwise_address,
-            initial_ec_op_address,
+            public_memory_padding,
+            pedersen_segment,
+            rc_segment,
+            ecdsa_segment,
+            bitwise_segment,
+            ec_op_segment,
+            log_n_steps: _,
+            layout_code: _,
+            program_segment: _,
+            execution_segment: _,
+            output_segment: _,
+            poseidon_segment,
         } = execution_info;
 
-        let initial_pedersen_address = initial_pedersen_address.expect("layout6 requires Pedersen");
-        let initial_rc_address = initial_rc_address.expect("layout6 requires range check");
-        let initial_ecdsa_address = initial_ecdsa_address.expect("layout6 requires ECDSA");
-        let initial_bitwise_address = initial_bitwise_address.expect("layout6 requires bitwise");
-        let initial_ec_op_address = initial_ec_op_address.expect("layout6 requires EC op");
+        let pedersen_segment = pedersen_segment.expect("layout6 requires Pedersen");
+        let rc_segment = rc_segment.expect("layout6 requires range check");
+        let ecdsa_segment = ecdsa_segment.expect("layout6 requires ECDSA");
+        let bitwise_segment = bitwise_segment.expect("layout6 requires bitwise");
+        let ec_op_segment = ec_op_segment.expect("layout6 requires EC op");
+        let poseidon_segment = poseidon_segment.expect("layout6 requires poseidon");
+
+        let initial_perdersen_address = pedersen_segment.begin_addr.into();
+        let initial_rc_address = rc_segment.begin_addr.into();
+        let initial_ecdsa_address = ecdsa_segment.begin_addr.into();
+        let initial_bitwise_address = bitwise_segment.begin_addr.into();
+        let initial_ec_op_address = ec_op_segment.begin_addr.into();
+        let initial_poseidon_address = poseidon_segment.begin_addr.into();
 
         let memory_product = utils::compute_public_memory_quotient(
             challenges[MemoryPermutation::Z],
             challenges[MemoryPermutation::A],
             trace_len,
             public_memory,
-            (*public_memory_padding_address as u64).into(),
-            *public_memory_padding_value,
+            *public_memory_padding,
         );
 
         let diluted_cumulative_val = compute_diluted_cumulative_value::<
@@ -1961,11 +1973,12 @@ impl ministark::air::AirConfig for AirConfig {
             (DilutedCheckProduct.index(), Fp::ONE),
             (DilutedCheckFirst.index(), Fp::ZERO),
             (DilutedCheckCumulativeValue.index(), diluted_cumulative_val),
-            (InitialPedersenAddr.index(), initial_pedersen_address.into()),
-            (InitialRcAddr.index(), initial_rc_address.into()),
-            (InitialEcdsaAddr.index(), initial_ecdsa_address.into()),
-            (InitialBitwiseAddr.index(), initial_bitwise_address.into()),
-            (InitialEcOpAddr.index(), initial_ec_op_address.into()),
+            (InitialPedersenAddr.index(), initial_perdersen_address),
+            (InitialRcAddr.index(), initial_rc_address),
+            (InitialEcdsaAddr.index(), initial_ecdsa_address),
+            (InitialBitwiseAddr.index(), initial_bitwise_address),
+            (InitialEcOpAddr.index(), initial_ec_op_address),
+            (InitialEcOpAddr.index(), initial_poseidon_address),
         ])
     }
 }
@@ -2633,6 +2646,7 @@ pub enum PublicInputHint {
     InitialEcdsaAddr,
     InitialBitwiseAddr,
     InitialEcOpAddr,
+    InitialPoseidonAddr,
 }
 
 impl Hint for PublicInputHint {

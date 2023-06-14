@@ -3,7 +3,7 @@ use super::MEMORY_STEP;
 use super::PUBLIC_MEMORY_STEP;
 use super::RANGE_CHECK_STEP;
 use crate::utils;
-use crate::ExecutionInfo;
+use crate::CairoAuxInput;
 use ark_ff::PrimeField;
 use ark_poly::EvaluationDomain;
 use ark_poly::Radix2EvaluationDomain;
@@ -31,7 +31,7 @@ impl<Fp: GpuFftField + PrimeField, Fq: StarkExtensionOf<Fp>> ministark::air::Air
     const NUM_EXTENSION_COLUMNS: usize = 1;
     type Fp = Fp;
     type Fq = Fq;
-    type PublicInputs = ExecutionInfo<Fp>;
+    type PublicInputs = CairoAuxInput<Fp>;
 
     fn constraints(trace_len: usize) -> Vec<Constraint<FieldVariant<Fp, Fq>>> {
         use AlgebraicItem::*;
@@ -534,11 +534,11 @@ impl<Fp: GpuFftField + PrimeField, Fq: StarkExtensionOf<Fp>> ministark::air::Air
 
     fn gen_hints(
         trace_len: usize,
-        execution_info: &ExecutionInfo<Self::Fp>,
+        aux_input: &CairoAuxInput<Self::Fp>,
         challenges: &Challenges<Self::Fq>,
     ) -> Hints<Self::Fq> {
         use PublicInputHint::*;
-        let ExecutionInfo {
+        let CairoAuxInput {
             initial_ap,
             initial_pc,
             final_ap,
@@ -546,22 +546,26 @@ impl<Fp: GpuFftField + PrimeField, Fq: StarkExtensionOf<Fp>> ministark::air::Air
             range_check_min,
             range_check_max,
             public_memory,
-            public_memory_padding_address,
-            public_memory_padding_value,
-            initial_pedersen_address: _,
-            initial_rc_address: _,
-            initial_ecdsa_address: _,
-            initial_bitwise_address: _,
-            initial_ec_op_address: _,
-        } = execution_info;
+            public_memory_padding,
+            pedersen_segment: _,
+            rc_segment: _,
+            ecdsa_segment: _,
+            bitwise_segment: _,
+            ec_op_segment: _,
+            log_n_steps: _,
+            layout_code: _,
+            program_segment: _,
+            execution_segment: _,
+            output_segment: _,
+            poseidon_segment: _,
+        } = aux_input;
 
         let memory_product = utils::compute_public_memory_quotient(
             challenges[MemoryPermutation::Z],
             challenges[MemoryPermutation::A],
             trace_len,
             public_memory,
-            (*public_memory_padding_address as u64).into(),
-            *public_memory_padding_value,
+            *public_memory_padding,
         );
 
         assert!(range_check_min <= range_check_max);

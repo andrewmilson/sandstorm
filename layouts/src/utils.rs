@@ -1,6 +1,7 @@
 use crate::layout6::PUBLIC_MEMORY_STEP;
 use ark_ff::PrimeField;
 use binary::CompiledProgram;
+use binary::MemoryEntry;
 use ministark::StarkExtensionOf;
 use ministark_gpu::GpuFftField;
 use ruint::aliases::U256;
@@ -12,9 +13,8 @@ pub fn compute_public_memory_quotient<Fp: GpuFftField + PrimeField, Fq: StarkExt
     z: Fq,
     alpha: Fq,
     trace_len: usize,
-    public_memory: &[(u32, Fp)],
-    public_memory_padding_address: Fp,
-    public_memory_padding_value: Fp,
+    public_memory: &[MemoryEntry<Fp>],
+    public_memory_padding: MemoryEntry<Fp>,
 ) -> Fq {
     // the actual number of public memory cells
     let n = public_memory.len();
@@ -26,11 +26,14 @@ pub fn compute_public_memory_quotient<Fp: GpuFftField + PrimeField, Fq: StarkExt
     // denominator = \prod_i( z - (addr_i + alpha * value_i) ),
     let denominator = public_memory
         .iter()
-        .map(|(a, v)| z - (alpha * v + Fp::from(*a)))
+        .map(|e| z - (alpha * e.value + Fp::from(e.address)))
         .product::<Fq>();
-    // padding = (z - (padding_addr + alpha * padding_value))^(S - N),
-    let padding = (z - (alpha * public_memory_padding_value + public_memory_padding_address))
-        .pow([(s - n) as u64]);
+    let padding = {
+        // padding = (z - (padding_addr + alpha * padding_value))^(S - N),
+        let padding_address = Fp::from(public_memory_padding.address);
+        let padding_value = public_memory_padding.value;
+        (z - (alpha * padding_value + padding_address)).pow([(s - n) as u64])
+    };
 
     // numerator / (denominator * padding)
     numerator / (denominator * padding)
@@ -111,17 +114,17 @@ pub fn get_ordered_memory_accesses<F: PrimeField>(
 ) -> Vec<(F, F)> {
     // the number of cells allocated for the public memory
     let num_pub_mem_cells = trace_len / PUBLIC_MEMORY_STEP;
-    let pub_mem = program.get_public_memory::<F>();
-    let pub_mem_accesses = pub_mem.iter().map(|&(a, v)| ((a as u64).into(), v));
-    let (padding_address, padding_value) = program.get_padding_address_and_value();
-    let padding_entry = ((padding_address as u64).into(), padding_value);
+    let pub_mem = program.get_program_memory::<F>();
+    let pub_mem_accesses = pub_mem.iter().map(|&e| (e.address.into(), e.value));
+    let padding_entry = program.get_public_memory_padding();
+    let padding_entry_felt = (padding_entry.address.into(), padding_entry.value);
 
     // order all memory accesses by address
     // memory accesses are of the form [address, value]
     let mut ordered_accesses = accesses
         .iter()
         .copied()
-        .chain((0..num_pub_mem_cells - pub_mem_accesses.len()).map(|_| padding_entry))
+        .chain((0..num_pub_mem_cells - pub_mem_accesses.len()).map(|_| padding_entry_felt))
         .chain(pub_mem_accesses)
         .collect::<Vec<(F, F)>>();
 
@@ -149,7 +152,7 @@ pub fn get_ordered_memory_accesses<F: PrimeField>(
 
 pub struct MemoryPool<F> {
     program: CompiledProgram,
-    memory: Vec<(u32, F)>,
+    memory: Vec<MemoryEntry<F>>,
 }
 
 impl<F: PrimeField> MemoryPool<F> {
@@ -162,17 +165,16 @@ impl<F: PrimeField> MemoryPool<F> {
     }
 
     /// Pushes a memory access to the pool
-    pub fn push(&mut self, address: u32, value: F) {
-        self.memory.push((address, value));
+    pub fn push(&mut self, entry: MemoryEntry<F>) {
+        self.memory.push(entry);
     }
 
-    #[allow(clippy::type_complexity)]
     pub fn get_ordered_accesses_with_padding(
         &self,
         trace_len: usize,
-    ) -> (Vec<(u32, F)>, Vec<(u32, F)>) {
-        let public_memory = self.program.get_public_memory();
-        let padding_access = self.program.get_padding_address_and_value();
+    ) -> (Vec<MemoryEntry<F>>, Vec<MemoryEntry<F>>) {
+        let public_memory = self.program.get_program_memory();
+        let padding_access = self.program.get_public_memory_padding();
 
         // order all memory accesses by address
         // memory accesses are of the form (address, value)
@@ -181,19 +183,22 @@ impl<F: PrimeField> MemoryPool<F> {
             .iter()
             .copied()
             .chain(public_memory)
-            .collect::<Vec<(u32, F)>>();
-        ordered_accesses.sort_by_key(|a| a.0);
+            .collect::<Vec<MemoryEntry<F>>>();
+        ordered_accesses.sort_by_key(|a| a.address);
 
         // memory values need to be continuos therefore any gaps
         // e.g. [..., (a:4, v:..), (a:7, v:..), ...] need to
         // be filled with [(a:5, v:..), (a:6, v:..)] as padding.
         let mut padding_accesses = Vec::new();
-        for &[(a_addr, _), (b_addr, _)] in ordered_accesses.array_windows() {
-            for padding_addr in a_addr.saturating_add(1)..b_addr {
-                padding_accesses.push(if padding_addr == padding_access.0 {
+        for &[a, b] in ordered_accesses.array_windows() {
+            for padding_addr in a.address.saturating_add(1)..b.address {
+                padding_accesses.push(if a.address == padding_access.address {
                     padding_access
                 } else {
-                    (padding_addr, F::ZERO)
+                    MemoryEntry {
+                        address: padding_addr,
+                        value: F::ZERO,
+                    }
                 })
             }
         }
@@ -215,14 +220,15 @@ impl<F: PrimeField> MemoryPool<F> {
         // assert_eq!(trace_len / 8, padding_accesses.len());
 
         // double check memory is "continuous" and "single valued"
-        ordered_accesses.array_windows().enumerate().for_each(
-            |(i, &[(a, v), (a_next, v_next)])| {
+        ordered_accesses
+            .array_windows()
+            .enumerate()
+            .for_each(|(i, &[curr, next])| {
                 assert!(
-                    (a == a_next && v == v_next) || a == a_next - 1,
-                    "mismatch at {i}: curr=(addr:{a}, val:{v}), next=(addr:{a_next}, val:{v_next})"
+                    curr == next || curr.address == next.address - 1,
+                    "mismatch at {i}: curr=({curr:?}), next=({next:?})"
                 );
-            },
-        );
+            });
 
         (ordered_accesses, padding_accesses)
     }

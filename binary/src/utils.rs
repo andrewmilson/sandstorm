@@ -1,3 +1,4 @@
+use crate::MemoryEntry;
 use alloc::vec::Vec;
 use ark_ff::PrimeField;
 use ruint::aliases::U256;
@@ -19,6 +20,23 @@ use serde_json::value::Number;
 pub fn deserialize_hex_str<'de, D: Deserializer<'de>>(deserializer: D) -> Result<U256, D::Error> {
     let hex_str = String::deserialize(deserializer)?;
     hex_str.parse::<U256>().map_err(de::Error::custom)
+}
+
+/// Deserialises a list of memory entries of the form
+/// `{value: "0x...", address: ...}`
+pub fn deserialize_hex_str_memory_entries<'de, D: Deserializer<'de>>(
+    deserializer: D,
+) -> Result<Vec<MemoryEntry<U256>>, D::Error> {
+    #[derive(Deserialize)]
+    struct Entry {
+        #[serde(deserialize_with = "deserialize_hex_str")]
+        pub value: U256,
+        pub address: u32,
+    }
+    let v = Vec::deserialize(deserializer)?;
+    Ok(v.into_iter()
+        .map(|Entry { address, value }| MemoryEntry { address, value })
+        .collect())
 }
 
 /// Deserialises a list of hex strings into a list of big integers

@@ -954,7 +954,9 @@ dependencies = [
  "sandstorm-binary",
  "sandstorm-builtins",
  "sandstorm-layouts",
+ "sandstorm-sharp",
  "serde_json",
+ "sha2",
  "structopt",
  "strum 0.21.0",
 ]
@@ -964,6 +966,7 @@ name = "sandstorm-binary"
 version = "0.1.0"
 dependencies = [
  "ark-ff",
+ "ark-serialize",
  "bincode",
  "ministark-gpu",
  "num-bigint",
@@ -1004,6 +1007,19 @@ dependencies = [
  "sandstorm-builtins",
  "strum 0.24.1",
  "strum_macros 0.24.3",
+]
+
+[[package]]
+name = "sandstorm-sharp"
+version = "0.1.0"
+dependencies = [
+ "ark-ff",
+ "ark-poly",
+ "ministark",
+ "ministark-gpu",
+ "ruint",
+ "sandstorm-layouts",
+ "sha2",
 ]
 
 [[package]]

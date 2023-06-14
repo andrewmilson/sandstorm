@@ -1,0 +1,13 @@
+[package]
+name = "sandstorm-sharp"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+ark-ff = "0.4"
+layouts = { path = "../layouts", package = "sandstorm-layouts" }
+ministark-gpu = { version = "0.1", path = "../../playground/ministark/gpu" }
+ministark = { path = "../../playground/ministark" }
+ruint = { version = "1.7", features = [ "serde", "num-bigint" ] }
+sha2 = "0.10"
+ark-poly = "0.4"

@@ -10,6 +10,8 @@ use super::PUBLIC_MEMORY_STEP;
 use super::RANGE_CHECK_STEP;
 use ark_ff::Zero;
 use binary::BitwiseInstance;
+use binary::Layout;
+use binary::MemoryEntry;
 use binary::PedersenInstance;
 use binary::RangeCheckInstance;
 use builtins::bitwise;
@@ -23,7 +25,7 @@ use binary::AirPublicInput;
 use builtins::range_check;
 use num_bigint::BigUint;
 use ruint::aliases::U256;
-use crate::ExecutionInfo;
+use crate::CairoAuxInput;
 use crate::layout6::BITWISE_RATIO;
 use crate::layout6::DILUTED_CHECK_N_BITS;
 use crate::layout6::DILUTED_CHECK_SPACING;
@@ -69,11 +71,10 @@ use ministark_gpu::fields::p3618502788666131213697322783095070105623107215331596
 use strum::IntoEnumIterator;
 
 pub struct ExecutionTrace {
-    pub public_memory_padding_address: u32,
-    pub public_memory_padding_value: Fp,
+    pub air_public_input: AirPublicInput,
+    pub public_memory: Vec<MemoryEntry<Fp>>,
     pub range_check_min: u16,
     pub range_check_max: u16,
-    pub public_memory: Vec<(u32, Fp)>,
     pub initial_registers: RegisterState,
     pub final_registers: RegisterState,
     pub initial_pedersen_address: u32,
@@ -81,8 +82,8 @@ pub struct ExecutionTrace {
     pub initial_ecdsa_address: u32,
     pub initial_bitwise_address: u32,
     pub initial_ec_op_address: u32,
+    pub program: CompiledProgram,
     _register_states: RegisterStates,
-    _program: CompiledProgram,
     _mem: Memory<Fp>,
     _flags_column: GpuVec<Fp>,
     npc_column: GpuVec<Fp>,
@@ -104,7 +105,14 @@ impl CairoExecutionTrace for ExecutionTrace {
         assert!(num_cycles.is_power_of_two());
         let trace_len = num_cycles * CYCLE_HEIGHT;
         assert!(trace_len >= TraceInfo::MIN_TRACE_LENGTH);
-        let public_memory = program.get_public_memory();
+        let public_memory = air_public_input
+            .public_memory
+            .iter()
+            .map(|e| MemoryEntry {
+                address: e.address,
+                value: Fp::from(BigUint::from(e.value)),
+            })
+            .collect::<Vec<MemoryEntry<Fp>>>();
 
         println!("Num cycles: {}", num_cycles);
         println!("Trace len: {}", trace_len);
@@ -112,13 +120,11 @@ impl CairoExecutionTrace for ExecutionTrace {
         let mut flags_column = Vec::new_in(GpuAllocator);
         flags_column.resize(trace_len, Fp::zero());
 
-        // set `padding_address == padding_value` to make filling the column easy
-        // let public_memory_padding_address = public_memory_padding_address(&mem,
-        // &register_states);
-        let (public_memory_padding_address, public_memory_padding_value) =
-            program.get_padding_address_and_value();
+        let padding_entry = program.get_public_memory_padding();
         let mut npc_column = Vec::new_in(GpuAllocator);
-        npc_column.resize(trace_len, public_memory_padding_value);
+        // set `padding_address == padding_value` to make filling the column easy
+        assert_eq!(padding_entry.value, padding_entry.address.into());
+        npc_column.resize(trace_len, padding_entry.value);
 
         // Keep trace of all 16-bit range check values
         let mut rc_pool = RangeCheckPool::new();
@@ -763,20 +769,20 @@ impl CairoExecutionTrace for ExecutionTrace {
         {
             // TODO: this is a bandaid hack. find better solution
             // goal is to find any gaps in memory and fill them in
-            let public_memory = program.get_public_memory();
-            let mut sorted_memory_accesses: Vec<(u32, Fp)> = npc_column
+            let public_memory = program.get_program_memory();
+            let mut sorted_memory_accesses: Vec<MemoryEntry<Fp>> = npc_column
                 .array_chunks()
-                .map(|&[mem_addr, mem_val]| {
-                    let addr = u32::try_from(BigUint::from(mem_addr)).unwrap();
-                    (addr, mem_val)
+                .map(|&[address, value]| {
+                    let address = u32::try_from(BigUint::from(address)).unwrap();
+                    MemoryEntry { value, address }
                 })
                 .chain(public_memory)
                 .collect();
-            sorted_memory_accesses.sort_by_key(|(addr, _)| *addr);
+            sorted_memory_accesses.sort_by_key(|MemoryEntry { address, .. }| *address);
             let mut padding_addrs = Vec::new();
-            for &[(a_addr, _), (b_addr, _)] in sorted_memory_accesses.array_windows() {
-                let a_addr = u32::try_from(BigUint::from(a_addr)).unwrap();
-                let b_addr = u32::try_from(BigUint::from(b_addr)).unwrap();
+            for [a, b] in sorted_memory_accesses.array_windows() {
+                let a_addr = u32::try_from(BigUint::from(a.address)).unwrap();
+                let b_addr = u32::try_from(BigUint::from(b.address)).unwrap();
                 for padding_addr in a_addr.saturating_add(1)..b_addr {
                     padding_addrs.push(padding_addr)
                 }
@@ -822,11 +828,10 @@ impl CairoExecutionTrace for ExecutionTrace {
         let final_registers = *register_states.last().unwrap();
 
         ExecutionTrace {
-            public_memory_padding_address,
-            public_memory_padding_value,
+            air_public_input,
+            public_memory,
             range_check_min,
             range_check_max,
-            public_memory,
             initial_registers,
             final_registers,
             npc_column,
@@ -838,32 +843,39 @@ impl CairoExecutionTrace for ExecutionTrace {
             initial_ecdsa_address,
             initial_bitwise_address,
             initial_ec_op_address,
+            program,
             _flags_column: flags_column,
             _auxiliary_column: auxiliary_column,
             _mem: mem,
             _register_states: register_states,
-            _program: program,
         }
     }
 
-    fn execution_info(&self) -> ExecutionInfo<Self::Fp> {
+    fn auxiliary_input(&self) -> CairoAuxInput<Self::Fp> {
         assert_eq!(self.initial_registers.ap, self.initial_registers.fp);
         assert_eq!(self.initial_registers.ap, self.final_registers.fp);
-        ExecutionInfo {
+        let public_input = &self.air_public_input;
+        let memory_segments = &public_input.memory_segments;
+        CairoAuxInput {
             initial_ap: (self.initial_registers.ap as u64).into(),
             initial_pc: (self.initial_registers.pc as u64).into(),
             final_ap: (self.final_registers.ap as u64).into(),
             final_pc: (self.final_registers.pc as u64).into(),
             public_memory: self.public_memory.clone(),
-            range_check_min: self.range_check_min,
-            range_check_max: self.range_check_max,
-            public_memory_padding_address: self.public_memory_padding_address,
-            public_memory_padding_value: self.public_memory_padding_value,
-            initial_pedersen_address: Some(self.initial_pedersen_address),
-            initial_rc_address: Some(self.initial_rc_address),
-            initial_ecdsa_address: Some(self.initial_ecdsa_address),
-            initial_bitwise_address: Some(self.initial_bitwise_address),
-            initial_ec_op_address: Some(self.initial_ec_op_address),
+            log_n_steps: public_input.n_steps.ilog2(),
+            layout_code: Layout::AllSolidity.sharp_code(),
+            range_check_min: public_input.rc_min,
+            range_check_max: public_input.rc_max,
+            public_memory_padding: self.program.get_public_memory_padding(),
+            program_segment: memory_segments.program,
+            execution_segment: memory_segments.execution,
+            output_segment: memory_segments.output,
+            pedersen_segment: memory_segments.pedersen,
+            rc_segment: memory_segments.range_check,
+            ecdsa_segment: memory_segments.ecdsa,
+            bitwise_segment: memory_segments.bitwise,
+            ec_op_segment: memory_segments.ec_op,
+            poseidon_segment: memory_segments.poseidon,
         }
     }
 }

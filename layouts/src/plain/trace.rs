@@ -13,8 +13,8 @@ use super::PUBLIC_MEMORY_STEP;
 use super::RANGE_CHECK_STEP;
 use crate::utils::get_ordered_memory_accesses;
 use crate::utils::RangeCheckPool;
+use crate::CairoAuxInput;
 use crate::CairoExecutionTrace;
-use crate::ExecutionInfo;
 use alloc::vec;
 use alloc::vec::Vec;
 use ark_ff::batch_inversion;
@@ -24,6 +24,7 @@ use binary::AirPrivateInput;
 use binary::AirPublicInput;
 use binary::CompiledProgram;
 use binary::Memory;
+use binary::MemoryEntry;
 use binary::RegisterState;
 use binary::RegisterStates;
 use core::iter::zip;
@@ -35,6 +36,7 @@ use ministark::StarkExtensionOf;
 use ministark::Trace;
 use ministark::TraceInfo;
 use ministark_gpu::GpuFftField;
+use num_bigint::BigUint;
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;
 use std::marker::PhantomData;
@@ -42,15 +44,11 @@ use strum::IntoEnumIterator;
 
 pub struct ExecutionTrace<Fp, Fq> {
     pub air_public_input: AirPublicInput,
-    pub public_memory_padding_address: u32,
-    pub public_memory_padding_value: Fp,
-    pub range_check_min: u16,
-    pub range_check_max: u16,
-    pub public_memory: Vec<(u32, Fp)>,
+    pub public_memory: Vec<MemoryEntry<Fp>>,
     pub initial_registers: RegisterState,
     pub final_registers: RegisterState,
+    pub program: CompiledProgram,
     _register_states: RegisterStates,
-    _program: CompiledProgram,
     _mem: Memory<Fp>,
     _flags_column: GpuVec<Fp>,
     npc_column: GpuVec<Fp>,
@@ -75,18 +73,23 @@ impl<Fp: GpuFftField + PrimeField, Fq: StarkExtensionOf<Fp>> CairoExecutionTrace
         assert!(num_cycles.is_power_of_two());
         let trace_len = num_cycles * CYCLE_HEIGHT;
         assert!(trace_len >= TraceInfo::MIN_TRACE_LENGTH);
-        let public_memory = program.get_public_memory();
+        let public_memory = air_public_input
+            .public_memory
+            .iter()
+            .map(|e| MemoryEntry {
+                address: e.address,
+                value: Fp::from(BigUint::from(e.value)),
+            })
+            .collect::<Vec<MemoryEntry<Fp>>>();
 
         let mut flags_column = Vec::new_in(GpuAllocator);
         flags_column.resize(trace_len, Fp::zero());
 
-        // set `padding_address == padding_value` to make filling the column easy
-        // let public_memory_padding_address = public_memory_padding_address(&mem,
-        // &register_states);
-        let (public_memory_padding_address, public_memory_padding_value) =
-            program.get_padding_address_and_value();
+        let padding_entry = program.get_public_memory_padding();
         let mut npc_column = Vec::new_in(GpuAllocator);
-        npc_column.resize(trace_len, public_memory_padding_value);
+        // set `padding_address == padding_value` to make filling the column easy
+        assert_eq!(padding_entry.value, padding_entry.address.into());
+        npc_column.resize(trace_len, padding_entry.value);
 
         // fill memory gaps to make memory "continuous"
         // skip the memory at address 0 - this is a special memory address in Cairo
@@ -108,7 +111,6 @@ impl<Fp: GpuFftField + PrimeField, Fq: StarkExtensionOf<Fp>> CairoExecutionTrace
         }
 
         let (ordered_rc_vals, ordered_rc_padding_vals) = rc_pool.get_ordered_values_with_padding();
-        let range_check_min = rc_pool.min().unwrap();
         let range_check_max = rc_pool.max().unwrap();
         let range_check_padding_value = Fp::from(range_check_max as u64);
         let mut ordered_rc_vals = ordered_rc_vals.into_iter();
@@ -241,10 +243,6 @@ impl<Fp: GpuFftField + PrimeField, Fq: StarkExtensionOf<Fp>> CairoExecutionTrace
 
         ExecutionTrace {
             air_public_input,
-            public_memory_padding_address,
-            public_memory_padding_value,
-            range_check_min,
-            range_check_max,
             public_memory,
             initial_registers,
             final_registers,
@@ -252,33 +250,41 @@ impl<Fp: GpuFftField + PrimeField, Fq: StarkExtensionOf<Fp>> CairoExecutionTrace
             memory_column,
             range_check_column,
             base_trace,
+            program,
             _flags_column: flags_column,
             _auxiliary_column: auxiliary_column,
             _mem: mem,
             _register_states: register_states,
-            _program: program,
             _marker: PhantomData,
         }
     }
 
-    fn execution_info(&self) -> ExecutionInfo<Self::Fp> {
+    fn auxiliary_input(&self) -> CairoAuxInput<Self::Fp> {
         assert_eq!(self.initial_registers.ap, self.initial_registers.fp);
         assert_eq!(self.initial_registers.ap, self.final_registers.fp);
-        ExecutionInfo {
+        let public_input = &self.air_public_input;
+        let memory_segments = &public_input.memory_segments;
+        CairoAuxInput {
             initial_ap: (self.initial_registers.ap as u64).into(),
             initial_pc: (self.initial_registers.pc as u64).into(),
             final_ap: (self.final_registers.ap as u64).into(),
             final_pc: (self.final_registers.pc as u64).into(),
             public_memory: self.public_memory.clone(),
-            range_check_min: self.range_check_min,
-            range_check_max: self.range_check_max,
-            public_memory_padding_address: self.public_memory_padding_address,
-            public_memory_padding_value: self.public_memory_padding_value,
-            initial_pedersen_address: None,
-            initial_rc_address: None,
-            initial_ecdsa_address: None,
-            initial_bitwise_address: None,
-            initial_ec_op_address: None,
+            range_check_min: public_input.rc_max,
+            range_check_max: public_input.rc_min,
+            public_memory_padding: self.program.get_public_memory_padding(),
+            log_n_steps: public_input.n_steps.ilog2(),
+            // TODO: use proper layout code
+            layout_code: 123,
+            program_segment: memory_segments.program,
+            execution_segment: memory_segments.execution,
+            output_segment: memory_segments.output,
+            pedersen_segment: None,
+            rc_segment: None,
+            ecdsa_segment: None,
+            bitwise_segment: None,
+            ec_op_segment: None,
+            poseidon_segment: None,
         }
     }
 }

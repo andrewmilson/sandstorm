@@ -1,5 +1,7 @@
+#![feature(async_fn_in_trait, allocator_api)]
+
 use ark_ff::PrimeField;
-use ark_poly::EvaluationDomain;
+use ark_poly::domain::EvaluationDomain;
 use layouts::CairoAirConfig;
 use layouts::CairoAuxInput;
 use layouts::CairoExecutionTrace;
@@ -15,20 +17,79 @@ use ministark::Matrix;
 use ministark::Proof;
 use ministark::ProofOptions;
 use ministark::Prover;
+use ruint::aliases::U256;
+use ruint::uint;
 use sha2::Sha256;
 use std::marker::PhantomData;
 use std::time::Instant;
 
-pub struct DefaultCairoProver<A: CairoAirConfig, T: CairoExecutionTrace>
-where
-    A::Fp: PrimeField,
-{
+#[derive(Default)]
+pub struct CairoAuxInputLayout6 {
+    pub log_n_steps: U256,
+    pub rc_min: U256,
+    pub rc_max: U256,
+    pub layout_code: U256,
+    pub program_begin_addr: U256,
+    pub program_stop_ptr: U256,
+    pub execution_begin_addr: U256,
+    pub execution_stop_ptr: U256,
+    pub output_begin_addr: U256,
+    pub output_stop_ptr: U256,
+    pub pedersen_begin_addr: U256,
+    pub pedersen_stop_ptr: U256,
+    pub range_check_begin_addr: U256,
+    pub range_check_stop_ptr: U256,
+    pub ecdsa_begin_addr: U256,
+    pub ecdsa_stop_ptr: U256,
+    pub bitwise_begin_addr: U256,
+    pub bitwise_stop_addr: U256,
+    pub ec_op_begin_addr: U256,
+    pub ec_op_stop_addr: U256,
+    pub poseidon_begin_addr: U256,
+    pub poseidon_stop_ptr: U256,
+    pub public_memory_padding_addr: U256,
+    pub public_memory_padding_value: U256,
+    pub n_public_memory_pages: U256,
+    pub public_memory: U256,
+}
+
+impl CairoAuxInputLayout6 {
+    pub const OFFSET_LOG_N_STEPS: usize = 0;
+    pub const OFFSET_RC_MIN: usize = 1;
+    pub const OFFSET_RC_MAX: usize = 2;
+    pub const OFFSET_LAYOUT_CODE: usize = 3;
+    pub const OFFSET_PROGRAM_BEGIN_ADDR: usize = 4;
+    pub const OFFSET_PROGRAM_STOP_PTR: usize = 5;
+    pub const OFFSET_EXECUTION_BEGIN_ADDR: usize = 6;
+    pub const OFFSET_EXECUTION_STOP_PTR: usize = 7;
+    pub const OFFSET_OUTPUT_BEGIN_ADDR: usize = 8;
+    pub const OFFSET_OUTPUT_STOP_PTR: usize = 9;
+    pub const OFFSET_PEDERSEN_BEGIN_ADDR: usize = 10;
+    pub const OFFSET_PEDERSEN_STOP_PTR: usize = 11;
+    pub const OFFSET_RANGE_CHECK_BEGIN_ADDR: usize = 12;
+    pub const OFFSET_RANGE_CHECK_STOP_PTR: usize = 13;
+    pub const OFFSET_ECDSA_BEGIN_ADDR: usize = 14;
+    pub const OFFSET_ECDSA_STOP_PTR: usize = 15;
+    pub const OFFSET_BITWISE_BEGIN_ADDR: usize = 16;
+    pub const OFFSET_BITWISE_STOP_ADDR: usize = 17;
+    pub const OFFSET_EC_OP_BEGIN_ADDR: usize = 18;
+    pub const OFFSET_EC_OP_STOP_ADDR: usize = 19;
+    pub const OFFSET_POSEIDON_BEGIN_ADDR: usize = 20;
+    pub const OFFSET_POSEIDON_STOP_PTR: usize = 21;
+    pub const OFFSET_PUBLIC_MEMORY_PADDING_ADDR: usize = 22;
+    pub const OFFSET_PUBLIC_MEMORY_PADDING_VALUE: usize = 23;
+    pub const OFFSET_N_PUBLIC_MEMORY_PAGES: usize = 24;
+    pub const OFFSET_PUBLIC_MEMORY: usize = 25;
+}
+
+/// Generate a proof just like StarkWare's SHARP (SHARed Prover)
+pub struct StarkWareProver<A: CairoAirConfig, T: CairoExecutionTrace> {
     options: ProofOptions,
     _marker: PhantomData<(A, T)>,
 }
 
 impl<A: CairoAirConfig, T: CairoExecutionTrace<Fp = A::Fp, Fq = A::Fq>> Prover
-    for DefaultCairoProver<A, T>
+    for StarkWareProver<A, T>
 where
     A::Fp: PrimeField,
 {
@@ -38,7 +99,7 @@ where
     type Trace = T;
 
     fn new(options: ProofOptions) -> Self {
-        DefaultCairoProver {
+        StarkWareProver {
             options,
             _marker: PhantomData,
         }
@@ -56,14 +117,14 @@ where
         &self,
         trace: Self::Trace,
     ) -> Result<Proof<Self::AirConfig>, ProvingError> {
+        println!("YEEEE!!!");
+
         let now = Instant::now();
         let options = self.options();
         let trace_info = trace.info();
-        let pub_inputs = self.get_pub_inputs(&trace);
-        let air = Air::new(trace_info.trace_len, pub_inputs, options);
+        let execution_info = self.get_pub_inputs(&trace);
+        let air = Air::new(trace_info.trace_len, execution_info, options);
         let mut channel = ProverChannel::<Self::AirConfig, Sha256>::new(&air);
-
-        println!("Init air: {:?}", now.elapsed());
 
         let now = Instant::now();
         let trace_xs = air.trace_domain();

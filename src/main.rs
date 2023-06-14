@@ -5,15 +5,17 @@ use binary::AirPrivateInput;
 use binary::AirPublicInput;
 use binary::CompiledProgram;
 use binary::Memory;
+use ministark::Trace;
+use sandstorm::CairoProver;
 use binary::RegisterStates;
 use layouts::CairoAirConfig;
 use layouts::CairoExecutionTrace;
 use ministark::Proof;
 use ministark::ProofOptions;
-use ministark::Prover;
 use ministark_gpu::fields::p18446744069414584321;
 use ministark_gpu::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481;
-use sandstorm::prover::CairoProver;
+use sandstorm::prover::DefaultCairoProver;
+use sharp::StarkWareProver;
 use std::fs;
 use std::fs::File;
 use std::io::Write;
@@ -95,12 +97,14 @@ fn main() {
                 Layout::Plain => {
                     type A = layouts::plain::AirConfig<Fp, Fp>;
                     type T = layouts::plain::ExecutionTrace<Fp, Fp>;
-                    execute_command::<A, T>(command, options, program);
+                    type P = DefaultCairoProver<A, T>;
+                    execute_command::<P>(command, options, program);
                 }
                 Layout::Layout6 => {
                     type A = layouts::layout6::AirConfig;
                     type T = layouts::layout6::ExecutionTrace;
-                    execute_command::<A, T>(command, options, program);
+                    type P = StarkWareProver<A, T>;
+                    execute_command::<P>(command, options, program);
                 }
             }
         }
@@ -112,7 +116,8 @@ fn main() {
                 Layout::Plain => {
                     type A = layouts::plain::AirConfig<Fp, Fq3>;
                     type T = layouts::plain::ExecutionTrace<Fp, Fq3>;
-                    execute_command::<A, T>(command, options, program);
+                    type P = DefaultCairoProver<A, T>;
+                    execute_command::<P>(command, options, program);
                 }
                 Layout::Layout6 => unimplemented!("layout6 does not support Goldilocks field"),
             }
@@ -121,26 +126,28 @@ fn main() {
     }
 }
 
-fn execute_command<A: CairoAirConfig, T: CairoExecutionTrace<Fp = A::Fp, Fq = A::Fq>>(
+fn execute_command<P: CairoProver>(
     command: Command,
     options: ProofOptions,
     program: CompiledProgram,
-) where
-    A::Fp: PrimeField,
+) where 
+P::Fp: PrimeField,
+P::AirConfig: CairoAirConfig,
+P::Trace: CairoExecutionTrace
 {
     match command {
         Command::Prove {
             output,
             air_private_input,
             air_public_input,
-        } => prove::<A, T>(
+        } => prove::<P>(
             options,
             program,
             &air_private_input,
             &air_public_input,
             &output,
         ),
-        Command::Verify { proof } => verify::<A>(options, program, &proof),
+        Command::Verify { proof } => verify::<P::AirConfig>(options, program, &proof),
     }
 }
 
@@ -151,7 +158,7 @@ where
     let proof_bytes = fs::read(proof_path).unwrap();
     let proof: Proof<A> = Proof::deserialize_compressed(proof_bytes.as_slice()).unwrap();
     let public_inputs = &proof.public_inputs;
-    assert_eq!(program.get_public_memory(), public_inputs.public_memory);
+    assert_eq!(program.get_program_memory(), public_inputs.public_memory);
     assert_eq!(options, proof.options);
 
     let now = Instant::now();
@@ -159,15 +166,17 @@ where
     println!("Proof verified in: {:?}", now.elapsed());
 }
 
-fn prove<A: CairoAirConfig, T: CairoExecutionTrace<Fp = A::Fp, Fq = A::Fq>>(
+fn prove<P: CairoProver>(
     options: ProofOptions,
     program: CompiledProgram,
     air_private_input_path: &PathBuf,
     air_public_input_path: &PathBuf,
     output_path: &PathBuf,
-) where
-    A::Fp: PrimeField,
-{
+) where 
+P::Fp: PrimeField,
+P::AirConfig: CairoAirConfig,
+P::Trace: CairoExecutionTrace
+ {
     let now = Instant::now();
 
     let air_private_input_file =
@@ -187,7 +196,7 @@ fn prove<A: CairoAirConfig, T: CairoExecutionTrace<Fp = A::Fp, Fq = A::Fq>>(
         File::open(air_public_input_path).expect("could not open the air public input file");
     let air_public_input: AirPublicInput = serde_json::from_reader(air_public_input_file).unwrap();
 
-    let execution_trace = T::new(
+    let execution_trace = P::Trace::new(
         program,
         air_public_input,
         air_private_input,
@@ -201,7 +210,7 @@ fn prove<A: CairoAirConfig, T: CairoExecutionTrace<Fp = A::Fp, Fq = A::Fq>>(
         now.elapsed(),
     );
 
-    let prover = CairoProver::<A, T>::new(options);
+    let prover = P::new(options);
     let now = Instant::now();
     let proof = pollster::block_on(prover.generate_proof(execution_trace)).unwrap();
     println!("Proof generated in: {:?}", now.elapsed());

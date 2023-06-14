@@ -5,6 +5,9 @@ extern crate alloc;
 use alloc::vec::Vec;
 use ark_ff::Field;
 use ark_ff::PrimeField;
+use ark_serialize::CanonicalDeserialize;
+use ark_serialize::CanonicalSerialize;
+use ark_serialize::Valid;
 use num_bigint::BigUint;
 use ruint::aliases::U256;
 use ruint::uint;
@@ -17,6 +20,7 @@ use std::marker::PhantomData;
 use std::ops::Deref;
 use std::path::PathBuf;
 use utils::deserialize_hex_str;
+use utils::deserialize_hex_str_memory_entries;
 use utils::deserialize_vec_hex_str;
 use utils::field_bytes;
 
@@ -47,6 +51,30 @@ pub struct RegisterState {
     pub ap: usize,
     pub fp: usize,
     pub pc: usize,
+}
+
+// TODO: not being used at all ATM
+/// https://www.youtube.com/live/jPxD9h7BdzU?feature=share&t=2800
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+pub enum Layout {
+    Plain = 0,
+    Small = 1,
+    Dex = 2,
+    Recursive = 3,
+    Starknet = 4,
+    RecursiveLargeOutput = 5,
+    AllSolidity = 6,
+    StarknetWithKeccak = 7,
+}
+
+impl Layout {
+    // Returns the unique code used by SHARP associated to this layout
+    pub fn sharp_code(&self) -> u64 {
+        match self {
+            Self::AllSolidity => 8319381555716711796,
+            _ => unimplemented!(),
+        }
+    }
 }
 
 pub struct RegisterStates(Vec<RegisterState>);
@@ -124,14 +152,47 @@ impl<F: Field> Deref for Memory<F> {
     }
 }
 
-#[derive(Deserialize, Clone, Copy, Debug)]
-pub struct MemoryEntry {
-    #[serde(deserialize_with = "deserialize_hex_str")]
-    pub value: U256,
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct MemoryEntry<T> {
+    pub value: T,
     pub address: u32,
 }
 
-#[derive(Deserialize, Clone, Copy, Debug)]
+impl<T: CanonicalSerialize> CanonicalSerialize for MemoryEntry<T> {
+    fn serialize_with_mode<W: ark_serialize::Write>(
+        &self,
+        mut writer: W,
+        compress: ark_serialize::Compress,
+    ) -> Result<(), ark_serialize::SerializationError> {
+        self.value.serialize_with_mode(&mut writer, compress)?;
+        self.address.serialize_with_mode(writer, compress)
+    }
+
+    fn serialized_size(&self, compress: ark_serialize::Compress) -> usize {
+        self.value.serialized_size(compress) + self.address.serialized_size(compress)
+    }
+}
+
+impl<T: Valid> Valid for MemoryEntry<T> {
+    fn check(&self) -> Result<(), ark_serialize::SerializationError> {
+        self.value.check()?;
+        self.address.check()
+    }
+}
+
+impl<T: CanonicalDeserialize> CanonicalDeserialize for MemoryEntry<T> {
+    fn deserialize_with_mode<R: Read>(
+        mut reader: R,
+        compress: ark_serialize::Compress,
+        validate: ark_serialize::Validate,
+    ) -> Result<Self, ark_serialize::SerializationError> {
+        let value = T::deserialize_with_mode(&mut reader, compress, validate)?;
+        let address = u32::deserialize_with_mode(reader, compress, validate)?;
+        Ok(Self { value, address })
+    }
+}
+
+#[derive(Deserialize, Clone, Copy, Debug, CanonicalSerialize, CanonicalDeserialize)]
 pub struct Segment {
     pub begin_addr: u32,
     pub stop_ptr: u32,
@@ -147,17 +208,19 @@ pub struct MemorySegments {
     pub ecdsa: Option<Segment>,
     pub bitwise: Option<Segment>,
     pub ec_op: Option<Segment>,
+    pub poseidon: Option<Segment>,
 }
 
 #[derive(Deserialize, Clone, Debug)]
 pub struct AirPublicInput {
-    pub rc_min: u32,
-    pub rc_max: u32,
-    pub n_steps: u32,
+    pub rc_min: u16,
+    pub rc_max: u16,
+    pub n_steps: u64,
+    // TODO: change from string
     pub layout: String,
     pub memory_segments: MemorySegments,
-    // TODO: check if the addresses are all sequential
-    pub public_memory: Vec<MemoryEntry>,
+    #[serde(deserialize_with = "deserialize_hex_str_memory_entries")]
+    pub public_memory: Vec<MemoryEntry<U256>>,
 }
 
 #[derive(Deserialize, Clone, Copy, Debug)]
@@ -330,22 +393,26 @@ impl CompiledProgram {
         assert_eq!(format!("{:#x}", modulus), self.prime.to_lowercase());
     }
 
-    pub fn get_public_memory<F: PrimeField>(&self) -> Vec<(u32, F)> {
+    pub fn get_program_memory<F: PrimeField>(&self) -> Vec<MemoryEntry<F>> {
         self.validate::<F>();
         self.data
             .iter()
             .enumerate()
             .map(|(i, &value)| {
                 // address 0 is reserved for dummy accesses
-                (i as u32 + 1, Word::new(value).into_felt())
+                MemoryEntry {
+                    address: i as u32 + 1,
+                    value: Word::new(value).into_felt(),
+                }
             })
             .collect()
     }
 
-    pub fn get_padding_address_and_value<F: Field>(&self) -> (u32, F) {
+    pub fn get_public_memory_padding<F: Field>(&self) -> MemoryEntry<F> {
         // TODO: make more concrete. By convention seems to be next after public memory
-        let address = self.data.len() + 1;
-        (address as u32, (address as u64).into())
+        let address = self.data.len() as u32 + 1;
+        let value = address.into();
+        MemoryEntry { address, value }
     }
 }
 
@@ -357,7 +424,7 @@ pub struct Word<F>(pub U256, PhantomData<F>);
 
 impl<F> Word<F> {
     /// Calculates $\tilde{f_i}$ - https://eprint.iacr.org/2021/1063.pdf
-    pub fn get_flag_prefix(&self, flag: Flag) -> u64 {
+    pub fn get_flag_prefix(&self, flag: Flag) -> u16 {
         if flag == Flag::Zero {
             return 0;
         }
@@ -527,6 +594,7 @@ pub enum FlagGroup {
 /// Cairo flag
 /// https://eprint.iacr.org/2021/1063.pdf section 9
 #[derive(Clone, Copy, PartialEq, Eq)]
+#[repr(u16)]
 pub enum Flag {
     // Group: [FlagGroup::DstReg]
     DstReg = 0,
