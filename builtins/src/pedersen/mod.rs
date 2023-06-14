@@ -212,3 +212,39 @@ pub fn constant_points_poly() -> (Vec<FieldVariant<Fp, Fp>>, Vec<FieldVariant<Fp
     let (x_coeffs, y_coeffs) = (polys.next().unwrap(), polys.next().unwrap());
     (x_coeffs, y_coeffs)
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::pedersen::pedersen_hash;
+    use ark_ff::MontFp as Fp;
+
+    #[test]
+    fn hash_example0_works() {
+        // Example source:
+        // https://github.com/starkware-libs/starkex-resources/blob/master/crypto/starkware/crypto/signature/signature_test_data.json#L87
+        let a = Fp!("1740729136829561885683894917751815192814966525555656371386868611731128807883");
+        let b = Fp!("919869093895560023824014392670608914007817594969197822578496829435657368346");
+
+        let output = pedersen_hash(a, b);
+
+        assert_eq!(
+            Fp!("1382171651951541052082654537810074813456022260470662576358627909045455537762"),
+            output
+        )
+    }
+
+    #[test]
+    fn hash_example1_works() {
+        // Example source:
+        // https://github.com/starkware-libs/starkex-resources/blob/master/crypto/starkware/crypto/signature/signature_test_data.json#L92
+        let a = Fp!("2514830971251288745316508723959465399194546626755475650431255835704887319877");
+        let b = Fp!("3405079826265633459083097571806844574925613129801245865843963067353416465931");
+
+        let output = pedersen_hash(a, b);
+
+        assert_eq!(
+            Fp!("2962565761002374879415469392216379291665599807391815720833106117558254791559"),
+            output
+        )
+    }
+}

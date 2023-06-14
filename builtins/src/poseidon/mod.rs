@@ -63,7 +63,7 @@ mod tests {
     use ministark_gpu::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481::ark::Fp;
 
     #[test]
-    fn zeros_hash_matches_example() {
+    fn zero_hash_matches_example() {
         // Example from https://github.com/starkware-industries/poseidon
         let expected = [
             Fp!("3446325744004048536138401612021367625846492093718951375866996507163446763827"),

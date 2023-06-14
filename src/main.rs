@@ -147,18 +147,17 @@ P::Trace: CairoExecutionTrace
             &air_public_input,
             &output,
         ),
-        Command::Verify { proof } => verify::<P::AirConfig>(options, program, &proof),
+        Command::Verify { proof } => verify::<P::AirConfig>(options, &proof),
     }
 }
 
-fn verify<A: CairoAirConfig>(options: ProofOptions, program: CompiledProgram, proof_path: &PathBuf)
+fn verify<A: CairoAirConfig>(options: ProofOptions, proof_path: &PathBuf)
 where
     A::Fp: PrimeField,
 {
     let proof_bytes = fs::read(proof_path).unwrap();
     let proof: Proof<A> = Proof::deserialize_compressed(proof_bytes.as_slice()).unwrap();
     assert_eq!(options, proof.options);
-
     let now = Instant::now();
     proof.verify().unwrap();
     println!("Proof verified in: {:?}", now.elapsed());
