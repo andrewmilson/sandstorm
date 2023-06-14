@@ -157,8 +157,6 @@ where
 {
     let proof_bytes = fs::read(proof_path).unwrap();
     let proof: Proof<A> = Proof::deserialize_compressed(proof_bytes.as_slice()).unwrap();
-    let public_inputs = &proof.public_inputs;
-    assert_eq!(program.get_program_memory(), public_inputs.public_memory);
     assert_eq!(options, proof.options);
 
     let now = Instant::now();

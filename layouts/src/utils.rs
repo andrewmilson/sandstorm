@@ -4,6 +4,8 @@ use binary::CompiledProgram;
 use binary::MemoryEntry;
 use ministark::StarkExtensionOf;
 use ministark_gpu::GpuFftField;
+use num_traits::One;
+use num_traits::Zero;
 use ruint::aliases::U256;
 use ruint::uint;
 
@@ -109,41 +111,38 @@ pub fn compute_diluted_cumulative_value<
 // TODO: make sure supports input, output and builtins
 pub fn get_ordered_memory_accesses<F: PrimeField>(
     trace_len: usize,
-    accesses: &[(F, F)],
-    program: &CompiledProgram,
-) -> Vec<(F, F)> {
+    accesses: &[MemoryEntry<F>],
+    public_memory: &[MemoryEntry<F>],
+    public_memory_padding: MemoryEntry<F>,
+) -> Vec<MemoryEntry<F>> {
     // the number of cells allocated for the public memory
     let num_pub_mem_cells = trace_len / PUBLIC_MEMORY_STEP;
-    let pub_mem = program.get_program_memory::<F>();
-    let pub_mem_accesses = pub_mem.iter().map(|&e| (e.address.into(), e.value));
-    let padding_entry = program.get_public_memory_padding();
-    let padding_entry_felt = (padding_entry.address.into(), padding_entry.value);
 
     // order all memory accesses by address
     // memory accesses are of the form [address, value]
     let mut ordered_accesses = accesses
         .iter()
         .copied()
-        .chain((0..num_pub_mem_cells - pub_mem_accesses.len()).map(|_| padding_entry_felt))
-        .chain(pub_mem_accesses)
-        .collect::<Vec<(F, F)>>();
+        .chain((0..num_pub_mem_cells - public_memory.len()).map(|_| public_memory_padding))
+        .chain(public_memory.iter().copied())
+        .collect::<Vec<MemoryEntry<F>>>();
 
-    ordered_accesses.sort();
+    ordered_accesses.sort_by_key(|e| e.address);
 
     // justification for this is explained in section 9.8 of the Cairo paper https://eprint.iacr.org/2021/1063.pdf.
     // SHARP starts the first address at address 1
     let (zeros, ordered_accesses) = ordered_accesses.split_at(num_pub_mem_cells);
-    assert!(zeros.iter().all(|(a, v)| a.is_zero() && v.is_zero()));
-    assert!(ordered_accesses[0].0.is_one());
+    assert!(zeros.iter().all(|e| e.address.is_zero()));
+    assert!(ordered_accesses[0].address.is_one());
 
     // check memory is "continuous" and "single valued"
     ordered_accesses
         .array_windows()
         .enumerate()
-        .for_each(|(i, &[(a, v), (a_next, v_next)])| {
+        .for_each(|(i, &[curr, next])| {
             assert!(
-                (a == a_next && v == v_next) || a == a_next - F::one(),
-                "mismatch at {i}: a={a}, v={v}, a_next={a_next}, v_next={v_next}"
+                curr == next || curr.address == next.address - 1,
+                "mismatch at {i}: curr=({curr:?}), next=({next:?})"
             );
         });
 

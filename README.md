@@ -73,17 +73,15 @@ cairo-run --program example/pedersen/main_compiled.json \
           --proof_mode --print_info
 
 # 3. generate the proof
-# use `-F parallel,asm` if not using an M1 Mac
-# make sure latest macOS is installed
-cargo +nightly run -r -F gpu,parallel,asm -- \
-    --program example/array-sum.json \
-    prove --trace example/trace.bin \
-          --memory example/memory.bin \
+cargo +nightly run -r -F parallel,asm -- \
+    --program example/pedersen/main_compiled.json --layout layout6 \
+    prove --air-private-input example/pedersen/air-private-input.json \
+          --air-public-input example/pedersen/air-public-input.json \
           --output example/array-sum.proof
 
 # 4. verify the proof
 cargo +nightly run -r -F parallel,asm -- \
-    --program example/array-sum.json \
+    --program example/pedersen/main_compiled.json --layout layout6 \
     verify --proof example/array-sum.proof
 ```
 

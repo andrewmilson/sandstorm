@@ -154,8 +154,8 @@ impl<F: Field> Deref for Memory<F> {
 
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct MemoryEntry<T> {
-    pub value: T,
     pub address: u32,
+    pub value: T,
 }
 
 impl<T: CanonicalSerialize> CanonicalSerialize for MemoryEntry<T> {
@@ -408,11 +408,12 @@ impl CompiledProgram {
             .collect()
     }
 
-    pub fn get_public_memory_padding<F: Field>(&self) -> MemoryEntry<F> {
-        // TODO: make more concrete. By convention seems to be next after public memory
-        let address = self.data.len() as u32 + 1;
-        let value = address.into();
-        MemoryEntry { address, value }
+    pub fn get_public_memory_padding<F: PrimeField>(&self) -> MemoryEntry<F> {
+        // Use the first entry
+        MemoryEntry {
+            address: 1,
+            value: Word::new(self.data[0]).into_felt(),
+        }
     }
 }
 

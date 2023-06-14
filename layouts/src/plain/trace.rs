@@ -87,9 +87,17 @@ impl<Fp: GpuFftField + PrimeField, Fq: StarkExtensionOf<Fp>> CairoExecutionTrace
 
         let padding_entry = program.get_public_memory_padding();
         let mut npc_column = Vec::new_in(GpuAllocator);
-        // set `padding_address == padding_value` to make filling the column easy
-        assert_eq!(padding_entry.value, padding_entry.address.into());
-        npc_column.resize(trace_len, padding_entry.value);
+        npc_column.resize(trace_len, Fp::zero());
+        {
+            // default all memory items to our padding entry
+            // TODO: this is a little hacky. not good
+            let padding_address = padding_entry.address.into();
+            let padding_value = padding_entry.value;
+            for [address, value] in npc_column.array_chunks_mut() {
+                *address = padding_address;
+                *value = padding_value;
+            }
+        }
 
         // fill memory gaps to make memory "continuous"
         // skip the memory at address 0 - this is a special memory address in Cairo
@@ -218,15 +226,21 @@ impl<Fp: GpuFftField + PrimeField, Fq: StarkExtensionOf<Fp>> CairoExecutionTrace
         assert!(ordered_rc_vals.next().is_none());
 
         // generate the memory column by ordering memory accesses
-        let memory_accesses: Vec<(Fp, Fp)> = npc_column
+        let memory_accesses: Vec<MemoryEntry<Fp>> = npc_column
             .array_chunks()
-            .map(|&[mem_addr, mem_val]| (mem_addr, mem_val))
+            .map(|&[address_felt, value_felt]| {
+                let address: BigUint = address_felt.into_bigint().into();
+                MemoryEntry {
+                    address: address.try_into().unwrap(),
+                    value: value_felt,
+                }
+            })
             .collect();
         let ordered_memory_accesses =
-            get_ordered_memory_accesses(trace_len, &memory_accesses, &program);
+            get_ordered_memory_accesses(trace_len, &memory_accesses, &public_memory, padding_entry);
         let memory_column = ordered_memory_accesses
             .into_iter()
-            .flat_map(|(a, v)| [a, v])
+            .flat_map(|e| [e.address.into(), e.value])
             .collect::<Vec<Fp>>()
             .to_vec_in(GpuAllocator);
 
