@@ -5,6 +5,7 @@ use super::EC_OP_BUILTIN_RATIO;
 use super::EC_OP_SCALAR_HEIGHT;
 use super::MEMORY_STEP;
 use super::PEDERSEN_BUILTIN_RATIO;
+use super::POSEIDON_RATIO;
 use super::PUBLIC_MEMORY_STEP;
 use super::RANGE_CHECK_BUILTIN_PARTS;
 use super::RANGE_CHECK_BUILTIN_RATIO;
@@ -20,6 +21,7 @@ use ark_poly::EvaluationDomain;
 use ark_poly::Radix2EvaluationDomain;
 use builtins::ecdsa;
 use builtins::pedersen;
+use builtins::poseidon;
 use ministark_gpu::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481::ark::Fp;
 use num_traits::One;
 use core::ops::Add;
@@ -692,7 +694,7 @@ impl ministark::air::AirConfig for AirConfig {
 
         // example for trace length n=512
         // =============================
-        // X^(n/256) - ω^(255*n/256)    = (x-ω^255)(x-ω^511)
+        // x^(n/256) - ω^(255*n/256)    = (x-ω^255)(x-ω^511)
         // (x-ω^255)(x-ω^511) / (X^n-1) = 1/(x-ω^0)..(x-ω^254)(x-ω^256)..(x-ω^510)
         // vanishes on groups of 256 consecutive rows except the last row in each group
         // TODO: come up with better names for these
@@ -719,8 +721,8 @@ impl ministark::air::AirConfig for AirConfig {
 
         // example for trace length n=512
         // =============================
-        // X^(n/256) - ω^(63*n/64)      = X^(n/256) - ω^(252*n/256)
-        // X^(n/256) - ω^(255*n/256)    = (x-ω^252)(x-ω^508)
+        // x^(n/256) - ω^(63*n/64)      = x^(n/256) - ω^(252*n/256)
+        // x^(n/256) - ω^(255*n/256)    = (x-ω^252)(x-ω^508)
         // (x-ω^255)(x-ω^511) / (X^n-1) = 1/(x-ω^0)..(x-ω^254)(x-ω^256)..(x-ω^510)
         // vanishes on the 252nd row of every 256 rows
         let pedersen_zero_suffix_zerofier_inv =
@@ -864,13 +866,13 @@ impl ministark::air::AirConfig for AirConfig {
 
         // example for trace length n=1024
         // =============================
-        // X^(n/512) - ω^(n/2)                = X^(n/512) - ω^(256*n/512)
-        // X^(n/512) - ω^(256*n/512)          = (x-ω^256)(x-ω^768)
+        // x^(n/512) - ω^(n/2)                = x^(n/512) - ω^(256*n/512)
+        // x^(n/512) - ω^(256*n/512)          = (x-ω^256)(x-ω^768)
         // x^(n/256) - 1                      = (x-ω_0)(x-ω_256)(x-ω_512)(x-ω_768)
-        // (x-ω^256)(x-ω^768) / (X^(n/256)-1) = 1/(x-ω_0)(x-ω_512)
-        // 1/(X^(n/512) - 1)                  = 1/(x-ω_0)(x-ω_512)
-        // NOTE: By using `(x-ω^256)(x-ω^768) / (X^(n/256)-1)` rather than
-        // `1/(X^(n/512) - 1)` we save an inversion operation since 1 / (X^(n/256)-1)
+        // (x-ω^256)(x-ω^768) / (x^(n/256)-1) = 1/(x-ω_0)(x-ω_512)
+        // 1/(x^(n/512) - 1)                  = 1/(x-ω_0)(x-ω_512)
+        // NOTE: By using `(x-ω^256)(x-ω^768) / (x^(n/256)-1)` rather than
+        // `1/(x^(n/512) - 1)` we save an inversion operation since 1 / (x^(n/256)-1)
         // has been calculated already and as a result of how constraints are
         // evaluated it will be cached.
         // TODO: check all zerofiers are being multiplied or divided correctly
@@ -962,14 +964,15 @@ impl ministark::air::AirConfig for AirConfig {
 
         // example for trace length n=32768
         // ================================
-        // X^(n/16384) - ω^(255*n/256)     = X^(n/16384) - ω^(16320*n/16384)
-        // X^(n/16384) - ω^(16320*n/16384) = (x-ω^16320)(x-ω^32704)
+        // x^(n/16384) - ω^(255*n/256)     = x^(n/16384) - ω^(16320*n/16384)
+        // x^(n/16384) - ω^(16320*n/16384) = (x-ω^16320)(x-ω^32704)
         //                                 = (x-ω^(64*255))(x-ω^(64*511))
         let every_64_row_zerofier = X.pow(n / 64) - &one;
+        let every_64_row_zerofier_inv = &one / every_64_row_zerofier;
         // vanishes on every 64 steps except the 255th of every 256
         let ec_op_transition_zerofier_inv = (X.pow(n / 16384)
             - Constant(FieldVariant::Fp(g.pow([(255 * n / 256) as u64]))))
-            / &every_64_row_zerofier;
+            * &every_64_row_zerofier_inv;
 
         // ecdsa/signature0/doubling_key/slope
         // TODO: figure out
@@ -1010,8 +1013,8 @@ impl ministark::air::AirConfig for AirConfig {
 
         // example for trace length n=65536
         // ================================
-        // X^(n/32768) - ω^(255*n/256)     = X^(n/32768) - ω^(32640*n/32768)
-        // X^(n/32768) - ω^(32640*n/32768) = (x-ω^32640)(x-ω^65408)
+        // x^(n/32768) - ω^(255*n/256)     = x^(n/32768) - ω^(32640*n/32768)
+        // x^(n/32768) - ω^(32640*n/32768) = (x-ω^32640)(x-ω^65408)
         //                                 = (x-ω^(128*255))(x-ω^(128*511))
         let every_128_row_zerofier = X.pow(n / 128) - &one;
         // vanishes on every 128 steps except the 255th of every 256
@@ -1039,8 +1042,8 @@ impl ministark::air::AirConfig for AirConfig {
 
         // example for trace length n=65536
         // =============================
-        // X^(n/32768) - ω^(251*n/256)     = X^(n/32768) - ω^(32128*n/32768)
-        // X^(n/32768) - ω^(32128*n/32768) = (x-ω^(32768*0+32128))(x-ω^(32768*1+32128))
+        // x^(n/32768) - ω^(251*n/256)     = x^(n/32768) - ω^(32128*n/32768)
+        // x^(n/32768) - ω^(32128*n/32768) = (x-ω^(32768*0+32128))(x-ω^(32768*1+32128))
         // vanishes on the 251st row of every 256 rows
         let ecdsa_zero_suffix_zerofier =
             X.pow(n / 32768) - Constant(FieldVariant::Fp(g.pow([(251 * n / 256) as u64])));
@@ -1410,10 +1413,10 @@ impl ministark::air::AirConfig for AirConfig {
 
         // example for trace length n=1024
         // ================================
-        // X^(n/1024) - ω^(3*n/4)      = X^(n/1024) - ω^(768*n/1024)
-        // X^(n/1024) - ω^(768*n/1024) = (x-ω^768)
-        // X^(n/256) - 1               = (x-ω^0)(x-ω^256)(x-ω^512)(x-ω^768)
-        // (x-ω^768)/(X^(n/256) - 1)   = 1/((x-ω^0)(x-ω^256)(x-ω^512))
+        // x^(n/1024) - ω^(3*n/4)      = x^(n/1024) - ω^(768*n/1024)
+        // x^(n/1024) - ω^(768*n/1024) = (x-ω^768)
+        // x^(n/256) - 1               = (x-ω^0)(x-ω^256)(x-ω^512)(x-ω^768)
+        // (x-ω^768)/(x^(n/256) - 1)   = 1/((x-ω^0)(x-ω^256)(x-ω^512))
         // vanishes on every 256th row except the 3rd of every 4
         let bitwise_transition_zerofier_inv = (X.pow(n / 1024)
             - Constant(FieldVariant::Fp(g.pow([(3 * n / 4) as u64]))))
@@ -1471,35 +1474,35 @@ impl ministark::air::AirConfig for AirConfig {
 
         // example for trace length n=2048
         // ===============================
-        // X^(n/1024) - ω^(1*n/64))  = X^(n/1024) - ω^(16 * n / 1024))
+        // x^(n/1024) - ω^(1*n/64))  = x^(n/1024) - ω^(16 * n / 1024))
         //                           = (x - ω^(16 * 1))(x - ω^(1024 + (16 * 1)))
-        // X^(n/1024) - ω^(1*n/32))  = X^(n/1024) - ω^(32 * n / 1024))
+        // x^(n/1024) - ω^(1*n/32))  = x^(n/1024) - ω^(32 * n / 1024))
         //                           = (x - ω^(16 * 2))(x - ω^(1024 + (16 * 2)))
-        // X^(n/1024) - ω^(3*n/64))  = X^(n/1024) - ω^(48 * n / 1024))
+        // x^(n/1024) - ω^(3*n/64))  = x^(n/1024) - ω^(48 * n / 1024))
         //                           = (x - ω^(16 * 3))(x - ω^(1024 + (16 * 3)))
-        // X^(n/1024) - ω^(1*n/16))  = X^(n/1024) - ω^(64 * n / 1024))
+        // x^(n/1024) - ω^(1*n/16))  = x^(n/1024) - ω^(64 * n / 1024))
         //                           = (x - ω^(16 * 4))(x - ω^(1024 + (16 * 4)))
-        // X^(n/1024) - ω^(5*n/64))  = X^(n/1024) - ω^(80 * n / 1024))
+        // x^(n/1024) - ω^(5*n/64))  = x^(n/1024) - ω^(80 * n / 1024))
         //                           = (x - ω^(16 * 5))(x - ω^(1024 + (16 * 5)))
-        // X^(n/1024) - ω^(3*n/32))  = X^(n/1024) - ω^(96 * n / 1024))
+        // x^(n/1024) - ω^(3*n/32))  = x^(n/1024) - ω^(96 * n / 1024))
         //                           = (x - ω^(16 * 6))(x - ω^(1024 + (16 * 6)))
-        // X^(n/1024) - ω^(7*n/64))  = X^(n/1024) - ω^(112 * n / 1024))
+        // x^(n/1024) - ω^(7*n/64))  = x^(n/1024) - ω^(112 * n / 1024))
         //                           = (x - ω^(16 * 7))(x - ω^(1024 + (16 * 7)))
-        // X^(n/1024) - ω^(1*n/8))   = X^(n/1024) - ω^(128 * n / 1024))
+        // x^(n/1024) - ω^(1*n/8))   = x^(n/1024) - ω^(128 * n / 1024))
         //                           = (x - ω^(16 * 8))(x - ω^(1024 + (16 * 8)))
-        // X^(n/1024) - ω^(9*n/64))  = X^(n/1024) - ω^(144 * n / 1024))
+        // x^(n/1024) - ω^(9*n/64))  = x^(n/1024) - ω^(144 * n / 1024))
         //                           = (x - ω^(16 * 9))(x - ω^(1024 + (16 * 9)))
-        // X^(n/1024) - ω^(5*n/32))  = X^(n/1024) - ω^(160 * n / 1024))
+        // x^(n/1024) - ω^(5*n/32))  = x^(n/1024) - ω^(160 * n / 1024))
         //                           = (x - ω^(16 * 10))(x - ω^(1024 + (16 * 10)))
-        // X^(n/1024) - ω^(11*n/64)) = X^(n/1024) - ω^(176 * n / 1024))
+        // x^(n/1024) - ω^(11*n/64)) = x^(n/1024) - ω^(176 * n / 1024))
         //                           = (x - ω^(16 * 11))(x - ω^(1024 + (16 * 11)))
-        // X^(n/1024) - ω^(3*n/16))  = X^(n/1024) - ω^(192 * n / 1024))
+        // x^(n/1024) - ω^(3*n/16))  = x^(n/1024) - ω^(192 * n / 1024))
         //                           = (x - ω^(16 * 12))(x - ω^(1024 + (16 * 12)))
-        // X^(n/1024) - ω^(13*n/64)) = X^(n/1024) - ω^(208 * n / 1024))
+        // x^(n/1024) - ω^(13*n/64)) = x^(n/1024) - ω^(208 * n / 1024))
         //                           = (x - ω^(16 * 13))(x - ω^(1024 + (16 * 13)))
-        // X^(n/1024) - ω^(7*n/32))  = X^(n/1024) - ω^(224 * n / 1024))
+        // x^(n/1024) - ω^(7*n/32))  = x^(n/1024) - ω^(224 * n / 1024))
         //                           = (x - ω^(16 * 14))(x - ω^(1024 + (16 * 14)))
-        // X^(n/1024) - ω^(15*n/64)) = X^(n/1024) - ω^(240 * n / 1024))
+        // x^(n/1024) - ω^(15*n/64)) = x^(n/1024) - ω^(240 * n / 1024))
         //                           = (x - ω^(16 * 15))(x - ω^(1024 + (16 * 15)))
         // NOTE: when you multiply all these together you get:
         // $\prod_{i=1}^{15}(x - ω^(16 * i))(x - ω^(1024 + (16 * i)))$
@@ -1759,8 +1762,74 @@ impl ministark::air::AirConfig for AirConfig {
 
         // Poseidon operations builtin
         // ===========================
+        // Check the initial memory address of the poseidon segment
+        let poseidon_init_input_output_addr =
+            (Npc::PoseidonInput0Addr.curr() - InitialPoseidonAddr.hint()) * &first_row_zerofier_inv;
+
+        // examples for trace length n=512
+        // ===============================
+        // x^(n/512)-g^(5*n/8)     = x^(n/512)-g^(320*n/512)
+        // x^(n/512)-g^(320*n/512) = (x-ω^320)
+        //
+        // x^(n/512)-g^(3*n/4)     = x^(n/512)-g^(384*n/512)
+        // x^(n/512)-g^(384*n/512) = (x-ω^384)
+        // x^(n/512)-g^(7*n/8)     = x^(n/512)-g^(448*n/512)
+        // x^(n/512)-g^(448*n/512) = (x-ω^448)
+        // domain14                = (x^(n/512)-g^(3*n/4))*(^n/512)-g^(7*n/8))
+        //
+        // (x-ω^320)(x-ω^384)(x-ω^448)              = (x-ω^(64*5))..(x-ω^(64*7))
+        // x^(n/64)-1                               = (x-ω^(64*0))..(x-ω^(64*7))
+        // (x-ω^320)(x-ω^384)(x-ω^448)/(x^(n/64)-1) = (x-ω^(64*0))..(x-ω^(64*4))
+        // poseidon_io_step_zerofier_inv            = 1/(x-ω^(64*0))..(x-ω^(64*4))
+        let domain14 = (X.pow(n / 512) - Constant(FieldVariant::Fp(g.pow([3 * n as u64 / 4]))))
+            * (X.pow(n / 512) - Constant(FieldVariant::Fp(g.pow([7 * n as u64 / 8]))));
+        let poseidon_io_step_zerofier_inv = (X.pow(n / 512)
+            - Constant(FieldVariant::Fp(g.pow([5 * n as u64 / 8]))))
+            * &domain14
+            * &every_64_row_zerofier_inv;
+        // TODO: this constraint while accurate isn't expressed well here
+        // note that the constraint checks the memory addresses are continuous for the 6
+        // memory locations used per poseidon hash instance
+        let poseidon_addr_input_output_step_inner = Npc::PoseidonInput0Addr.curr()
+            - (Npc::PoseidonInput1Addr.curr() - &one) * &poseidon_io_step_zerofier_inv;
+
+        // TODO: find out what Trace(8, 53) holds
+        // clearly Trace(8, 29) holds the square of it
+        // column8_row53 * column8_row53 - column8_row29
+        let poseidon_poseidon_full_rounds_state0_squaring =
+            (Expr::from(Trace(8, 53)) * Trace(8, 53) - Trace(8, 29)) * &every_64_row_zerofier_inv;
+
+        // TODO
+        // let poseidon_poseidon_full_rounds_state1_squaring = column8_row13 *
+        // column8_row13 - column8_row61
+
+        // TODO: other poseidon constraints
+
+        let all_poseidon_zerofier = X.pow(n / 512) - &one;
+        let all_poseidon_zerofier_inv = &one / all_poseidon_zerofier;
+
+        // load in the first input
+        // TODO: trace(8, 53)
+        let poseidon_poseidon_add_first_round_key0 = (Npc::PoseidonInput0Val.curr()
+            + Constant(poseidon::params::ROUND_KEYS[0][0])
+            - Trace(8, 53))
+            * &all_poseidon_zerofier_inv;
+        let poseidon_poseidon_add_first_round_key1 = (Npc::PoseidonInput1Val.curr()
+            + Constant(poseidon::params::ROUND_KEYS[0][1])
+            - Trace(8, 13))
+            * &all_poseidon_zerofier_inv;
+        let poseidon_poseidon_add_first_round_key2 = (Npc::PoseidonInput1Val.curr()
+            + Constant(poseidon::params::ROUND_KEYS[0][2])
+            - Trace(8, 45))
+            * &all_poseidon_zerofier_inv;
+
+        // poseidon/poseidon/full_round0
+        // TODO: figure out what Trace(8, 117) is 
+        // NOTE: 117 - 64 = 53
+        let poseidon_poseidon_full_round0 = column8_row117
 
         let _ = [
+            &domain14,
             &cpu_decode_opcode_rc_b,
             &cpu_decode_opcode_rc_zero,
             &cpu_decode_opcode_rc_input,
@@ -2099,6 +2168,10 @@ impl ministark::air::AirConfig for AirConfig {
             ec_op_get_p_y,
             ec_op_set_r_x,
             ec_op_set_r_y,
+            poseidon_init_input_output_addr,
+            poseidon_addr_input_output_step_inner,
+            // TODO
+            poseidon_poseidon_add_first_round_key0,
         ]
         .into_iter()
         .map(Constraint::new)
@@ -2283,6 +2356,23 @@ impl ExecutionTraceColumn for RangeCheckBuiltin {
             Self::Rc16Component => step as isize * offset + *self as isize,
         };
         AlgebraicItem::Trace(column, trace_offset).into()
+    }
+}
+
+#[derive(Clone, Copy)]
+pub enum Poseidon {
+    State0 = 0,
+    State1 = 0,
+    State2 = 0,
+}
+
+impl ExecutionTraceColumn for EcOp {
+    fn index(&self) -> usize {
+        todo!()
+    }
+
+    fn offset<T>(&self, offset: isize) -> Expr<AlgebraicItem<T>> {
+        todo!()
     }
 }
 
@@ -2645,6 +2735,21 @@ pub enum Npc {
     EcOpRYAddr = 14726,
     EcOpRYVal = 14727,
 
+    // 38 % 16 = 6
+    // 39 % 17 = 7
+    PoseidonInput0Addr = 38,
+    PoseidonInput0Val = 39,
+
+    // 102 % 16 = 6
+    // 103 % 17 = 7
+    PoseidonInput1Addr = 102,
+    PoseidonInput1Val = 103,
+
+    // 140 % 16 = 6
+    // 141 % 17 = 7
+    PoseidonInput2Addr = 140,
+    PoseidonInput2Val = 141,
+
     MemDstAddr = 8,
     MemDst = 9,
     // NOTE: cycle cells 10 and 11 is occupied by PubMemAddr since the public memory step is 8.
@@ -2703,6 +2808,12 @@ impl ExecutionTraceColumn for Npc {
             | Self::EcOpRXVal
             | Self::EcOpRYAddr
             | Self::EcOpRYVal => EC_OP_BUILTIN_RATIO * CYCLE_HEIGHT,
+            Self::PoseidonInput0Addr
+            | Self::PoseidonInput0Val
+            | Self::PoseidonInput1Addr
+            | Self::PoseidonInput1Val
+            | Self::PoseidonInput2Addr
+            | Self::PoseidonInput2Val => POSEIDON_RATIO * CYCLE_HEIGHT,
         } as isize;
         let column = self.index();
         let trace_offset = step * offset + *self as isize;

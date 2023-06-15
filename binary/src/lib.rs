@@ -75,6 +75,13 @@ impl Layout {
             _ => unimplemented!(),
         }
     }
+
+    pub fn from_sharp_code(code: u64) -> Self {
+        match code {
+            8319381555716711796 => Self::Starknet,
+            _ => unimplemented!(),
+        }
+    }
 }
 
 pub struct RegisterStates(Vec<RegisterState>);
