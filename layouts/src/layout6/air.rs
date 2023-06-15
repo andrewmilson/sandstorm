@@ -261,8 +261,8 @@ impl ministark::air::AirConfig for AirConfig {
         // ```
         // NOTE: Trace(5, 8) dest mem address
         let cpu_operands_mem_dst_addr = (Npc::MemDstAddr.curr() + &half_offset_size
-            - (Flag::DstReg.curr() * RangeCheck::Fp.curr()
-                + (&one - Flag::DstReg.curr()) * RangeCheck::Ap.curr()
+            - (Flag::DstReg.curr() * Auxiliary::Fp.curr()
+                + (&one - Flag::DstReg.curr()) * Auxiliary::Ap.curr()
                 + RangeCheck::OffDst.curr()))
             * &all_cycles_zerofier_inv;
 
@@ -276,23 +276,23 @@ impl ministark::air::AirConfig for AirConfig {
         // ```
         // NOTE: StarkEx contracts as: cpu_operands_mem0_addr
         let cpu_operands_mem_op0_addr = (Npc::MemOp0Addr.curr() + &half_offset_size
-            - (Flag::Op0Reg.curr() * RangeCheck::Fp.curr()
-                + (&one - Flag::Op0Reg.curr()) * RangeCheck::Ap.curr()
+            - (Flag::Op0Reg.curr() * Auxiliary::Fp.curr()
+                + (&one - Flag::Op0Reg.curr()) * Auxiliary::Ap.curr()
                 + RangeCheck::OffOp0.curr()))
             * &all_cycles_zerofier_inv;
 
         // NOTE: StarkEx contracts as: cpu_operands_mem1_addr
         let cpu_operands_mem_op1_addr = (Npc::MemOp1Addr.curr() + &half_offset_size
             - (Flag::Op1Imm.curr() * Npc::Pc.curr()
-                + Flag::Op1Ap.curr() * RangeCheck::Ap.curr()
-                + Flag::Op1Fp.curr() * RangeCheck::Fp.curr()
+                + Flag::Op1Ap.curr() * Auxiliary::Ap.curr()
+                + Flag::Op1Fp.curr() * Auxiliary::Fp.curr()
                 + &cpu_decode_flag_op1_base_op0_0 * Npc::MemOp0.curr()
                 + RangeCheck::OffOp1.curr()))
             * &all_cycles_zerofier_inv;
 
         // op1 * op0
         // NOTE: starkex cpu/operands/ops_mul
-        let cpu_operands_ops_mul = (RangeCheck::Op0MulOp1.curr()
+        let cpu_operands_ops_mul = (Auxiliary::Op0MulOp1.curr()
             - Npc::MemOp0.curr() * Npc::MemOp1.curr())
             * &all_cycles_zerofier_inv;
 
@@ -320,9 +320,9 @@ impl ministark::air::AirConfig for AirConfig {
         //     case 1: res = op0 + op1
         //     case 2: res = op0 * op1
         // ```
-        let cpu_operands_res = ((&one - Flag::PcJnz.curr()) * RangeCheck::Res.curr()
+        let cpu_operands_res = ((&one - Flag::PcJnz.curr()) * Auxiliary::Res.curr()
             - (Flag::ResAdd.curr() * (Npc::MemOp0.curr() + Npc::MemOp1.curr())
-                + Flag::ResMul.curr() * RangeCheck::Op0MulOp1.curr()
+                + Flag::ResMul.curr() * Auxiliary::Op0MulOp1.curr()
                 + &cpu_decode_flag_res_op1_0 * Npc::MemOp1.curr()))
             * &all_cycles_zerofier_inv;
 
@@ -354,7 +354,7 @@ impl ministark::air::AirConfig for AirConfig {
         // temporary variable `v`. The value assigned to v is `dst^(−1)`.
         // NOTE: `t1 = t0 * v`
         let cpu_update_registers_update_pc_tmp1 = (Auxiliary::Tmp1.curr()
-            - Auxiliary::Tmp0.curr() * RangeCheck::Res.curr())
+            - Auxiliary::Tmp0.curr() * Auxiliary::Res.curr())
             * &all_cycles_except_last_zerofier_inv;
 
         // There are two constraints here bundled in one. The first is `t0 * (next_pc −
@@ -370,8 +370,8 @@ impl ministark::air::AirConfig for AirConfig {
             * Npc::Pc.next()
             + Auxiliary::Tmp0.curr() * (Npc::Pc.next() - (Npc::Pc.curr() + Npc::MemOp1.curr()))
             - (&cpu_decode_flag_pc_update_regular_0 * &npc_reg_0
-                + Flag::PcJumpAbs.curr() * RangeCheck::Res.curr()
-                + Flag::PcJumpRel.curr() * (Npc::Pc.curr() + RangeCheck::Res.curr())))
+                + Flag::PcJumpAbs.curr() * Auxiliary::Res.curr()
+                + Flag::PcJumpRel.curr() * (Npc::Pc.curr() + Auxiliary::Res.curr())))
             * &all_cycles_except_last_zerofier_inv;
 
         // ensure `if dst == 0: pc + instruction_size == next_pc`
@@ -385,9 +385,9 @@ impl ministark::air::AirConfig for AirConfig {
         // + fOPCODE_CALL · 2` meets the pseudo code in the whitepaper
         // Ok, it does kinda make sense. move the `opcode == 1` statement inside and
         // move the switch to the outside and it's more clear.
-        let cpu_update_registers_update_ap_ap_update = (RangeCheck::Ap.next()
-            - (RangeCheck::Ap.curr()
-                + Flag::ApAdd.curr() * RangeCheck::Res.curr()
+        let cpu_update_registers_update_ap_ap_update = (Auxiliary::Ap.next()
+            - (Auxiliary::Ap.curr()
+                + Flag::ApAdd.curr() * Auxiliary::Res.curr()
                 + Flag::ApAdd1.curr()
                 + Flag::OpcodeCall.curr() * &two))
             * &all_cycles_except_last_zerofier_inv;
@@ -397,17 +397,17 @@ impl ministark::air::AirConfig for AirConfig {
         // This handles all fp update except the `op0 == pc + instruction_size`, `res =
         // dst` and `dst == fp` assertions.
         // TODO: fix padding bug
-        let cpu_update_registers_update_fp_fp_update = (RangeCheck::Fp.next()
-            - (&cpu_decode_fp_update_regular_0 * RangeCheck::Fp.curr()
+        let cpu_update_registers_update_fp_fp_update = (Auxiliary::Fp.next()
+            - (&cpu_decode_fp_update_regular_0 * Auxiliary::Fp.curr()
                 + Flag::OpcodeRet.curr() * Npc::MemDst.curr()
-                + Flag::OpcodeCall.curr() * (RangeCheck::Ap.curr() + &two)))
+                + Flag::OpcodeCall.curr() * (Auxiliary::Ap.curr() + &two)))
             * &all_cycles_except_last_zerofier_inv;
 
         // push registers to memory (see section 8.4 in the whitepaper).
         // These are essentially the assertions for assert `op0 == pc +
         // instruction_size` and `assert dst == fp`.
         let cpu_opcodes_call_push_fp = (Flag::OpcodeCall.curr()
-            * (Npc::MemDst.curr() - RangeCheck::Fp.curr()))
+            * (Npc::MemDst.curr() - Auxiliary::Fp.curr()))
             * &all_cycles_zerofier_inv;
         let cpu_opcodes_call_push_pc = (Flag::OpcodeCall.curr()
             * (Npc::MemOp0.curr() - (Npc::Pc.curr() + Flag::Op1Imm.curr() + &one)))
@@ -455,20 +455,20 @@ impl ministark::air::AirConfig for AirConfig {
         // handles the "assert equal" instruction. Represents this pseudo code from the
         // whitepaper `assert res = dst`.
         let cpu_opcodes_assert_eq_assert_eq = (Flag::OpcodeAssertEq.curr()
-            * (Npc::MemDst.curr() - RangeCheck::Res.curr()))
+            * (Npc::MemDst.curr() - Auxiliary::Res.curr()))
             * &all_cycles_zerofier_inv;
 
         let first_row_zerofier = &x - &one;
         let first_row_zerofier_inv = &one / first_row_zerofier;
 
         // boundary constraint expression for initial registers
-        let initial_ap = (RangeCheck::Ap.curr() - InitialAp.hint()) * &first_row_zerofier_inv;
-        let initial_fp = (RangeCheck::Fp.curr() - InitialAp.hint()) * &first_row_zerofier_inv;
+        let initial_ap = (Auxiliary::Ap.curr() - InitialAp.hint()) * &first_row_zerofier_inv;
+        let initial_fp = (Auxiliary::Fp.curr() - InitialAp.hint()) * &first_row_zerofier_inv;
         let initial_pc = (Npc::Pc.curr() - InitialPc.hint()) * &first_row_zerofier_inv;
 
         // boundary constraint expression for final registers
-        let final_ap = (RangeCheck::Ap.curr() - FinalAp.hint()) * &last_cycle_zerofier_inv;
-        let final_fp = (RangeCheck::Fp.curr() - InitialAp.hint()) * &last_cycle_zerofier_inv;
+        let final_ap = (Auxiliary::Ap.curr() - FinalAp.hint()) * &last_cycle_zerofier_inv;
+        let final_fp = (Auxiliary::Fp.curr() - InitialAp.hint()) * &last_cycle_zerofier_inv;
         let final_pc = (Npc::Pc.curr() - FinalPc.hint()) * &last_cycle_zerofier_inv;
 
         // examples for trace length n=8
@@ -1810,23 +1810,23 @@ impl ministark::air::AirConfig for AirConfig {
 
         // load in the first input
         // TODO: trace(8, 53)
-        let poseidon_poseidon_add_first_round_key0 = (Npc::PoseidonInput0Val.curr()
-            + Constant(poseidon::params::ROUND_KEYS[0][0])
-            - Trace(8, 53))
-            * &all_poseidon_zerofier_inv;
-        let poseidon_poseidon_add_first_round_key1 = (Npc::PoseidonInput1Val.curr()
-            + Constant(poseidon::params::ROUND_KEYS[0][1])
-            - Trace(8, 13))
-            * &all_poseidon_zerofier_inv;
-        let poseidon_poseidon_add_first_round_key2 = (Npc::PoseidonInput1Val.curr()
-            + Constant(poseidon::params::ROUND_KEYS[0][2])
-            - Trace(8, 45))
-            * &all_poseidon_zerofier_inv;
+        // let poseidon_poseidon_add_first_round_key0 = (Npc::PoseidonInput0Val.curr()
+        //     + Constant(poseidon::params::ROUND_KEYS[0][0])
+        //     - Trace(8, 53))
+        //     * &all_poseidon_zerofier_inv;
+        // let poseidon_poseidon_add_first_round_key1 = (Npc::PoseidonInput1Val.curr()
+        //     + Constant(poseidon::params::ROUND_KEYS[0][1])
+        //     - Trace(8, 13))
+        //     * &all_poseidon_zerofier_inv;
+        // let poseidon_poseidon_add_first_round_key2 = (Npc::PoseidonInput1Val.curr()
+        //     + Constant(poseidon::params::ROUND_KEYS[0][2])
+        //     - Trace(8, 45))
+        //     * &all_poseidon_zerofier_inv;
 
         // poseidon/poseidon/full_round0
-        // TODO: figure out what Trace(8, 117) is 
+        // TODO: figure out what Trace(8, 117) is
         // NOTE: 117 - 64 = 53
-        let poseidon_poseidon_full_round0 = column8_row117
+        // let poseidon_poseidon_full_round0 = column8_row117
 
         let _ = [
             &domain14,
@@ -2171,7 +2171,7 @@ impl ministark::air::AirConfig for AirConfig {
             poseidon_init_input_output_addr,
             poseidon_addr_input_output_step_inner,
             // TODO
-            poseidon_poseidon_add_first_round_key0,
+            // poseidon_poseidon_add_first_round_key0,
         ]
         .into_iter()
         .map(Constraint::new)
@@ -2362,11 +2362,11 @@ impl ExecutionTraceColumn for RangeCheckBuiltin {
 #[derive(Clone, Copy)]
 pub enum Poseidon {
     State0 = 0,
-    State1 = 0,
-    State2 = 0,
+    State1 = 1,
+    State2 = 2,
 }
 
-impl ExecutionTraceColumn for EcOp {
+impl ExecutionTraceColumn for Poseidon {
     fn index(&self) -> usize {
         todo!()
     }
@@ -2431,35 +2431,35 @@ impl ExecutionTraceColumn for EcOp {
 
 #[derive(Clone, Copy)]
 pub enum Ecdsa {
-    PubkeyDoublingX = 4,
-    PubkeyDoublingY = 36,
-    PubkeyDoublingSlope = 50,
-    PubkeyPartialSumX = 20,
-    PubkeyPartialSumY = 52,
-    PubkeyPartialSumXDiffInv = 42,
-    PubkeyPartialSumSlope = 10,
-    RSuffix = 12,
-    MessageSuffix = 38,
-    GeneratorPartialSumY = 70,
-    GeneratorPartialSumX = 6,
-    GeneratorPartialSumXDiffInv = 22,
-    GeneratorPartialSumSlope = 102,
-    // NOTE: 16346 % 64 = 26
-    // NOTE: 32730 % 64 = 26
-    RPointSlope = 16346,
-    RPointXDiffInv = 32730,
+    PubkeyDoublingX = 1,
+    PubkeyDoublingY = 33,
+    PubkeyDoublingSlope = 35,
+    PubkeyPartialSumX = 17,
+    PubkeyPartialSumY = 49,
+    PubkeyPartialSumXDiffInv = 51,
+    PubkeyPartialSumSlope = 19,
+    RSuffix = 9,
+    MessageSuffix = 59,
+    GeneratorPartialSumY = 91,
+    GeneratorPartialSumX = 27,
+    GeneratorPartialSumXDiffInv = 7,
+    GeneratorPartialSumSlope = 123,
+    // NOTE: 16331 % 64 = 11
+    // NOTE: 32715 % 64 = 11
+    RPointSlope = 16331,
+    RPointXDiffInv = 32715,
     // NOTE: 16370 % 64 = 50
     // NOTE: 32754 % 64 = 50
     RInv = 16370,
     WInv = 32754,
-    // NOTE: 32762 % 64 = 58
-    // NOTE: 16378 % 64 = 58
-    MessageInv = 16378,
-    PubkeyXSquared = 32762,
-    // NOTE: 32742 % 128 = 102
-    // NOTE: 32662 % 128 = 22
-    BSlope = 32742,
-    BXDiffInv = 32662,
+    // NOTE: 16363 % 64 = 43
+    // NOTE: 32747 % 64 = 43
+    MessageInv = 16363,
+    PubkeyXSquared = 32747,
+    // NOTE: 32763 % 128 = 123
+    // NOTE: 32647 % 128 = 7
+    BSlope = 32763,
+    BXDiffInv = 32647,
 }
 
 impl ExecutionTraceColumn for Ecdsa {
@@ -2622,7 +2622,7 @@ pub enum Pedersen {
     PartialSumY,
     Suffix,
     Slope,
-    Bit251AndBit196AndBit192 = 86,
+    Bit251AndBit196AndBit192 = 71,
     Bit251AndBit196 = 255,
 }
 
@@ -2867,20 +2867,16 @@ impl ExecutionTraceColumn for DilutedCheck {
 pub enum RangeCheck {
     OffDst = 0,
     Ordered = 2, // Stores ordered values for the range check
-    Ap = 3,      // Allocation pointer (ap)
     // TODO 2
     OffOp1 = 4,
     // Ordered = 6 - trace step is 4
-    Op0MulOp1 = 7, // =op0*op1
     OffOp0 = 8,
     // Ordered = 10 - trace step is 4
-    Fp = 11, // Frame pointer (fp)
     // This cell alternates cycle to cycle between:
     // - Being used for the 128 bit range checks builtin - even cycles
     // - Filled with padding to fill any gaps - odd cycles
     Unused = 12,
     // Ordered = 14 - trace step is 4
-    Res = 15,
 }
 
 impl ExecutionTraceColumn for RangeCheck {
@@ -2902,8 +2898,12 @@ impl ExecutionTraceColumn for RangeCheck {
 // Auxiliary column 8
 #[derive(Clone, Copy)]
 pub enum Auxiliary {
-    Tmp0 = 0,
-    Tmp1 = 8,
+    Ap = 0, // Allocation pointer (ap)
+    Tmp0 = 2,
+    Op0MulOp1 = 4, // =op0*op1
+    Fp = 8,        // Frame pointer (fp)
+    Tmp1 = 10,
+    Res = 12,
 }
 
 impl ExecutionTraceColumn for Auxiliary {
@@ -2914,7 +2914,9 @@ impl ExecutionTraceColumn for Auxiliary {
     fn offset<T>(&self, cycle_offset: isize) -> Expr<AlgebraicItem<T>> {
         let column = self.index();
         let step = match self {
-            Self::Tmp0 | Self::Tmp1 => CYCLE_HEIGHT,
+            Self::Ap | Self::Fp | Self::Tmp0 | Self::Tmp1 | Self::Op0MulOp1 | Self::Res => {
+                CYCLE_HEIGHT
+            }
         } as isize;
         let trace_offset = step * cycle_offset + *self as isize;
         AlgebraicItem::Trace(column, trace_offset).into()

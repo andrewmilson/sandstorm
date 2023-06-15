@@ -224,17 +224,17 @@ impl CairoExecutionTrace for ExecutionTrace {
 
                     // RANGE CHECK
                     rc_cycle[RangeCheck::OffDst as usize] = off_dst.into();
-                    rc_cycle[RangeCheck::Ap as usize] = (ap as u64).into();
                     rc_cycle[RangeCheck::OffOp1 as usize] = off_op1.into();
-                    rc_cycle[RangeCheck::Op0MulOp1 as usize] = op0 * op1;
                     rc_cycle[RangeCheck::OffOp0 as usize] = off_op0.into();
-                    rc_cycle[RangeCheck::Fp as usize] = (fp as u64).into();
-                    rc_cycle[RangeCheck::Res as usize] = res;
                     // RangeCheck::Ordered and RangeCheck::Unused are handled after cycle padding
 
                     // COL8 - TODO: better name
                     aux_cycle[Auxiliary::Tmp0 as usize] = tmp0;
                     aux_cycle[Auxiliary::Tmp1 as usize] = tmp1;
+                    aux_cycle[Auxiliary::Ap as usize] = (ap as u64).into();
+                    aux_cycle[Auxiliary::Fp as usize] = (fp as u64).into();
+                    aux_cycle[Auxiliary::Op0MulOp1 as usize] = op0 * op1;
+                    aux_cycle[Auxiliary::Res as usize] = res;
                 },
             );
 
