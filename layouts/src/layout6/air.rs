@@ -2378,20 +2378,22 @@ impl ExecutionTraceColumn for Poseidon {
 
 #[derive(Clone, Copy)]
 pub enum EcOp {
-    QDoublingX = 44,
+    QDoublingX = 41,
     QDoublingY = 28,
-    QDoublingSlope = 60,
-    RPartialSumX = 2,
-    RPartialSumY = 34,
-    RPartialSumSlope = 26,
-    RPartialSumXDiffInv = 58,
-    MSuffix = 18,
+    QDoublingSlope = 57,
+    RPartialSumX = 5,
+    RPartialSumY = 37,
+    RPartialSumSlope = 11,
+    RPartialSumXDiffInv = 43,
+    MSuffix = 21,
     /// Repurposes the last [Ecdsa::PubkeyPartialSumXDiffInv]
     /// (which doesn't have a constraint)
-    MBit251AndBit196AndBit192 = 16362,
+    // NOTE: 16371 % 64 = 51
+    MBit251AndBit196AndBit192 = 16371,
     /// Repurposes the last [Ecdsa::PubkeyPartialSumSlope]
     /// (which doesn't have a constraint)
-    MBit251AndBit196 = 16330,
+    // NOTE: 16339 % 64 = 19
+    MBit251AndBit196 = 16339,
 }
 
 impl ExecutionTraceColumn for EcOp {
