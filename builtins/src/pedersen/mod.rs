@@ -10,17 +10,16 @@ use constants::P1;
 use constants::P2;
 use constants::P3;
 use constants::P4;
-use ministark::utils::FieldVariant;
 use ministark_gpu::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481::ark::Fp;
 use num_bigint::BigUint;
 use ruint::aliases::U256;
 use ruint::uint;
 use crate::utils::curve::Fr;
 use crate::utils::curve::StarkwareCurve;
-use crate::utils::gen_periodic_table;
 use crate::utils::curve::calculate_slope;
 
 pub mod constants;
+pub mod periodic;
 
 /// Computes the Pedersen hash of a and b using StarkWare's parameters.
 /// The hash is defined by:
@@ -163,54 +162,6 @@ fn gen_element_steps(
     }
 
     res
-}
-
-/// Ouptut is of the form (x_points_coeffs, y_points_coeffs)
-// TODO: Generate these constant polynomials at compile time
-#[allow(clippy::type_complexity)]
-pub fn constant_points_poly() -> (Vec<FieldVariant<Fp, Fp>>, Vec<FieldVariant<Fp, Fp>>) {
-    let mut evals = Vec::new();
-
-    let mut acc = Projective::from(P1);
-    for _ in 0..Fp::MODULUS_BIT_SIZE - 4 {
-        let p = acc.into_affine();
-        evals.push((p.x, p.y));
-        acc += acc;
-    }
-
-    let mut acc = Projective::from(P2);
-    for _ in 0..4 {
-        let p = acc.into_affine();
-        evals.push((p.x, p.y));
-        acc += acc;
-    }
-
-    assert_eq!(evals.len(), 252);
-    evals.resize(256, (Fp::ZERO, Fp::ZERO));
-
-    let mut acc = Projective::from(P3);
-    for _ in 0..Fp::MODULUS_BIT_SIZE - 4 {
-        let p = acc.into_affine();
-        evals.push((p.x, p.y));
-        acc += acc;
-    }
-
-    let mut acc = Projective::from(P4);
-    for _ in 0..4 {
-        let p = acc.into_affine();
-        evals.push((p.x, p.y));
-        acc += acc;
-    }
-
-    assert_eq!(evals.len(), 256 + 252);
-    evals.resize(512, (Fp::ZERO, Fp::ZERO));
-
-    let (x_evals, y_evals) = evals.into_iter().unzip();
-    let mut polys = gen_periodic_table(vec![x_evals, y_evals])
-        .into_iter()
-        .map(|poly| poly.coeffs.into_iter().map(FieldVariant::Fp).collect());
-    let (x_coeffs, y_coeffs) = (polys.next().unwrap(), polys.next().unwrap());
-    (x_coeffs, y_coeffs)
 }
 
 #[cfg(test)]

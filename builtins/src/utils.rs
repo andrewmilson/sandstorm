@@ -26,6 +26,7 @@ use ark_poly::Radix2EvaluationDomain;
 /// ```
 ///
 /// Input and output matrix are to be represented in column-major.
+// TODO: consider deleting
 pub fn gen_periodic_table<F: FftField>(matrix: Vec<Vec<F>>) -> Vec<DensePolynomial<F>> {
     if matrix.is_empty() {
         return Vec::new();

@@ -6,6 +6,7 @@ use super::EC_OP_SCALAR_HEIGHT;
 use super::MEMORY_STEP;
 use super::PEDERSEN_BUILTIN_RATIO;
 use super::POSEIDON_RATIO;
+use super::POSEIDON_ROUNDS_FULL;
 use super::PUBLIC_MEMORY_STEP;
 use super::RANGE_CHECK_BUILTIN_PARTS;
 use super::RANGE_CHECK_BUILTIN_RATIO;
@@ -109,7 +110,7 @@ impl ministark::air::AirConfig for AirConfig {
             &rc_builtin_value5_0 * &offset_size + RangeCheckBuiltin::Rc16Component.offset(6);
         let rc_builtin_value7_0 =
             &rc_builtin_value6_0 * &offset_size + RangeCheckBuiltin::Rc16Component.offset(7);
-        let ecdsa_sig0_doubling_key_x_squared: Expr<AlgebraicItem<FieldVariant<Fp, Fp>>> =
+        let ecdsa_sig0_doubling_key_x_squared =
             Ecdsa::PubkeyDoublingX.curr() * Ecdsa::PubkeyDoublingX.curr();
         let ecdsa_sig0_exponentiate_generator_b0 = Ecdsa::MessageSuffix.curr()
             - (Ecdsa::MessageSuffix.next() + Ecdsa::MessageSuffix.next());
@@ -119,47 +120,56 @@ impl ministark::air::AirConfig for AirConfig {
         let ecdsa_sig0_exponentiate_key_b0_neg = &one - &ecdsa_sig0_exponentiate_key_b0;
 
         // bits 0->127 (inclusive) of a bitwise number
-        let bitwise_sum_var_0_0: Expr<AlgebraicItem<FieldVariant<Fp, Fp>>> =
-            Bitwise::Bits16Chunk0Offset0.curr()
-                + Bitwise::Bits16Chunk0Offset1.curr() * (&two).pow(1)
-                + Bitwise::Bits16Chunk0Offset2.curr() * (&two).pow(2)
-                + Bitwise::Bits16Chunk0Offset3.curr() * (&two).pow(3)
-                + Bitwise::Bits16Chunk1Offset0.curr() * (&two).pow(64)
-                + Bitwise::Bits16Chunk1Offset1.curr() * (&two).pow(65)
-                + Bitwise::Bits16Chunk1Offset2.curr() * (&two).pow(66)
-                + Bitwise::Bits16Chunk1Offset3.curr() * (&two).pow(67);
+        let bitwise_sum_var_0_0 = Bitwise::Bits16Chunk0Offset0.curr()
+            + Bitwise::Bits16Chunk0Offset1.curr() * (&two).pow(1)
+            + Bitwise::Bits16Chunk0Offset2.curr() * (&two).pow(2)
+            + Bitwise::Bits16Chunk0Offset3.curr() * (&two).pow(3)
+            + Bitwise::Bits16Chunk1Offset0.curr() * (&two).pow(64)
+            + Bitwise::Bits16Chunk1Offset1.curr() * (&two).pow(65)
+            + Bitwise::Bits16Chunk1Offset2.curr() * (&two).pow(66)
+            + Bitwise::Bits16Chunk1Offset3.curr() * (&two).pow(67);
         // bits 128->255 (inclusive) of a bitwise number
-        let bitwise_sum_var_8_0: Expr<AlgebraicItem<FieldVariant<Fp, Fp>>> =
-            Bitwise::Bits16Chunk2Offset0.curr() * (&two).pow(128)
-                + Bitwise::Bits16Chunk2Offset1.curr() * (&two).pow(129)
-                + Bitwise::Bits16Chunk2Offset2.curr() * (&two).pow(130)
-                + Bitwise::Bits16Chunk2Offset3.curr() * (&two).pow(131)
-                + Bitwise::Bits16Chunk3Offset0.curr() * (&two).pow(192)
-                + Bitwise::Bits16Chunk3Offset1.curr() * (&two).pow(193)
-                + Bitwise::Bits16Chunk3Offset2.curr() * (&two).pow(194)
-                + Bitwise::Bits16Chunk3Offset3.curr() * (&two).pow(195);
+        let bitwise_sum_var_8_0 = Bitwise::Bits16Chunk2Offset0.curr() * (&two).pow(128)
+            + Bitwise::Bits16Chunk2Offset1.curr() * (&two).pow(129)
+            + Bitwise::Bits16Chunk2Offset2.curr() * (&two).pow(130)
+            + Bitwise::Bits16Chunk2Offset3.curr() * (&two).pow(131)
+            + Bitwise::Bits16Chunk3Offset0.curr() * (&two).pow(192)
+            + Bitwise::Bits16Chunk3Offset1.curr() * (&two).pow(193)
+            + Bitwise::Bits16Chunk3Offset2.curr() * (&two).pow(194)
+            + Bitwise::Bits16Chunk3Offset3.curr() * (&two).pow(195);
 
         let ec_op_doubling_q_x_squared_0 = EcOp::QDoublingX.curr() * EcOp::QDoublingX.curr();
         let ec_op_ec_subset_sum_bit_0 =
             EcOp::MSuffix.curr() - (EcOp::MSuffix.next() + EcOp::MSuffix.next());
         let ec_op_ec_subset_sum_bit_0_neg = &one - &ec_op_ec_subset_sum_bit_0;
 
-        // let poseidon_poseidon_full_rounds_state0_cubed_0 = Expr::from(Trace(8, 53)) *
-        // Trace(8, 29); let poseidon_poseidon_full_rounds_state1_cubed_0 =
-        // Expr::from(Trace(8, 13)) * Trace(8, 61);
-        // let poseidon_poseidon_full_rounds_state2_cubed_0 = Expr::from(Trace(8, 45)) *
-        // Trace(8, 3); let poseidon_poseidon_full_rounds_state0_cubed_7 =
-        //     Expr::from(Trace(8, 501)) * Trace(8, 477);
+        // let poseidon_poseidon_full_rounds_state0_cubed_0 =
+        //     Poseidon::FullRoundsState0.offset(0) *
+        // Poseidon::FullRoundsState0Squared.offset(0);
+        // let poseidon_poseidon_full_rounds_state1_cubed_0 =
+        //     Poseidon::FullRoundsState1.offset(0) *
+        // Poseidon::FullRoundsState1Squared.offset(0);
+        // let poseidon_poseidon_full_rounds_state2_cubed_0 =
+        //     Poseidon::FullRoundsState2.offset(0) *
+        // Poseidon::FullRoundsState2Squared.offset(0);
+        // let poseidon_poseidon_full_rounds_state0_cubed_7 =
+        //     Poseidon::FullRoundsState0.offset(7) *
+        // Poseidon::FullRoundsState0Squared.offset(7);
         // let poseidon_poseidon_full_rounds_state1_cubed_7 =
-        //     Expr::from(Trace(8, 461)) * Trace(8, 509);
+        //     Poseidon::FullRoundsState1.offset(7) *
+        // Poseidon::FullRoundsState1Squared.offset(7);
         // let poseidon_poseidon_full_rounds_state2_cubed_7 =
-        //     Expr::from(Trace(8, 493)) * Trace(8, 451);
+        //     Poseidon::FullRoundsState2.offset(7) *
+        // Poseidon::FullRoundsState2Squared.offset(7);
         // let poseidon_poseidon_full_rounds_state0_cubed_3 =
-        //     Expr::from(Trace(8, 245)) * Trace(8, 221);
+        //     Poseidon::FullRoundsState0.offset(3) *
+        // Poseidon::FullRoundsState0Squared.offset(3);
         // let poseidon_poseidon_full_rounds_state1_cubed_3 =
-        //     Expr::from(Trace(8, 205)) * Trace(8, 253);
+        //     Poseidon::FullRoundsState1.offset(3) *
+        // Poseidon::FullRoundsState1Squared.offset(3);
         // let poseidon_poseidon_full_rounds_state2_cubed_3 =
-        //     Expr::from(Trace(8, 237)) * Trace(8, 195);
+        //     Poseidon::FullRoundsState2.offset(3) *
+        // Poseidon::FullRoundsState2Squared.offset(3);
         // let poseidon_poseidon_partial_rounds_state0_cubed_0 = Expr::from(Trace(7, 3))
         // * Trace(7, 7); let poseidon_poseidon_partial_rounds_state0_cubed_1 =
         //   Expr::from(Trace(7, 11)) * Trace(7, 15);
@@ -790,13 +800,13 @@ impl ministark::air::AirConfig for AirConfig {
         // ├───────────┼────────────────────┼────────────────────┤
         // │   ω^251   │   [P_2 * 2^3]_x    │   [P_2 * 2^3]_y    │
         // ├───────────┼────────────────────┼────────────────────┤
-        // │   ω^252   │         0          │         0          │
+        // │   ω^252   │   [P_2 * 2^3]_x    │   [P_2 * 2^3]_y    │<- unused copy of prev
         // ├───────────┼────────────────────┼────────────────────┤
-        // │   ω^253   │         0          │         0          │
+        // │   ω^253   │   [P_2 * 2^3]_x    │   [P_2 * 2^3]_y    │<- unused copy of prev
         // ├───────────┼────────────────────┼────────────────────┤
-        // │   ω^254   │         0          │         0          │
+        // │   ω^254   │   [P_2 * 2^3]_x    │   [P_2 * 2^3]_y    │<- unused copy of prev
         // ├───────────┼────────────────────┼────────────────────┤
-        // │   ω^255   │         0          │         0          │
+        // │   ω^255   │   [P_2 * 2^3]_x    │   [P_2 * 2^3]_y    │<- unused copy of prev
         // ├───────────┼────────────────────┼────────────────────┤
         // │   ω^256   │   [P_3 * 2^0]_x    │   [P_3 * 2^0]_y    │
         // ├───────────┼────────────────────┼────────────────────┤
@@ -814,17 +824,18 @@ impl ministark::air::AirConfig for AirConfig {
         // ├───────────┼────────────────────┼────────────────────┤
         // │   ω^507   │   [P_4 * 2^3]_x    │   [P_4 * 2^3]_y    │
         // ├───────────┼────────────────────┼────────────────────┤
-        // │   ω^508   │         0          │         0          │
+        // │   ω^508   │   [P_4 * 2^3]_x    │   [P_4 * 2^3]_y    │<- unused copy of prev
         // ├───────────┼────────────────────┼────────────────────┤
-        // │   ω^509   │         0          │         0          │
+        // │   ω^509   │   [P_4 * 2^3]_x    │   [P_4 * 2^3]_y    │<- unused copy of prev
         // ├───────────┼────────────────────┼────────────────────┤
-        // │   ω^510   │         0          │         0          │
+        // │   ω^510   │   [P_4 * 2^3]_x    │   [P_4 * 2^3]_y    │<- unused copy of prev
         // ├───────────┼────────────────────┼────────────────────┤
-        // │   ω^511   │         0          │         0          │
+        // │   ω^511   │   [P_4 * 2^3]_x    │   [P_4 * 2^3]_y    │<- unused copy of prev
         // └───────────┴────────────────────┴────────────────────┘
-        let (pedersen_x_coeffs, pedersen_y_coeffs) = pedersen::constant_points_poly();
-        let pedersen_points_x = Polynomial::new(pedersen_x_coeffs);
-        let pedersen_points_y = Polynomial::new(pedersen_y_coeffs);
+        let pedersen_x_coeffs = pedersen::periodic::HASH_POINTS_X_COEFFS.map(FieldVariant::Fp);
+        let pedersen_y_coeffs = pedersen::periodic::HASH_POINTS_Y_COEFFS.map(FieldVariant::Fp);
+        let pedersen_points_x = Polynomial::new(pedersen_x_coeffs.to_vec());
+        let pedersen_points_y = Polynomial::new(pedersen_y_coeffs.to_vec());
 
         // TODO: double check if the value that's being evaluated is correct
         let pedersen_point_x = pedersen_points_x.eval(X.pow(n / 512));
@@ -1100,7 +1111,15 @@ impl ministark::air::AirConfig for AirConfig {
         // ├───────────┼──────────────────┼──────────────────┤
         // │    ...    │         ...      │         ...      │
         // ├───────────┼──────────────────┼──────────────────┤
-        // │   ω^255   │  [G * 2^255]_x   │  [G * 2^255]_y   │
+        // │   ω^251   │  [G * 2^251]_x   │  [G * 2^251]_y   │
+        // ├───────────┼──────────────────┼──────────────────┤
+        // │   ω^252   │  [G * 2^251]_x   │  [G * 2^251]_y   │<- unused copy of prev
+        // ├───────────┼──────────────────┼──────────────────┤
+        // │   ω^253   │  [G * 2^251]_x   │  [G * 2^251]_y   │<- unused copy of prev
+        // ├───────────┼──────────────────┼──────────────────┤
+        // │   ω^254   │  [G * 2^251]_x   │  [G * 2^251]_y   │<- unused copy of prev
+        // ├───────────┼──────────────────┼──────────────────┤
+        // │   ω^255   │  [G * 2^251]_x   │  [G * 2^251]_y   │<- unused copy of prev
         // ├───────────┼──────────────────┼──────────────────┤
         // │   ω^256   │   [G * 2^0]_x    │   [G * 2^0]_y    │
         // ├───────────┼──────────────────┼──────────────────┤
@@ -1108,9 +1127,12 @@ impl ministark::air::AirConfig for AirConfig {
         // ├───────────┼──────────────────┼──────────────────┤
         // │    ...    │         ...      │         ...      │
         // └───────────┴──────────────────┴──────────────────┘
-        let (ecdsa_generator_x_coeffs, ecdsa_generator_y_coeffs) = ecdsa::generator_points_poly();
-        let ecdsa_generator_points_x = Polynomial::new(ecdsa_generator_x_coeffs);
-        let ecdsa_generator_points_y = Polynomial::new(ecdsa_generator_y_coeffs);
+        let ecdsa_generator_x_coeffs =
+            ecdsa::periodic::GENERATOR_POINTS_X_COEFFS.map(FieldVariant::Fp);
+        let ecdsa_generator_y_coeffs =
+            ecdsa::periodic::GENERATOR_POINTS_Y_COEFFS.map(FieldVariant::Fp);
+        let ecdsa_generator_points_x = Polynomial::new(ecdsa_generator_x_coeffs.to_vec());
+        let ecdsa_generator_points_y = Polynomial::new(ecdsa_generator_y_coeffs.to_vec());
 
         // TODO: double check if the value that's being evaluated is correct
         let ecdsa_generator_point_x = ecdsa_generator_points_x.eval(X.pow(n / 32768));
@@ -1777,13 +1799,13 @@ impl ministark::air::AirConfig for AirConfig {
         // x^(n/512)-g^(448*n/512) = (x-ω^448)
         // domain14                = (x^(n/512)-g^(3*n/4))*(^n/512)-g^(7*n/8))
         //
-        // (x-ω^320)(x-ω^384)(x-ω^448)              = (x-ω^(64*5))..(x-ω^(64*7))
-        // x^(n/64)-1                               = (x-ω^(64*0))..(x-ω^(64*7))
-        // (x-ω^320)(x-ω^384)(x-ω^448)/(x^(n/64)-1) = (x-ω^(64*0))..(x-ω^(64*4))
-        // poseidon_io_step_zerofier_inv            = 1/(x-ω^(64*0))..(x-ω^(64*4))
+        // (x-ω^320)(x-ω^384)(x-ω^448)               = (x-ω^(64*5))..(x-ω^(64*7))
+        // x^(n/64)-1                                = (x-ω^(64*0))..(x-ω^(64*7))
+        // (x-ω^320)(x-ω^384)(x-ω^448)/(x^(n/64)-1)  = (x-ω^(64*0))..(x-ω^(64*4))
+        // poseidon_inputs_outputs_step_zerofier_inv = 1/(x-ω^(64*0))..(x-ω^(64*4))
         let domain14 = (X.pow(n / 512) - Constant(FieldVariant::Fp(g.pow([3 * n as u64 / 4]))))
             * (X.pow(n / 512) - Constant(FieldVariant::Fp(g.pow([7 * n as u64 / 8]))));
-        let poseidon_io_step_zerofier_inv = (X.pow(n / 512)
+        let poseidon_inputs_outputs_step_zerofier_inv = (X.pow(n / 512)
             - Constant(FieldVariant::Fp(g.pow([5 * n as u64 / 8]))))
             * &domain14
             * &every_64_row_zerofier_inv;
@@ -1791,42 +1813,69 @@ impl ministark::air::AirConfig for AirConfig {
         // note that the constraint checks the memory addresses are continuous for the 6
         // memory locations used per poseidon hash instance
         let poseidon_addr_input_output_step_inner = Npc::PoseidonInput0Addr.curr()
-            - (Npc::PoseidonInput1Addr.curr() - &one) * &poseidon_io_step_zerofier_inv;
-
-        // TODO: find out what Trace(8, 53) holds
-        // clearly Trace(8, 29) holds the square of it
-        // column8_row53 * column8_row53 - column8_row29
-        let poseidon_poseidon_full_rounds_state0_squaring =
-            (Expr::from(Trace(8, 53)) * Trace(8, 53) - Trace(8, 29)) * &every_64_row_zerofier_inv;
-
-        // TODO
-        // let poseidon_poseidon_full_rounds_state1_squaring = column8_row13 *
-        // column8_row13 - column8_row61
-
-        // TODO: other poseidon constraints
+            - (Npc::PoseidonInput1Addr.curr() - &one) * &poseidon_inputs_outputs_step_zerofier_inv;
 
         let all_poseidon_zerofier = X.pow(n / 512) - &one;
         let all_poseidon_zerofier_inv = &one / all_poseidon_zerofier;
+        let all_poseidon_zerofier_except_last_inv =
+            (X - Constant(FieldVariant::Fp(g.pow([512 * (n as u64 / 512 - 1)]))))
+                * &all_poseidon_zerofier_inv;
 
-        // load in the first input
-        // TODO: trace(8, 53)
-        // let poseidon_poseidon_add_first_round_key0 = (Npc::PoseidonInput0Val.curr()
-        //     + Constant(poseidon::params::ROUND_KEYS[0][0])
-        //     - Trace(8, 53))
-        //     * &all_poseidon_zerofier_inv;
-        // let poseidon_poseidon_add_first_round_key1 = (Npc::PoseidonInput1Val.curr()
-        //     + Constant(poseidon::params::ROUND_KEYS[0][1])
-        //     - Trace(8, 13))
-        //     * &all_poseidon_zerofier_inv;
-        // let poseidon_poseidon_add_first_round_key2 = (Npc::PoseidonInput1Val.curr()
-        //     + Constant(poseidon::params::ROUND_KEYS[0][2])
-        //     - Trace(8, 45))
-        //     * &all_poseidon_zerofier_inv;
+        // Check the memory addresses for the next poseidon instance are directly after
+        // the last address of the previous instance
+        let poseidon_addr_input_output_step_outter = (Npc::PoseidonInput0Addr.next()
+            - (Npc::PoseidonOutput2Addr.curr() + &one))
+            * &all_poseidon_zerofier_except_last_inv;
 
-        // poseidon/poseidon/full_round0
-        // TODO: figure out what Trace(8, 117) is
-        // NOTE: 117 - 64 = 53
-        // let poseidon_poseidon_full_round0 = column8_row117
+        // TODO
+
+        // Our AIR blowup factor is 2 but we need to check a cube
+        // We use another field to spread the calculation of the cube across 2 trace
+        // cells so the constraints remain with a blowup factor of 2.
+        let poseidon_poseidon_full_rounds_state0_squaring = (Poseidon::FullRoundsState0.curr()
+            * Poseidon::FullRoundsState0.curr()
+            - Poseidon::FullRoundsState0Squared.curr())
+            * &every_64_row_zerofier_inv;
+        let poseidon_poseidon_full_rounds_state1_squaring = (Poseidon::FullRoundsState1.curr()
+            * Poseidon::FullRoundsState1.curr()
+            - Poseidon::FullRoundsState1Squared.curr())
+            * &every_64_row_zerofier_inv;
+        let poseidon_poseidon_full_rounds_state2_squaring = (Poseidon::FullRoundsState2.curr()
+            * Poseidon::FullRoundsState2.curr()
+            - Poseidon::FullRoundsState2Squared.curr())
+            * &every_64_row_zerofier_inv;
+        // poseidon/poseidon/full_rounds_state2_squaring
+
+        // TODO:
+        // let poseidon_poseidon_partial_rounds_state0_squaring =
+
+        // check the loading of the inputs into the initial state
+        let poseidon_poseidon_add_first_round_key0 = (Npc::PoseidonInput0Val.curr()
+            + Constant(FieldVariant::Fp(poseidon::params::ROUND_KEYS[0][0]))
+            - Poseidon::FullRoundsState0.curr())
+            * &all_poseidon_zerofier_inv;
+        let poseidon_poseidon_add_first_round_key1 = (Npc::PoseidonInput1Val.curr()
+            + Constant(FieldVariant::Fp(poseidon::params::ROUND_KEYS[0][1]))
+            - Poseidon::FullRoundsState1.curr())
+            * &all_poseidon_zerofier_inv;
+        let poseidon_poseidon_add_first_round_key2 = (Npc::PoseidonInput1Val.curr()
+            + Constant(FieldVariant::Fp(poseidon::params::ROUND_KEYS[0][2]))
+            - Poseidon::FullRoundsState2.curr())
+            * &all_poseidon_zerofier_inv;
+
+        // column8_row117 - (poseidon__poseidon__full_rounds_state0_cubed_0 +
+        // poseidon__poseidon__full_rounds_state0_cubed_0 +
+        // poseidon__poseidon__full_rounds_state0_cubed_0 +
+        // poseidon__poseidon__full_rounds_state1_cubed_0 +
+        // poseidon__poseidon__full_rounds_state2_cubed_0 +
+        // poseidon__poseidon__full_round_key0).
+        // let poseidon_poseidon_full_round0 = Poseidon::FullRoundsState0.next()
+        //     - (&poseidon_poseidon_full_rounds_state0_cubed_0 +
+        //       &poseidon_poseidon_full_rounds_state0_cubed_0 +
+        //       &poseidon_poseidon_full_rounds_state0_cubed_0 +
+        //       &poseidon_poseidon_full_rounds_state1_cubed_0 +
+        //       &poseidon_poseidon_full_rounds_state2_cubed_0 +
+        //       poseidon_poseidon_full_rounds_key0);
 
         let _ = [
             &domain14,
@@ -2170,8 +2219,14 @@ impl ministark::air::AirConfig for AirConfig {
             ec_op_set_r_y,
             poseidon_init_input_output_addr,
             poseidon_addr_input_output_step_inner,
+            poseidon_addr_input_output_step_outter,
+            poseidon_poseidon_full_rounds_state0_squaring,
+            poseidon_poseidon_full_rounds_state1_squaring,
+            poseidon_poseidon_full_rounds_state2_squaring,
             // TODO
-            // poseidon_poseidon_add_first_round_key0,
+            poseidon_poseidon_add_first_round_key0,
+            poseidon_poseidon_add_first_round_key1,
+            poseidon_poseidon_add_first_round_key2,
         ]
         .into_iter()
         .map(Constraint::new)
@@ -2361,18 +2416,41 @@ impl ExecutionTraceColumn for RangeCheckBuiltin {
 
 #[derive(Clone, Copy)]
 pub enum Poseidon {
-    State0 = 0,
-    State1 = 1,
-    State2 = 2,
+    FullRoundsState0 = 53,
+    FullRoundsState0Squared = 29,
+    FullRoundsState1 = 13,
+    FullRoundsState1Squared = 61,
+    FullRoundsState2 = 45,
+    FullRoundsState2Squared = 3,
+    // PartialRoundsState0 = 3,
+    // PartialRoundsState0Squared = 7,
 }
 
 impl ExecutionTraceColumn for Poseidon {
     fn index(&self) -> usize {
-        todo!()
+        match self {
+            Self::FullRoundsState0
+            | Self::FullRoundsState0Squared
+            | Self::FullRoundsState1
+            | Self::FullRoundsState1Squared
+            | Self::FullRoundsState2
+            | Self::FullRoundsState2Squared => 8,
+            // Self::PartialRoundsState0 | Self::PartialRoundsState0 => 7,
+        }
     }
 
     fn offset<T>(&self, offset: isize) -> Expr<AlgebraicItem<T>> {
-        todo!()
+        let column = self.index();
+        let step = match self {
+            Self::FullRoundsState0
+            | Self::FullRoundsState0Squared
+            | Self::FullRoundsState1
+            | Self::FullRoundsState1Squared
+            | Self::FullRoundsState2
+            | Self::FullRoundsState2Squared => POSEIDON_RATIO * CYCLE_HEIGHT / POSEIDON_ROUNDS_FULL,
+        } as isize;
+        let trace_offset = step * offset + *self as isize;
+        AlgebraicItem::Trace(column, trace_offset).into()
     }
 }
 
@@ -2738,19 +2816,34 @@ pub enum Npc {
     EcOpRYVal = 14727,
 
     // 38 % 16 = 6
-    // 39 % 17 = 7
+    // 39 % 16 = 7
     PoseidonInput0Addr = 38,
     PoseidonInput0Val = 39,
 
     // 102 % 16 = 6
-    // 103 % 17 = 7
+    // 103 % 16 = 7
     PoseidonInput1Addr = 102,
     PoseidonInput1Val = 103,
 
-    // 140 % 16 = 6
-    // 141 % 17 = 7
-    PoseidonInput2Addr = 140,
-    PoseidonInput2Val = 141,
+    // 166 % 16 = 6
+    // 167 % 16 = 7
+    PoseidonInput2Addr = 166,
+    PoseidonInput2Val = 167,
+
+    // 230 % 16 = 6
+    // 231 % 16 = 7
+    PoseidonOutput0Addr = 230,
+    PoseidonOutput0Val = 231,
+
+    // 294 % 16 = 6
+    // 295 % 16 = 7
+    PoseidonOutput1Addr = 294,
+    PoseidonOutput1Val = 295,
+
+    // 358 % 16 = 6
+    // 359 % 16 = 7
+    PoseidonOutput2Addr = 358,
+    PoseidonOutput2Val = 359,
 
     MemDstAddr = 8,
     MemDst = 9,
@@ -2815,7 +2908,13 @@ impl ExecutionTraceColumn for Npc {
             | Self::PoseidonInput1Addr
             | Self::PoseidonInput1Val
             | Self::PoseidonInput2Addr
-            | Self::PoseidonInput2Val => POSEIDON_RATIO * CYCLE_HEIGHT,
+            | Self::PoseidonInput2Val
+            | Self::PoseidonOutput0Addr
+            | Self::PoseidonOutput0Val
+            | Self::PoseidonOutput1Addr
+            | Self::PoseidonOutput1Val
+            | Self::PoseidonOutput2Addr
+            | Self::PoseidonOutput2Val => POSEIDON_RATIO * CYCLE_HEIGHT,
         } as isize;
         let column = self.index();
         let trace_offset = step * offset + *self as isize;

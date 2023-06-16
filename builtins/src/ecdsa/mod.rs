@@ -1,5 +1,4 @@
 use std::sync::OnceLock;
-
 use ark_ec::CurveGroup;
 use ark_ec::Group;
 use ark_ec::short_weierstrass::Projective;
@@ -20,6 +19,8 @@ use crate::utils::curve::calculate_slope;
 use ministark_gpu::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481::ark::Fp;
 use ark_ec::short_weierstrass::Affine;
 use ark_ff::PrimeField;
+
+pub mod periodic;
 
 pub const SHIFT_POINT: Affine<StarkwareCurve> = super::pedersen::constants::P0;
 
@@ -321,29 +322,4 @@ pub(crate) fn mimic_ec_mad_air(
         m >>= 1;
     }
     Some(partial_sum)
-}
-
-/// Ouptut is of the form (x_points_coeffs, y_points_coeffs)
-// TODO: Generate these constant polynomials at compile time
-#[allow(clippy::type_complexity)]
-pub fn generator_points_poly() -> (Vec<FieldVariant<Fp, Fp>>, Vec<FieldVariant<Fp, Fp>>) {
-    let mut evals = Vec::new();
-
-    let mut acc = Projective::from(StarkwareCurve::GENERATOR);
-    for _ in 0..256 {
-        let p = acc.into_affine();
-        evals.push((p.x, p.y));
-        acc.double_in_place();
-    }
-
-    // TODO: need to figure out the exact polynomial starkware is using
-    // assert_eq!(evals.len(), 256 + 252);
-    // evals.resize(512, (Fp::ZERO, Fp::ZERO));
-
-    let (x_evals, y_evals) = evals.into_iter().unzip();
-    let mut polys = gen_periodic_table(vec![x_evals, y_evals])
-        .into_iter()
-        .map(|poly| poly.coeffs.into_iter().map(FieldVariant::Fp).collect());
-    let (x_coeffs, y_coeffs) = (polys.next().unwrap(), polys.next().unwrap());
-    (x_coeffs, y_coeffs)
 }

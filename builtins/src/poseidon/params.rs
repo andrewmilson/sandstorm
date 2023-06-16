@@ -6,9 +6,9 @@ pub const RATE: usize = 2;
 
 pub const CAPACITY: usize = 1;
 
-pub const FULL_ROUNDS: usize = 8;
+pub const NUM_FULL_ROUNDS: usize = 8;
 
-pub const PARTIAL_ROUNDS: usize = 83;
+pub const NUM_PARTIAL_ROUNDS: usize = 83;
 
 pub const MDS_MATRIX: [[Fp; 3]; 3] = [
     [Fp!("3"), Fp!("1"), Fp!("1")],

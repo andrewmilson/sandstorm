@@ -2,6 +2,7 @@ use std::iter::zip;
 
 use ministark_gpu::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481::ark::Fp;
 pub mod params;
+pub mod periodic;
 use ark_ff::Field;
 
 /// Computes the Poseidon hash using StarkWare's parameters. Source:
@@ -10,7 +11,7 @@ fn permute(input: [Fp; 3]) -> [Fp; 3] {
     let mut state = input;
     let mut round = 0;
     // first full rounds
-    for _ in 0..params::FULL_ROUNDS / 2 {
+    for _ in 0..params::NUM_FULL_ROUNDS / 2 {
         // round constants, nonlinear layer, matrix multiplication
         for (s, round_key) in zip(&mut state, params::ROUND_KEYS[round]) {
             *s = (*s + round_key).pow([3]);
@@ -19,7 +20,7 @@ fn permute(input: [Fp; 3]) -> [Fp; 3] {
         round += 1;
     }
     // Middle partial rounds
-    for _ in 0..params::PARTIAL_ROUNDS {
+    for _ in 0..params::NUM_PARTIAL_ROUNDS {
         // round constants, nonlinear layer, matrix multiplication
         for (s, round_key) in zip(&mut state, params::ROUND_KEYS[round]) {
             *s += round_key;
@@ -29,7 +30,7 @@ fn permute(input: [Fp; 3]) -> [Fp; 3] {
         round += 1;
     }
     // last full rounds
-    for _ in 0..params::FULL_ROUNDS / 2 {
+    for _ in 0..params::NUM_FULL_ROUNDS / 2 {
         // round constants, nonlinear layer, matrix multiplication
         for (s, round_key) in zip(&mut state, params::ROUND_KEYS[round]) {
             *s = (*s + round_key).pow([3]);
