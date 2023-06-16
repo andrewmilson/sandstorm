@@ -6,13 +6,11 @@ use ark_ec::short_weierstrass::SWCurveConfig;
 use ark_ff::Zero;
 use binary::EcdsaInstance;
 use binary::Signature;
-use ministark::utils::FieldVariant;
 use num_bigint::BigUint;
 use ruint::aliases::U256;
 use ruint::uint;
 use ark_ff::Field;
 use crate::pedersen::pedersen_hash;
-use crate::utils::gen_periodic_table;
 use crate::utils::curve::Fr;
 use crate::utils::curve::StarkwareCurve;
 use crate::utils::curve::calculate_slope;
@@ -104,9 +102,11 @@ impl InstanceTrace {
         let b_doubling_steps = doubling_steps(256, b.into());
         let wb = Affine::from(mimic_ec_mad_air(w.into(), b.into(), shift_point).unwrap());
 
-        let zg_steps = gen_ec_mad_steps(message.into(), generator, -shift_point);
-        let rq_steps = gen_ec_mad_steps(r.into(), pubkey.into(), shift_point);
-        let wb_steps = gen_ec_mad_steps(w.into(), b.into(), shift_point);
+        // Restrict generator max doublings to 250 to match the
+        // periodic column used by AIR.
+        let zg_steps = gen_ec_mad_steps::<250>(message.into(), generator, -shift_point);
+        let rq_steps = gen_ec_mad_steps::<255>(r.into(), pubkey.into(), shift_point);
+        let wb_steps = gen_ec_mad_steps::<255>(w.into(), b.into(), shift_point);
 
         assert_eq!(zg, zg_steps.last().unwrap().partial_sum);
         assert_eq!(qr, rq_steps.last().unwrap().partial_sum);
@@ -161,7 +161,10 @@ impl InstanceTrace {
 }
 
 /// Generates a list of the steps involved with an EC multiply-add
-fn gen_ec_mad_steps(
+// TODO: NOTE: MAX_POINT_DOUBLINGS is a little decoupled but this is to do with
+// the periodic column construction. If this is done for i>251 the AIR with
+// error.
+fn gen_ec_mad_steps<const MAX_POINT_DOUBLINGS: usize>(
     x: BigUint,
     mut point: Projective<StarkwareCurve>,
     shift_point: Projective<StarkwareCurve>,
@@ -194,7 +197,9 @@ fn gen_ec_mad_steps(
         });
 
         partial_sum = partial_sum_next;
-        point.double_in_place();
+        if i < MAX_POINT_DOUBLINGS {
+            point.double_in_place();
+        }
     }
     res
 }

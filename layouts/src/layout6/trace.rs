@@ -13,6 +13,7 @@ use binary::BitwiseInstance;
 use binary::Layout;
 use binary::MemoryEntry;
 use binary::PedersenInstance;
+use binary::PoseidonInstance;
 use binary::RangeCheckInstance;
 use builtins::bitwise;
 use builtins::bitwise::dilute;
@@ -22,6 +23,7 @@ use builtins::pedersen;
 use ark_ff::One;
 use binary::AirPrivateInput;
 use binary::AirPublicInput;
+use builtins::poseidon;
 use builtins::range_check;
 use num_bigint::BigUint;
 use ruint::aliases::U256;
@@ -33,6 +35,7 @@ use crate::layout6::DILUTED_CHECK_STEP;
 use crate::layout6::ECDSA_BUILTIN_RATIO;
 use crate::layout6::EC_OP_BUILTIN_RATIO;
 use crate::layout6::EC_OP_SCALAR_HEIGHT;
+use crate::layout6::POSEIDON_RATIO;
 use crate::layout6::RANGE_CHECK_BUILTIN_PARTS;
 use crate::layout6::RANGE_CHECK_BUILTIN_RATIO;
 use crate::layout6::air::Bitwise;
@@ -769,6 +772,61 @@ impl CairoExecutionTrace for ExecutionTrace {
                 npc[Npc::EcOpRYAddr as usize] = r_y_addr.into();
                 npc[Npc::EcOpRYVal as usize] = ec_op_trace.r.y;
             });
+
+        // // Poseidon builtin
+        // // ================
+        // let poseidon_memory_segment = air_public_input
+        //     .memory_segments
+        //     .poseidon
+        //     .expect("layout6 requires a poseidon memory segment");
+        // let initial_poseidon_address = poseidon_memory_segment.begin_addr;
+
+        // // Create dummy instances if there are cells that need to be filled
+        // let poseidon_instances = air_private_input.poseidon;
+        // let num_poseidon_instances = poseidon_instances.len() as u32;
+        // let poseidon_dummy_instances =
+        // (num_poseidon_instances..).map(PoseidonInstance::new_empty);
+        // let poseidon_traces = poseidon_instances
+        //     .into_iter()
+        //     .chain(poseidon_dummy_instances)
+        //     .map(poseidon::InstanceTrace::new);
+
+        // const POSEIDON_STEP_ROWS: usize = POSEIDON_RATIO * CYCLE_HEIGHT;
+        // let (poseidon_npc_steps, _) =
+        // npc_column.as_chunks_mut::<POSEIDON_STEP_ROWS>();
+        // let (poseidon_rc_steps, _) =
+        // range_check_column.as_chunks_mut::<POSEIDON_STEP_ROWS>();
+        // let (poseidon_auxiliary_steps, _) =
+        // auxiliary_column.as_chunks_mut::<POSEIDON_STEP_ROWS>();
+
+        // ark_std::cfg_iter_mut!(poseidon_npc_steps)
+        //     .zip(poseidon_rc_steps)
+        //     .zip(poseidon_auxiliary_steps)
+        //     .zip(poseidon_traces)
+        //     .for_each(|(((npc, rc), aux), poseidon_trace)| {
+        //         // load EC op values into memory
+        //         let instance = poseidon_trace.instance;
+        //         let (
+        //             input0_addr,
+        //             input1_addr,
+        //             input2_addr,
+        //             output0_addr,
+        //             output1_addr,
+        //             output2_addr,
+        //         ) = instance.mem_addr(initial_poseidon_address);
+        //         npc[Npc::PoseidonInput0Addr as usize] = input0_addr.into();
+        //         npc[Npc::PoseidonInput0Val as usize] = poseidon_trace.input0;
+        //         npc[Npc::PoseidonInput1Addr as usize] = input1_addr.into();
+        //         npc[Npc::PoseidonInput1Val as usize] = poseidon_trace.input1;
+        //         npc[Npc::PoseidonInput2Addr as usize] = input2_addr.into();
+        //         npc[Npc::PoseidonInput2Val as usize] = poseidon_trace.input2;
+        //         npc[Npc::PoseidonOutput0Addr as usize] = output0_addr.into();
+        //         npc[Npc::PoseidonOutput0Val as usize] = poseidon_trace.output0;
+        //         npc[Npc::PoseidonOutput1Addr as usize] = output1_addr.into();
+        //         npc[Npc::PoseidonOutput1Val as usize] = poseidon_trace.output1;
+        //         npc[Npc::PoseidonOutput2Addr as usize] = output2_addr.into();
+        //         npc[Npc::PoseidonOutput2Val as usize] = poseidon_trace.output2;
+        //     });
 
         // VM Memory
         // =========

@@ -2217,16 +2217,16 @@ impl ministark::air::AirConfig for AirConfig {
             ec_op_get_p_y,
             ec_op_set_r_x,
             ec_op_set_r_y,
-            poseidon_init_input_output_addr,
-            poseidon_addr_input_output_step_inner,
-            poseidon_addr_input_output_step_outter,
-            poseidon_poseidon_full_rounds_state0_squaring,
-            poseidon_poseidon_full_rounds_state1_squaring,
-            poseidon_poseidon_full_rounds_state2_squaring,
+            // poseidon_init_input_output_addr,
+            // poseidon_addr_input_output_step_inner,
+            // poseidon_addr_input_output_step_outter,
+            // poseidon_poseidon_full_rounds_state0_squaring,
+            // poseidon_poseidon_full_rounds_state1_squaring,
+            // poseidon_poseidon_full_rounds_state2_squaring,
             // TODO
-            poseidon_poseidon_add_first_round_key0,
-            poseidon_poseidon_add_first_round_key1,
-            poseidon_poseidon_add_first_round_key2,
+            // poseidon_poseidon_add_first_round_key0,
+            // poseidon_poseidon_add_first_round_key1,
+            // poseidon_poseidon_add_first_round_key2,
         ]
         .into_iter()
         .map(Constraint::new)
@@ -2457,7 +2457,7 @@ impl ExecutionTraceColumn for Poseidon {
 #[derive(Clone, Copy)]
 pub enum EcOp {
     QDoublingX = 41,
-    QDoublingY = 28,
+    QDoublingY = 25,
     QDoublingSlope = 57,
     RPartialSumX = 5,
     RPartialSumY = 37,
@@ -2528,10 +2528,10 @@ pub enum Ecdsa {
     // NOTE: 32715 % 64 = 11
     RPointSlope = 16331,
     RPointXDiffInv = 32715,
-    // NOTE: 16370 % 64 = 50
-    // NOTE: 32754 % 64 = 50
-    RInv = 16370,
-    WInv = 32754,
+    // NOTE: 16355 % 64 = 35
+    // NOTE: 32739 % 64 = 35
+    RInv = 16355,
+    WInv = 32739,
     // NOTE: 16363 % 64 = 43
     // NOTE: 32747 % 64 = 43
     MessageInv = 16363,

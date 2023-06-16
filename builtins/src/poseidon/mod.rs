@@ -1,9 +1,42 @@
 use std::iter::zip;
 
+use binary::PoseidonInstance;
 use ministark_gpu::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481::ark::Fp;
 pub mod params;
 pub mod periodic;
 use ark_ff::Field;
+use num_bigint::BigUint;
+
+#[derive(Clone, Debug)]
+pub struct InstanceTrace {
+    pub instance: PoseidonInstance,
+    pub input0: Fp,
+    pub input1: Fp,
+    pub input2: Fp,
+    pub output0: Fp,
+    pub output1: Fp,
+    pub output2: Fp,
+}
+
+impl InstanceTrace {
+    pub fn new(instance: PoseidonInstance) -> Self {
+        let input0 = Fp::from(BigUint::from(instance.input0));
+        let input1 = Fp::from(BigUint::from(instance.input1));
+        let input2 = Fp::from(BigUint::from(instance.input2));
+
+        let [output0, output1, output2] = permute([input0, input1, input2]);
+
+        Self {
+            instance,
+            input0,
+            input1,
+            input2,
+            output0,
+            output1,
+            output2,
+        }
+    }
+}
 
 /// Computes the Poseidon hash using StarkWare's parameters. Source:
 /// <https://extgit.iaik.tugraz.at/krypto/hadeshash/-/blob/master/code/starkadperm_x5_256_3.sage>
@@ -64,7 +97,7 @@ mod tests {
     use ministark_gpu::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481::ark::Fp;
 
     #[test]
-    fn zero_hash_matches_example() {
+    fn zero_hash_matches_starkware_example() {
         // Example from https://github.com/starkware-industries/poseidon
         let expected = [
             Fp!("3446325744004048536138401612021367625846492093718951375866996507163446763827"),

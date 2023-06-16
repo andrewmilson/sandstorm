@@ -1,10 +1,11 @@
-%builtins output pedersen range_check ecdsa bitwise ec_op
+%builtins output pedersen range_check ecdsa bitwise ec_op poseidon
 
-from starkware.cairo.common.cairo_builtins import HashBuiltin, SignatureBuiltin, BitwiseBuiltin, EcOpBuiltin
+from starkware.cairo.common.cairo_builtins import HashBuiltin, SignatureBuiltin, BitwiseBuiltin, EcOpBuiltin, PoseidonBuiltin
 from starkware.cairo.common.hash import hash2
 from starkware.cairo.common.ec_point import EcPoint
 from starkware.cairo.common.ec import StarkCurve
 from starkware.cairo.common.signature import check_ecdsa_signature
+from starkware.cairo.common.builtin_poseidon.poseidon import poseidon_hash_single
 // from starkware.cairo.common.signature import 
 from starkware.cairo.common.bitwise import bitwise_and
 from starkware.cairo.common.signature import (
@@ -58,7 +59,7 @@ from starkware.cairo.common.signature import (
 
 // Implicit arguments: addresses of the output and pedersen
 // builtins.
-func main{output_ptr, pedersen_ptr: HashBuiltin*, range_check_ptr, ecdsa_ptr: SignatureBuiltin*, bitwise_ptr: BitwiseBuiltin*, ec_op_ptr: EcOpBuiltin*}() {
+func main{output_ptr, pedersen_ptr: HashBuiltin*, range_check_ptr, ecdsa_ptr: SignatureBuiltin*, bitwise_ptr: BitwiseBuiltin*, ec_op_ptr: EcOpBuiltin*, poseidon_ptr: PoseidonBuiltin*}() {
     alloc_locals;
     // The following line implicitly updates the pedersen_ptr
     // reference to pedersen_ptr + 3.
@@ -105,7 +106,7 @@ func main{output_ptr, pedersen_ptr: HashBuiltin*, range_check_ptr, ecdsa_ptr: Si
     assert yoyo = 1190020890442526208725573243584847930292605552660038159110459769316048045408;
 
     // let (zG: EcPoint) = ec_mul(m=3189, p=EcPoint(x=StarkCurve.GEN_X, y=StarkCurve.GEN_Y));
-
+    let (simple_hash) = poseidon_hash_single(27318998);
 
 
     let (yo1) = bitwise_and(0, 0);

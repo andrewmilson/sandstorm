@@ -372,6 +372,43 @@ impl EcOpInstance {
     }
 }
 
+#[derive(Deserialize, Clone, Copy, Debug)]
+pub struct PoseidonInstance {
+    pub index: u32,
+    #[serde(rename = "input_s0", deserialize_with = "deserialize_hex_str")]
+    pub input0: U256,
+    #[serde(rename = "input_s1", deserialize_with = "deserialize_hex_str")]
+    pub input1: U256,
+    #[serde(rename = "input_s2", deserialize_with = "deserialize_hex_str")]
+    pub input2: U256,
+}
+
+impl PoseidonInstance {
+    pub fn new_empty(index: u32) -> Self {
+        Self {
+            index,
+            input0: U256::ZERO,
+            input1: U256::ZERO,
+            input2: U256::ZERO,
+        }
+    }
+
+    /// Get the memory address for this instance
+    /// Output is of the form (input0_addr, input1_addr, input2_addr,
+    /// output0_addr, output1_addr, output2_addr)
+    pub fn mem_addr(&self, poseidon_segment_addr: u32) -> (u32, u32, u32, u32, u32, u32) {
+        let instance_offset = poseidon_segment_addr + self.index * 6;
+        (
+            instance_offset,
+            instance_offset + 1,
+            instance_offset + 2,
+            instance_offset + 3,
+            instance_offset + 4,
+            instance_offset + 5,
+        )
+    }
+}
+
 #[derive(Deserialize)]
 pub struct AirPrivateInput {
     pub trace_path: PathBuf,
@@ -381,6 +418,7 @@ pub struct AirPrivateInput {
     pub range_check: Vec<RangeCheckInstance>,
     pub bitwise: Vec<BitwiseInstance>,
     pub ec_op: Vec<EcOpInstance>,
+    pub poseidon: Vec<PoseidonInstance>,
 }
 
 #[derive(Clone, Deserialize, Debug)]

@@ -93,5 +93,12 @@
             "q_y": "0x3e6442a66525965a4ecf83be433a68f21068e1954c33170c0ba0cad14337ce8"
         }
     ],
-    "poseidon": []
+    "poseidon": [
+        {
+            "index": 0,
+            "input_s0": "0x1a0dad6",
+            "input_s1": "0x0",
+            "input_s2": "0x1"
+        }
+    ]
 }
