@@ -1812,8 +1812,9 @@ impl ministark::air::AirConfig for AirConfig {
         // TODO: this constraint while accurate isn't expressed well here
         // note that the constraint checks the memory addresses are continuous for the 6
         // memory locations used per poseidon hash instance
-        let poseidon_addr_input_output_step_inner = Npc::PoseidonInput0Addr.curr()
-            - (Npc::PoseidonInput1Addr.curr() - &one) * &poseidon_inputs_outputs_step_zerofier_inv;
+        let poseidon_addr_input_output_step_inner = (Npc::PoseidonInput0Addr.curr()
+            - (Npc::PoseidonInput1Addr.curr() - &one))
+            * &poseidon_inputs_outputs_step_zerofier_inv;
 
         let all_poseidon_zerofier = X.pow(n / 512) - &one;
         let all_poseidon_zerofier_inv = &one / all_poseidon_zerofier;
@@ -2217,9 +2218,9 @@ impl ministark::air::AirConfig for AirConfig {
             ec_op_get_p_y,
             ec_op_set_r_x,
             ec_op_set_r_y,
-            // poseidon_init_input_output_addr,
-            // poseidon_addr_input_output_step_inner,
-            // poseidon_addr_input_output_step_outter,
+            poseidon_init_input_output_addr,
+            poseidon_addr_input_output_step_inner,
+            poseidon_addr_input_output_step_outter,
             // poseidon_poseidon_full_rounds_state0_squaring,
             // poseidon_poseidon_full_rounds_state1_squaring,
             // poseidon_poseidon_full_rounds_state2_squaring,
