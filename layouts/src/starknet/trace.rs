@@ -28,24 +28,24 @@ use builtins::range_check;
 use num_bigint::BigUint;
 use ruint::aliases::U256;
 use crate::CairoAuxInput;
-use crate::layout6::BITWISE_RATIO;
-use crate::layout6::DILUTED_CHECK_N_BITS;
-use crate::layout6::DILUTED_CHECK_SPACING;
-use crate::layout6::DILUTED_CHECK_STEP;
-use crate::layout6::ECDSA_BUILTIN_RATIO;
-use crate::layout6::EC_OP_BUILTIN_RATIO;
-use crate::layout6::EC_OP_SCALAR_HEIGHT;
-use crate::layout6::POSEIDON_RATIO;
-use crate::layout6::RANGE_CHECK_BUILTIN_PARTS;
-use crate::layout6::RANGE_CHECK_BUILTIN_RATIO;
-use crate::layout6::air::Bitwise;
-use crate::layout6::air::DilutedCheck;
-use crate::layout6::air::DilutedCheckAggregation;
-use crate::layout6::air::DilutedCheckPermutation;
-use crate::layout6::air::EcOp;
-use crate::layout6::air::Ecdsa;
-use crate::layout6::air::Pedersen;
-use crate::layout6::air::RangeCheckBuiltin;
+use super::BITWISE_RATIO;
+use super::DILUTED_CHECK_N_BITS;
+use super::DILUTED_CHECK_SPACING;
+use super::DILUTED_CHECK_STEP;
+use super::ECDSA_BUILTIN_RATIO;
+use super::EC_OP_BUILTIN_RATIO;
+use super::EC_OP_SCALAR_HEIGHT;
+use super::POSEIDON_RATIO;
+use super::RANGE_CHECK_BUILTIN_PARTS;
+use super::RANGE_CHECK_BUILTIN_RATIO;
+use super::air::Bitwise;
+use super::air::DilutedCheck;
+use super::air::DilutedCheckAggregation;
+use super::air::DilutedCheckPermutation;
+use super::air::EcOp;
+use super::air::Ecdsa;
+use super::air::Pedersen;
+use super::air::RangeCheckBuiltin;
 use crate::utils::DilutedCheckPool;
 use crate::utils::RangeCheckPool;
 use super::air::Permutation;
@@ -330,7 +330,7 @@ impl CairoExecutionTrace for ExecutionTrace {
         let pedersen_memory_segment = air_public_input
             .memory_segments
             .pedersen
-            .expect("layout6 requires a pedersen memory segment");
+            .expect("layout requires a pedersen memory segment");
         let initial_pedersen_address = pedersen_memory_segment.begin_addr;
 
         // load individual hash traces into the global execution trace
@@ -392,7 +392,7 @@ impl CairoExecutionTrace for ExecutionTrace {
         let rc_memory_segment = air_public_input
             .memory_segments
             .range_check
-            .expect("layout6 requires a range check memory segment");
+            .expect("layout requires a range check memory segment");
         let initial_rc_address = rc_memory_segment.begin_addr;
 
         ark_std::cfg_iter_mut!(rc_range_check_steps)
@@ -428,7 +428,7 @@ impl CairoExecutionTrace for ExecutionTrace {
         let ecdsa_memory_segment = air_public_input
             .memory_segments
             .ecdsa
-            .expect("layout6 requires an ECDSA memory segment");
+            .expect("layout requires an ECDSA memory segment");
         let initial_ecdsa_address = ecdsa_memory_segment.begin_addr;
 
         // Create dummy instances if there are cells that need to be filled
@@ -527,7 +527,7 @@ impl CairoExecutionTrace for ExecutionTrace {
         let bitwise_memory_segment = air_public_input
             .memory_segments
             .bitwise
-            .expect("layout6 requires a bitwise memory segment");
+            .expect("layout requires a bitwise memory segment");
         let initial_bitwise_address = bitwise_memory_segment.begin_addr;
 
         // create dummy instances if there are cells that need to be filled
@@ -706,7 +706,7 @@ impl CairoExecutionTrace for ExecutionTrace {
         let ec_op_memory_segment = air_public_input
             .memory_segments
             .ec_op
-            .expect("layout6 requires a EC op memory segment");
+            .expect("layout requires a EC op memory segment");
         let initial_ec_op_address = ec_op_memory_segment.begin_addr;
 
         // Create dummy instances if there are cells that need to be filled
@@ -778,7 +778,7 @@ impl CairoExecutionTrace for ExecutionTrace {
         let poseidon_memory_segment = air_public_input
             .memory_segments
             .poseidon
-            .expect("layout6 requires a poseidon memory segment");
+            .expect("layout requires a poseidon memory segment");
         let initial_poseidon_address = poseidon_memory_segment.begin_addr;
 
         // Create dummy instances if there are cells that need to be filled

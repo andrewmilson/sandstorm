@@ -610,7 +610,7 @@ impl ministark::air::AirConfig for AirConfig {
             &zerofier_8th_last_row * &every_8_row_zerofier_inv;
 
         // we have an out-of-order and in-order list of diluted values for this layout
-        // (layout6). We want to check each list is a permutation of one another
+        // (starknet). We want to check each list is a permutation of one another
         let diluted_check_permutation_step0 = ((DilutedCheckPermutation::Z.challenge()
             - DilutedCheck::Ordered.next())
             * Permutation::DilutedCheck.next()
@@ -2404,12 +2404,12 @@ impl ministark::air::AirConfig for AirConfig {
             output_segment: _,
         } = execution_info;
 
-        let pedersen_segment = pedersen_segment.expect("layout6 requires Pedersen");
-        let rc_segment = rc_segment.expect("layout6 requires range check");
-        let ecdsa_segment = ecdsa_segment.expect("layout6 requires ECDSA");
-        let bitwise_segment = bitwise_segment.expect("layout6 requires bitwise");
-        let ec_op_segment = ec_op_segment.expect("layout6 requires EC op");
-        let poseidon_segment = poseidon_segment.expect("layout6 requires poseidon");
+        let pedersen_segment = pedersen_segment.expect("layout requires Pedersen");
+        let rc_segment = rc_segment.expect("layout requires range check");
+        let ecdsa_segment = ecdsa_segment.expect("layout requires ECDSA");
+        let bitwise_segment = bitwise_segment.expect("layout requires bitwise");
+        let ec_op_segment = ec_op_segment.expect("layout requires EC op");
+        let poseidon_segment = poseidon_segment.expect("layout requires poseidon");
 
         let initial_perdersen_address = pedersen_segment.begin_addr.into();
         let initial_rc_address = rc_segment.begin_addr.into();

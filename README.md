@@ -74,14 +74,14 @@ cairo-run --program example/pedersen/main_compiled.json \
 
 # 3. generate the proof
 cargo +nightly run -r -F parallel,asm -- \
-    --program example/pedersen/main_compiled.json --layout layout6 \
+    --program example/pedersen/main_compiled.json --layout starknet \
     prove --air-private-input example/pedersen/air-private-input.json \
           --air-public-input example/pedersen/air-public-input.json \
           --output example/array-sum.proof
 
 # 4. verify the proof
 cargo +nightly run -r -F parallel,asm -- \
-    --program example/pedersen/main_compiled.json --layout layout6 \
+    --program example/pedersen/main_compiled.json --layout starknet \
     verify --proof example/array-sum.proof
 ```
 
@@ -137,7 +137,7 @@ Sandstorm implements a subset of the constraints and trace layout that's used by
 
 ## How Sandstorm works
 
-Those curious about the inner workings of Sandstorm can read the comments in [air.rs](layouts/src/layout6/air.rs#36). The comments expect some understanding of how STARK proofs are generated - if you need some background on this then [Anatomy of a STARK (part 4)](https://aszepieniec.github.io/stark-anatomy/) by [Alan Szepieniec](https://twitter.com/aszepieniec) is a great resource. The pseudo code in section 4.5 of the [Cairo whitepaper](https://eprint.iacr.org/2021/1063.pdf) provides a nice high level overview of how some pieces fit together.
+Those curious about the inner workings of Sandstorm can read the comments in [air.rs](layouts/src/starknet/air.rs#36). The comments expect some understanding of how STARK proofs are generated - if you need some background on this then [Anatomy of a STARK (part 4)](https://aszepieniec.github.io/stark-anatomy/) by [Alan Szepieniec](https://twitter.com/aszepieniec) is a great resource. The pseudo code in section 4.5 of the [Cairo whitepaper](https://eprint.iacr.org/2021/1063.pdf) provides a nice high level overview of how some pieces fit together.
 
 
 ```
@@ -147,17 +147,17 @@ cairo-run --program example/pedersen/main_compiled.json \
           --air_public_input example/pedersen/air-public-input.json \
           --trace_file example/pedersen/trace.bin \
           --memory_file example/pedersen/memory.bin \
-          --layout layout6 \
+          --layout starknet \
           --min_steps 128 \
           --proof_mode
 
 cargo +nightly run -r -F parallel,asm -- \
-    --program example/pedersen/main_compiled.json --layout layout6 \
+    --program example/pedersen/main_compiled.json --layout starknet \
     prove --air-private-input example/pedersen/air-private-input.json \
           --air-public-input example/pedersen/air-public-input.json \
           --output example/array-sum.proof
 
 cargo +nightly run -r -F parallel,asm -- \
-    --program example/pedersen/main_compiled.json --layout layout6 \
+    --program example/pedersen/main_compiled.json --layout starknet \
     verify --proof example/array-sum.proof
 ```

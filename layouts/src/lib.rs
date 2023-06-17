@@ -23,8 +23,8 @@ use binary::Segment;
 use ministark::air::AirConfig;
 use ministark::Trace;
 
-pub mod layout6;
 pub mod plain;
+pub mod starknet;
 pub mod utils;
 
 // Section 9.2 https://eprint.iacr.org/2021/1063.pdf

@@ -1,5 +1,5 @@
-//! Matches Layout 6 from StarkWare's open source verifier
-//! <https://github.com/starkware-libs/starkex-contracts/blob/master/evm-verifier/solidity/contracts/cpu/layout6/CpuConstraintPoly.sol#L794>
+//! Matches `starknet` layout from StarkWare's open source verifier
+//! <https://github.com/starkware-libs/cairo-lang/blob/361fe32d5930db340ea78fe05aedfe706f6c9405/src/starkware/cairo/lang/instances.py#L157>
 
 mod air;
 mod trace;

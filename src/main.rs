@@ -46,7 +46,7 @@ struct SandstormOptions {
 #[strum(serialize_all = "kebab_case")]
 enum Layout {
     Plain,
-    Layout6,
+    Starknet,
 }
 
 #[derive(StructOpt, Debug)]
@@ -100,9 +100,9 @@ fn main() {
                     type P = DefaultCairoProver<A, T>;
                     execute_command::<P>(command, options, program);
                 }
-                Layout::Layout6 => {
-                    type A = layouts::layout6::AirConfig;
-                    type T = layouts::layout6::ExecutionTrace;
+                Layout::Starknet => {
+                    type A = layouts::starknet::AirConfig;
+                    type T = layouts::starknet::ExecutionTrace;
                     type P = StarkWareProver<A, T>;
                     execute_command::<P>(command, options, program);
                 }
@@ -119,7 +119,7 @@ fn main() {
                     type P = DefaultCairoProver<A, T>;
                     execute_command::<P>(command, options, program);
                 }
-                Layout::Layout6 => unimplemented!("layout6 does not support Goldilocks field"),
+                Layout::Starknet => unimplemented!("'starknet' layout does not support Goldilocks field"),
             }
         }
         prime => unimplemented!("prime field p={prime} is not supported yet"),

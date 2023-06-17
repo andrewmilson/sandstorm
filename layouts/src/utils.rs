@@ -1,4 +1,4 @@
-use crate::layout6::PUBLIC_MEMORY_STEP;
+use crate::starknet::PUBLIC_MEMORY_STEP;
 use ark_ff::PrimeField;
 use binary::CompiledProgram;
 use binary::MemoryEntry;
