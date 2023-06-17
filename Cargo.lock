@@ -994,6 +994,7 @@ dependencies = [
 name = "sandstorm-layouts"
 version = "0.1.0"
 dependencies = [
+ "ark-ec",
  "ark-ff",
  "ark-poly",
  "ark-serialize",

@@ -5,10 +5,10 @@ mod air;
 mod trace;
 
 pub use air::AirConfig;
+use builtins::{utils::curve::StarkwareCurve, pedersen};
 pub use ministark_gpu::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481::ark::Fp;
-use ark_ff::MontFp as Fp;
 pub use trace::ExecutionTrace;
-use ark_ff::Field;
+use ark_ec::models::short_weierstrass::SWCurveConfig;
 
 // must be a power-of-two
 pub const CYCLE_HEIGHT: usize = 16;
@@ -38,13 +38,10 @@ pub const EC_OP_BUILTIN_RATIO: usize = 1024;
 pub const EC_OP_SCALAR_HEIGHT: usize = 256;
 pub const EC_OP_N_BITS: usize = 252;
 // TODO: take from curve config
-pub const ECDSA_SIG_CONFIG_ALPHA: Fp = Fp::ONE;
-pub const ECDSA_SIG_CONFIG_BETA: Fp =
-    Fp!("3141592653589793238462643383279502884197169399375105820974944592307816406665");
-pub const ECDSA_SIG_CONFIG_SHIFT_POINT_X: Fp =
-    Fp!("2089986280348253421170679821480865132823066470938446095505822317253594081284");
-pub const ECDSA_SIG_CONFIG_SHIFT_POINT_Y: Fp =
-    Fp!("1713931329540660377023406109199410414810705867260802078187082345529207694986");
+pub const ECDSA_SIG_CONFIG_ALPHA: Fp = StarkwareCurve::COEFF_A;
+pub const ECDSA_SIG_CONFIG_BETA: Fp = StarkwareCurve::COEFF_B;
+pub const ECDSA_SIG_CONFIG_SHIFT_POINT_X: Fp = pedersen::constants::P0.x;
+pub const ECDSA_SIG_CONFIG_SHIFT_POINT_Y: Fp = pedersen::constants::P0.y;
 
 pub const POSEIDON_RATIO: usize = 32;
 pub const POSEIDON_M: usize = 3;

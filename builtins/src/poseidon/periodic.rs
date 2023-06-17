@@ -8,25 +8,25 @@ use ark_ff::MontFp as Fp;
 /// unity. e.g.
 ///
 /// ```text
-/// ┌───────────┬───────────────────────────┐
-/// │     X     │            P(X)           │
-/// ├───────────┼───────────────────────────┤
-/// │    ω^0    │   FULL_ROUND_KEYS[1][0]   │
-/// ├───────────┼───────────────────────────┤
-/// │    ω^1    │   FULL_ROUND_KEYS[2][0]   │
-/// ├───────────┼───────────────────────────┤
-/// │    ω^2    │   FULL_ROUND_KEYS[3][0]   │
-/// ├───────────┼───────────────────────────┤
-/// │    ω^3    │             0             │
-/// ├───────────┼───────────────────────────┤
-/// │    ω^4    │   FULL_ROUND_KEYS[5][0]   │
-/// ├───────────┼───────────────────────────┤
-/// │    ω^5    │   FULL_ROUND_KEYS[6][0]   │
-/// ├───────────┼───────────────────────────┤
-/// │    ω^6    │   FULL_ROUND_KEYS[7][0]   │
-/// ├───────────┼───────────────────────────┤
-/// │    ω^7    │             0             │
-/// └───────────┴───────────────────────────┘
+/// ┌───────────┬────────────────────────────────────┐
+/// │     X     │                P(X)                │
+/// ├───────────┼────────────────────────────────────┤
+/// │    ω^0    │   FULL_ROUND_KEYS_1ST_HALF[1][0]   │
+/// ├───────────┼────────────────────────────────────┤
+/// │    ω^1    │   FULL_ROUND_KEYS_1ST_HALF[2][0]   │
+/// ├───────────┼────────────────────────────────────┤
+/// │    ω^2    │   FULL_ROUND_KEYS_1ST_HALF[3][0]   │
+/// ├───────────┼────────────────────────────────────┤
+/// │    ω^3    │                 0                  │
+/// ├───────────┼────────────────────────────────────┤
+/// │    ω^4    │   FULL_ROUND_KEYS_2ND_HALF[1][0]   │
+/// ├───────────┼────────────────────────────────────┤
+/// │    ω^5    │   FULL_ROUND_KEYS_2ND_HALF[2][0]   │
+/// ├───────────┼────────────────────────────────────┤
+/// │    ω^6    │   FULL_ROUND_KEYS_2ND_HALF[3][0]   │
+/// ├───────────┼────────────────────────────────────┤
+/// │    ω^7    │                 0                  │
+/// └───────────┴────────────────────────────────────┘
 /// ```
 ///
 /// NOTE: exact polynomial from StarkWare's solidity verifier:
@@ -48,25 +48,25 @@ pub const FULL_ROUND_KEY_0_COEFFS: [Fp; 8] = [
 /// unity. e.g.
 ///
 /// ```text
-/// ┌───────────┬───────────────────────────┐
-/// │     X     │            P(X)           │
-/// ├───────────┼───────────────────────────┤
-/// │    ω^0    │   FULL_ROUND_KEYS[1][1]   │
-/// ├───────────┼───────────────────────────┤
-/// │    ω^1    │   FULL_ROUND_KEYS[2][1]   │
-/// ├───────────┼───────────────────────────┤
-/// │    ω^2    │   FULL_ROUND_KEYS[3][1]   │
-/// ├───────────┼───────────────────────────┤
-/// │    ω^3    │             0             │
-/// ├───────────┼───────────────────────────┤
-/// │    ω^4    │   FULL_ROUND_KEYS[5][1]   │
-/// ├───────────┼───────────────────────────┤
-/// │    ω^5    │   FULL_ROUND_KEYS[6][1]   │
-/// ├───────────┼───────────────────────────┤
-/// │    ω^6    │   FULL_ROUND_KEYS[7][1]   │
-/// ├───────────┼───────────────────────────┤
-/// │    ω^7    │             0             │
-/// └───────────┴───────────────────────────┘
+/// ┌───────────┬────────────────────────────────────┐
+/// │     X     │                P(X)                │
+/// ├───────────┼────────────────────────────────────┤
+/// │    ω^0    │   FULL_ROUND_KEYS_1ST_HALF[1][1]   │
+/// ├───────────┼────────────────────────────────────┤
+/// │    ω^1    │   FULL_ROUND_KEYS_1ST_HALF[2][1]   │
+/// ├───────────┼────────────────────────────────────┤
+/// │    ω^2    │   FULL_ROUND_KEYS_1ST_HALF[3][1]   │
+/// ├───────────┼────────────────────────────────────┤
+/// │    ω^3    │                 0                  │
+/// ├───────────┼────────────────────────────────────┤
+/// │    ω^4    │   FULL_ROUND_KEYS_2ND_HALF[1][1]   │
+/// ├───────────┼────────────────────────────────────┤
+/// │    ω^5    │   FULL_ROUND_KEYS_2ND_HALF[2][1]   │
+/// ├───────────┼────────────────────────────────────┤
+/// │    ω^6    │   FULL_ROUND_KEYS_2ND_HALF[3][1]   │
+/// ├───────────┼────────────────────────────────────┤
+/// │    ω^7    │                 0                  │
+/// └───────────┴────────────────────────────────────┘
 /// ```
 ///
 /// NOTE: exact polynomial from StarkWare's solidity verifier:
@@ -88,25 +88,25 @@ pub const FULL_ROUND_KEY_1_COEFFS: [Fp; 8] = [
 /// unity. e.g.
 ///
 /// ```text
-/// ┌───────────┬───────────────────────────┐
-/// │     X     │            P(X)           │
-/// ├───────────┼───────────────────────────┤
-/// │    ω^0    │   FULL_ROUND_KEYS[1][2]   │
-/// ├───────────┼───────────────────────────┤
-/// │    ω^1    │   FULL_ROUND_KEYS[2][2]   │
-/// ├───────────┼───────────────────────────┤
-/// │    ω^2    │   FULL_ROUND_KEYS[3][2]   │
-/// ├───────────┼───────────────────────────┤
-/// │    ω^3    │             0             │
-/// ├───────────┼───────────────────────────┤
-/// │    ω^4    │   FULL_ROUND_KEYS[5][2]   │
-/// ├───────────┼───────────────────────────┤
-/// │    ω^5    │   FULL_ROUND_KEYS[6][2]   │
-/// ├───────────┼───────────────────────────┤
-/// │    ω^6    │   FULL_ROUND_KEYS[7][2]   │
-/// ├───────────┼───────────────────────────┤
-/// │    ω^7    │             0             │
-/// └───────────┴───────────────────────────┘
+/// ┌───────────┬────────────────────────────────────┐
+/// │     X     │                P(X)                │
+/// ├───────────┼────────────────────────────────────┤
+/// │    ω^0    │   FULL_ROUND_KEYS_1ST_HALF[1][2]   │
+/// ├───────────┼────────────────────────────────────┤
+/// │    ω^1    │   FULL_ROUND_KEYS_1ST_HALF[2][2]   │
+/// ├───────────┼────────────────────────────────────┤
+/// │    ω^2    │   FULL_ROUND_KEYS_1ST_HALF[3][2]   │
+/// ├───────────┼────────────────────────────────────┤
+/// │    ω^3    │                 0                  │
+/// ├───────────┼────────────────────────────────────┤
+/// │    ω^4    │   FULL_ROUND_KEYS_2ND_HALF[1][2]   │
+/// ├───────────┼────────────────────────────────────┤
+/// │    ω^5    │   FULL_ROUND_KEYS_2ND_HALF[2][2]   │
+/// ├───────────┼────────────────────────────────────┤
+/// │    ω^6    │   FULL_ROUND_KEYS_2ND_HALF[3][2]   │
+/// ├───────────┼────────────────────────────────────┤
+/// │    ω^7    │                 0                  │
+/// └───────────┴────────────────────────────────────┘
 /// ```
 ///
 /// NOTE: exact polynomial from StarkWare's solidity verifier:
@@ -230,6 +230,9 @@ mod tests {
     use super::FULL_ROUND_KEY_0_COEFFS;
     use super::PARTIAL_ROUND_KEY_0_COEFFS;
     use super::PARTIAL_ROUND_KEY_1_COEFFS;
+    use crate::poseidon::calc_optimized_partial_round_keys;
+    use crate::poseidon::params::FULL_ROUND_KEYS_1ST_HALF;
+    use crate::poseidon::params::FULL_ROUND_KEYS_2ND_HALF;
     use crate::poseidon::params::NUM_FULL_ROUNDS;
     use crate::poseidon::params::NUM_PARTIAL_ROUNDS;
     use crate::poseidon::params::ROUND_KEYS;
@@ -241,51 +244,54 @@ mod tests {
     use ministark_gpu::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481::ark::Fp;
 
     #[test]
-    fn full_round_key0_match() {
+    fn full_round_keys0_match() {
         let domain = Radix2EvaluationDomain::<Fp>::new(NUM_FULL_ROUNDS).unwrap();
-        let (mut full_rounds_1st_half, _, mut full_rounds_2nd_half) = get_round_keys_column(0);
-        full_rounds_1st_half.rotate_left(1);
-        full_rounds_2nd_half.rotate_left(1);
-        *full_rounds_1st_half.last_mut().unwrap() = Fp::ZERO;
-        *full_rounds_2nd_half.last_mut().unwrap() = Fp::ZERO;
+        let mut full_round_keys_1st_half = FULL_ROUND_KEYS_1ST_HALF.map(|r| r[0]);
+        let mut full_round_keys_2nd_half = FULL_ROUND_KEYS_2ND_HALF.map(|r| r[0]);
+        full_round_keys_1st_half.rotate_left(1);
+        full_round_keys_2nd_half.rotate_left(1);
+        *full_round_keys_1st_half.last_mut().unwrap() = Fp::ZERO;
+        *full_round_keys_2nd_half.last_mut().unwrap() = Fp::ZERO;
 
         let evals = domain.fft(&FULL_ROUND_KEY_0_COEFFS);
         let (evals_1st_half, evals_2nd_half) = evals.split_at(NUM_FULL_ROUNDS / 2);
 
-        assert_eq!(&full_rounds_1st_half, evals_1st_half);
-        assert_eq!(&full_rounds_2nd_half, evals_2nd_half);
+        assert_eq!(&full_round_keys_1st_half, evals_1st_half);
+        assert_eq!(&full_round_keys_2nd_half, evals_2nd_half);
     }
 
     #[test]
-    fn full_round_key1_match() {
-        let domain = Radix2EvaluationDomain::<Fp>::new(64).unwrap();
-        let (mut full_rounds_1st_half, _, mut full_rounds_2nd_half) = get_round_keys_column(1);
-        full_rounds_1st_half.rotate_left(1);
-        full_rounds_2nd_half.rotate_left(1);
-        *full_rounds_1st_half.last_mut().unwrap() = Fp::ZERO;
-        *full_rounds_2nd_half.last_mut().unwrap() = Fp::ZERO;
+    fn full_round_keys1_match() {
+        let domain = Radix2EvaluationDomain::<Fp>::new(NUM_FULL_ROUNDS).unwrap();
+        let mut full_round_keys_1st_half = FULL_ROUND_KEYS_1ST_HALF.map(|r| r[1]);
+        let mut full_round_keys_2nd_half = FULL_ROUND_KEYS_2ND_HALF.map(|r| r[1]);
+        full_round_keys_1st_half.rotate_left(1);
+        full_round_keys_2nd_half.rotate_left(1);
+        *full_round_keys_1st_half.last_mut().unwrap() = Fp::ZERO;
+        *full_round_keys_2nd_half.last_mut().unwrap() = Fp::ZERO;
 
         let evals = domain.fft(&FULL_ROUND_KEY_1_COEFFS);
         let (evals_1st_half, evals_2nd_half) = evals.split_at(NUM_FULL_ROUNDS / 2);
 
-        assert_eq!(&full_rounds_1st_half, evals_1st_half);
-        assert_eq!(&full_rounds_2nd_half, evals_2nd_half);
+        assert_eq!(&full_round_keys_1st_half, evals_1st_half);
+        assert_eq!(&full_round_keys_2nd_half, evals_2nd_half);
     }
 
     #[test]
-    fn full_round_key2_match() {
+    fn full_round_keys2_match() {
         let domain = Radix2EvaluationDomain::<Fp>::new(NUM_FULL_ROUNDS).unwrap();
-        let (mut full_rounds_1st_half, _, mut full_rounds_2nd_half) = get_round_keys_column(2);
-        full_rounds_1st_half.rotate_left(1);
-        full_rounds_2nd_half.rotate_left(1);
-        *full_rounds_1st_half.last_mut().unwrap() = Fp::ZERO;
-        *full_rounds_2nd_half.last_mut().unwrap() = Fp::ZERO;
+        let mut full_round_keys_1st_half = FULL_ROUND_KEYS_1ST_HALF.map(|r| r[2]);
+        let mut full_round_keys_2nd_half = FULL_ROUND_KEYS_2ND_HALF.map(|r| r[2]);
+        full_round_keys_1st_half.rotate_left(1);
+        full_round_keys_2nd_half.rotate_left(1);
+        *full_round_keys_1st_half.last_mut().unwrap() = Fp::ZERO;
+        *full_round_keys_2nd_half.last_mut().unwrap() = Fp::ZERO;
 
         let evals = domain.fft(&FULL_ROUND_KEY_2_COEFFS);
         let (evals_1st_half, evals_2nd_half) = evals.split_at(NUM_FULL_ROUNDS / 2);
 
-        assert_eq!(&full_rounds_1st_half, evals_1st_half);
-        assert_eq!(&full_rounds_2nd_half, evals_2nd_half);
+        assert_eq!(&full_round_keys_1st_half, evals_1st_half);
+        assert_eq!(&full_round_keys_2nd_half, evals_2nd_half);
     }
 
     #[test]
@@ -330,14 +336,11 @@ mod tests {
         // assert_eq!(&full_rounds_2nd_half, evals_2nd_half);
     }
 
-    // Output is of the form:
-    // (full_round_1st_half, partial_round, full_round_2nd_half)
-    fn get_round_keys_column(col_idx: usize) -> (Vec<Fp>, Vec<Fp>, Vec<Fp>) {
-        let col = ROUND_KEYS.map(|round| round[col_idx]);
-        (
-            col[0..NUM_FULL_ROUNDS / 2].to_vec(),
-            col[NUM_FULL_ROUNDS / 2..][..NUM_PARTIAL_ROUNDS].to_vec(),
-            col[NUM_FULL_ROUNDS / 2 + NUM_PARTIAL_ROUNDS..].to_vec(),
-        )
+    #[test]
+    fn testing_optimized_partial_keys() {
+        let optimized_partial_round_keys = calc_optimized_partial_round_keys();
+        for (i, v) in optimized_partial_round_keys.iter().enumerate() {
+            println!("GO[{i}]: {}", v[0]);
+        }
     }
 }

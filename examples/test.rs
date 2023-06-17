@@ -1,5 +1,6 @@
 use ark_ff::FftField;
 use ark_ff::Field;
+use builtins::poseidon;
 use num_traits::Zero;
 
 #[macro_use]
@@ -18,10 +19,19 @@ fn get_u<const BITS: usize, const SPACING: usize>(j: u32) -> u32 {
 }
 
 fn main() {
-    for i in 0..16 {
-        // println!("yo: {:016b}", dilute::<16, 4>(i));
-        println!("BREH: {i:04b} {:016b}", get_u::<16, 4>(i + 1));
-    }
+    // let res = poseidon::mds_mul(poseidon::params::ROUND_KEYS[4]);
+    // println!("{}", res[0].pow([3]));
+    // println!("{}", res[1].pow([3]));
+    // println!("{}", res[2].pow([3]));
+    // println!("{}", (res[0] + res[1] + res[2]).pow([3]));
+    // println!("{}", res[0] + res[2]);
+    // println!("{}", res[1] + res[2]);
+    // println!("{}", res[1] + res[0]);
+
+    // for i in 0..16 {
+    //     // println!("yo: {:016b}", dilute::<16, 4>(i));
+    //     println!("BREH: {i:04b} {:016b}", get_u::<16, 4>(i + 1));
+    // }
 
     // let (ecdsa_generator_x_coeffs, ecdsa_generator_y_coeffs) =
     // ecdsa::generator_points_poly(); let x_poly =

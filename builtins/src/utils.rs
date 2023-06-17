@@ -1,8 +1,10 @@
 use ark_ff::FftField;
+use ark_ff::Field;
 use ark_poly::univariate::DensePolynomial;
 use ark_poly::EvaluationDomain;
 use ark_poly::Evaluations;
 use ark_poly::Radix2EvaluationDomain;
+use std::ops::Mul;
 
 /// Generates a periodic table comprising of values in the matrix.
 /// The columns of the periodic table are are represented by polynomials that
@@ -41,6 +43,81 @@ pub fn gen_periodic_table<F: FftField>(matrix: Vec<Vec<F>>) -> Vec<DensePolynomi
         .into_iter()
         .map(|col| Evaluations::from_vec_and_domain(col, domain).interpolate())
         .collect()
+}
+
+#[derive(Clone, Copy, Default, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Mat3x3<T>(pub [[T; 3]; 3]);
+
+impl<T> Mat3x3<T> {
+    pub fn transpose(self) -> Self {
+        let [[a, b, c], [d, e, f], [g, h, i]] = self.0;
+        Mat3x3([[a, d, g], [b, e, h], [c, f, i]])
+    }
+}
+
+impl<F: Field> Mat3x3<F> {
+    pub fn identity() -> Self {
+        Self([
+            [F::one(), F::zero(), F::zero()],
+            [F::zero(), F::one(), F::zero()],
+            [F::zero(), F::zero(), F::one()],
+        ])
+    }
+
+    pub fn inverse(self) -> Option<Self> {
+        let [[a, b, c], [d, e, f], [g, h, i]] = self.0;
+        let a_prime = e * i - f * h;
+        let b_prime = -(b * i - c * h);
+        let c_prime = b * f - c * e;
+        let d_prime = -(d * i - f * g);
+        let e_prime = a * i - c * g;
+        let f_prime = -(a * f - c * d);
+        let g_prime = d * h - e * g;
+        let h_prime = -(a * h - b * g);
+        let i_prime = a * e - b * d;
+        let det = a * a_prime + b * d_prime + c * g_prime;
+        let det_inv = det.inverse()?;
+        let inv = Self([
+            [a_prime, b_prime, c_prime],
+            [d_prime, e_prime, f_prime],
+            [g_prime, h_prime, i_prime],
+        ]) * det_inv;
+        debug_assert_eq!(self * inv, Self::identity());
+        Some(inv)
+    }
+}
+
+impl<F: Field> Mul<F> for Mat3x3<F> {
+    type Output = Self;
+
+    /// Multiplies the matrix by a vector
+    fn mul(self, rhs: F) -> Self {
+        Self(self.0.map(|row| row.map(|cell| cell * rhs)))
+    }
+}
+
+impl<F: Field> Mul<Self> for Mat3x3<F> {
+    type Output = Self;
+
+    /// Multiplies the matrix by a vector
+    fn mul(self, rhs: Self) -> Self {
+        let [v0, v1, v2] = rhs.transpose().0;
+        Mat3x3([self * v0, self * v1, self * v2]).transpose()
+    }
+}
+
+impl<F: Field> Mul<[F; 3]> for Mat3x3<F> {
+    type Output = [F; 3];
+
+    /// Multiplies the matrix by a vector
+    fn mul(self, [x, y, z]: [F; 3]) -> [F; 3] {
+        let [[a, b, c], [d, e, f], [g, h, i]] = self.0;
+        [
+            x * a + y * b + z * c,
+            x * d + y * e + z * f,
+            x * g + y * h + z * i,
+        ]
+    }
 }
 
 pub mod curve {
