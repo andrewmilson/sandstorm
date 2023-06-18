@@ -190,7 +190,7 @@ pub const PARTIAL_ROUND_KEY_0_COEFFS: [Fp; 64] = [
     Fp!("1472197238932273074617280345699913126639197451199647801548108788096142113621"),
 ];
 
-const PARTIAL_ROUND_KEY_1_COEFFS: [Fp; 32] = [
+pub const PARTIAL_ROUND_KEY_1_COEFFS: [Fp; 32] = [
     Fp!("2134335647277236274172649243940335615164845847046811650862308089928274309142"),
     Fp!("2913860402982745297192222836556238327676350387704743365206163352943615939695"),
     Fp!("1568267719665639329068021097686449424596763578883734209116294890374401775542"),
@@ -236,11 +236,14 @@ mod tests {
     use crate::poseidon::params::NUM_FULL_ROUNDS;
     use crate::poseidon::params::NUM_PARTIAL_ROUNDS;
     use crate::poseidon::params::ROUND_KEYS;
+    use ark_poly::Polynomial;
     use crate::poseidon::periodic::FULL_ROUND_KEY_1_COEFFS;
     use crate::poseidon::periodic::FULL_ROUND_KEY_2_COEFFS;
     use ark_ff::Field;
+    use ark_poly::DenseUVPolynomial;
     use ark_poly::EvaluationDomain;
     use ark_poly::Radix2EvaluationDomain;
+    use ark_poly::univariate::DensePolynomial;
     use ministark_gpu::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481::ark::Fp;
 
     #[test]
@@ -305,9 +308,9 @@ mod tests {
 
         let evals = domain.fft(&PARTIAL_ROUND_KEY_0_COEFFS);
 
-        // for (i, v) in evals.iter().enumerate() {
-        //     println!("YO[{i}]: {v}");
-        // }
+        for (i, v) in evals.iter().enumerate() {
+            println!("YO[{i}]: {v}");
+        }
         // let (evals_1st_half, evals_2nd_half) = evals.split_at(NUM_FULL_ROUNDS
         // / 2);
 
@@ -324,11 +327,14 @@ mod tests {
         // *full_rounds_1st_half.last_mut().unwrap() = Fp::ZERO;
         // *full_rounds_2nd_half.last_mut().unwrap() = Fp::ZERO;
 
-        let evals = domain.fft(&PARTIAL_ROUND_KEY_1_COEFFS);
+        // let evals = domain.fft(&PARTIAL_ROUND_KEY_1_COEFFS);
 
-        for (i, v) in evals.iter().enumerate() {
-            println!("YO[{i}]: {}", v);
-        }
+        let poly = DensePolynomial::from_coefficients_vec(PARTIAL_ROUND_KEY_1_COEFFS.to_vec());
+
+        // for (i, v) in evals.iter().enumerate() {
+        // for (i, v) in evals.iter().enumerate() {
+        println!("YOOOOOoooO[]: {}", poly.evaluate(&Fp::ONE));
+        // }
         // let (evals_1st_half, evals_2nd_half) = evals.split_at(NUM_FULL_ROUNDS
         // / 2);
 
@@ -336,11 +342,11 @@ mod tests {
         // assert_eq!(&full_rounds_2nd_half, evals_2nd_half);
     }
 
-    #[test]
-    fn testing_optimized_partial_keys() {
-        let optimized_partial_round_keys = calc_optimized_partial_round_keys();
-        for (i, v) in optimized_partial_round_keys.iter().enumerate() {
-            println!("GO[{i}]: {}", v[0]);
-        }
-    }
+    // #[test]
+    // fn testing_optimized_partial_keys() {
+    //     let optimized_partial_round_keys =
+    // calc_optimized_partial_round_keys();     for (i, v) in
+    // optimized_partial_round_keys.iter().enumerate() {         println!("
+    // GO[{i}]: {}", v[0]);     }
+    // }
 }

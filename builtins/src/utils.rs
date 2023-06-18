@@ -75,13 +75,12 @@ impl<F: Field> Mat3x3<F> {
         let g_prime = d * h - e * g;
         let h_prime = -(a * h - b * g);
         let i_prime = a * e - b * d;
-        let det = a * a_prime + b * d_prime + c * g_prime;
-        let det_inv = det.inverse()?;
+        let determinant = a * a_prime + b * d_prime + c * g_prime;
         let inv = Self([
             [a_prime, b_prime, c_prime],
             [d_prime, e_prime, f_prime],
             [g_prime, h_prime, i_prime],
-        ]) * det_inv;
+        ]) * determinant.inverse()?;
         debug_assert_eq!(self * inv, Self::identity());
         Some(inv)
     }
@@ -90,7 +89,7 @@ impl<F: Field> Mat3x3<F> {
 impl<F: Field> Mul<F> for Mat3x3<F> {
     type Output = Self;
 
-    /// Multiplies the matrix by a vector
+    /// Multiplies the matrix by a scalar
     fn mul(self, rhs: F) -> Self {
         Self(self.0.map(|row| row.map(|cell| cell * rhs)))
     }
@@ -99,7 +98,7 @@ impl<F: Field> Mul<F> for Mat3x3<F> {
 impl<F: Field> Mul<Self> for Mat3x3<F> {
     type Output = Self;
 
-    /// Multiplies the matrix by a vector
+    /// Multiplies the matrix by another matrix
     fn mul(self, rhs: Self) -> Self {
         let [v0, v1, v2] = rhs.transpose().0;
         Mat3x3([self * v0, self * v1, self * v2]).transpose()
@@ -180,5 +179,54 @@ pub mod curve {
             // use slope
             (y2 - y1) / (x2 - x1)
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use ministark_gpu::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481::ark::Fp;
+
+    use super::Mat3x3;
+
+    #[test]
+    fn matrix_multiplication() {
+        let a = Fp::from(37u8);
+        let b = Fp::from(29u8);
+        let c = Fp::from(13u8);
+        let d = Fp::from(89u8);
+        let e = Fp::from(67u8);
+        let f = Fp::from(45u8);
+        let g = Fp::from(5u8);
+        let h = Fp::from(9u8);
+        let i = Fp::from(2u8);
+        let m = Mat3x3([[a, b, c], [d, e, f], [g, h, i]]);
+
+        let mm = m * m;
+
+        let [row0, row1, row2] = mm.0;
+        assert_eq!(
+            row0,
+            [
+                a * a + b * d + c * g,
+                a * b + b * e + c * h,
+                a * c + b * f + c * i,
+            ]
+        );
+        assert_eq!(
+            row1,
+            [
+                d * a + e * d + f * g,
+                d * b + e * e + f * h,
+                d * c + e * f + f * i,
+            ]
+        );
+        assert_eq!(
+            row2,
+            [
+                g * a + h * d + i * g,
+                g * b + h * e + i * h,
+                g * c + h * f + i * i,
+            ]
+        );
     }
 }

@@ -28,6 +28,7 @@ use builtins::range_check;
 use num_bigint::BigUint;
 use ruint::aliases::U256;
 use crate::CairoAuxInput;
+use crate::starknet::air::Poseidon;
 use super::BITWISE_RATIO;
 use super::DILUTED_CHECK_N_BITS;
 use super::DILUTED_CHECK_SPACING;
@@ -800,6 +801,66 @@ impl CairoExecutionTrace for ExecutionTrace {
             .zip(poseidon_auxiliary_steps)
             .zip(poseidon_traces)
             .for_each(|(((npc, rc), aux), poseidon_trace)| {
+                // load the poseidon rounds into the trace
+                let (full_rounds, _) = aux.as_chunks_mut::<64>();
+
+                // load in full rounds
+                let full_round_states = [
+                    poseidon_trace.full_round_states_1st_half,
+                    poseidon_trace.full_round_states_2nd_half,
+                ]
+                .concat();
+                for (full_round, round_state) in zip(full_rounds.iter_mut(), full_round_states) {
+                    let (c0, state0_offset) = Poseidon::FullRoundsState0.col_and_shift();
+                    let (c1, state1_offset) = Poseidon::FullRoundsState1.col_and_shift();
+                    let (c2, state2_offset) = Poseidon::FullRoundsState2.col_and_shift();
+                    let (c3, state0_sq_offset) = Poseidon::FullRoundsState0Squared.col_and_shift();
+                    let (c4, state1_sq_offset) = Poseidon::FullRoundsState1Squared.col_and_shift();
+                    let (c5, state2_sq_offset) = Poseidon::FullRoundsState2Squared.col_and_shift();
+                    // ensure the columns are as expected
+                    assert_eq!((c0, c1, c2, c3, c4, c5), (8, 8, 8, 8, 8, 8));
+
+                    full_round[state0_offset as usize] = round_state.after_add_round_keys[0];
+                    full_round[state1_offset as usize] = round_state.after_add_round_keys[1];
+                    full_round[state2_offset as usize] = round_state.after_add_round_keys[2];
+
+                    full_round[state0_sq_offset as usize] =
+                        round_state.after_add_round_keys[0].square();
+                    full_round[state1_sq_offset as usize] =
+                        round_state.after_add_round_keys[1].square();
+                    full_round[state2_sq_offset as usize] =
+                        round_state.after_add_round_keys[2].square();
+                }
+
+                {
+                    // TODO: remove
+                    let partial_round_states = poseidon_trace.partial_round_states;
+
+                    let (c0, state0_offset) = Poseidon::PartialRoundsState0.col_and_shift();
+                    let (c1, state0_sq_offset) =
+                        Poseidon::PartialRoundsState0Squared.col_and_shift();
+                    assert_eq!((c0, c1), (7, 7));
+
+                    // load in the first 64 partial rounds
+                    let (partial_rounds0, _) = rc.as_chunks_mut::<8>();
+                    for (round, state) in zip(partial_rounds0, &partial_round_states) {
+                        round[state0_offset as usize] = state.after_add_round_key;
+                        round[state0_sq_offset as usize] = state.after_add_round_key.square();
+                    }
+
+                    let (c0, state1_offset) = Poseidon::PartialRoundsState1.col_and_shift();
+                    let (c1, state1_sq_offset) =
+                        Poseidon::PartialRoundsState1Squared.col_and_shift();
+                    assert_eq!((c0, c1), (8, 8));
+
+                    // load in the last 22 partial rounds
+                    let (partial_rounds1, _) = aux.as_chunks_mut::<16>();
+                    for (round, state) in zip(partial_rounds1, &partial_round_states[64 - 3..]) {
+                        round[state1_offset as usize] = state.after_add_round_key;
+                        round[state1_sq_offset as usize] = state.after_add_round_key.square();
+                    }
+                }
+
                 // load EC op values into memory
                 let instance = poseidon_trace.instance;
                 let (
@@ -1024,6 +1085,11 @@ impl Trace for ExecutionTrace {
         for (i, (n, d_inv)) in zip(rc_perm_numerators, rc_perm_denominators_inv).enumerate() {
             permutation_column[i * RANGE_CHECK_STEP + Permutation::RangeCheck as usize] = n * d_inv;
         }
+
+        assert!(
+            (dc_perm_numerators.last().unwrap() * dc_perm_denominators_inv.last().unwrap())
+                .is_one()
+        );
 
         // insert intermediate diluted check results
         for (i, (n, d_inv)) in zip(dc_perm_numerators, dc_perm_denominators_inv).enumerate() {
