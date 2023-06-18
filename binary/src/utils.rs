@@ -61,7 +61,8 @@ pub fn deserialize_big_uint<'de, D: Deserializer<'de>>(deserializer: D) -> Resul
 
 /// Deserialises a JSON list of big integers
 /// See docs for [deserialize_big_uint] to understand why this is needed.
-pub fn deserialize_vec_big_uint<'de, D: Deserializer<'de>>(
+// TODO: consider removing
+pub fn _deserialize_vec_big_uint<'de, D: Deserializer<'de>>(
     deserializer: D,
 ) -> Result<Vec<U256>, D::Error> {
     #[derive(Deserialize)]

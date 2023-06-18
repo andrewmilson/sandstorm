@@ -120,10 +120,10 @@ fn gen_half_full_round_states(
     round_keys: [[Fp; 3]; NUM_FULL_ROUNDS / 2],
 ) -> Vec<FullRoundStates> {
     let mut rounds = Vec::new();
-    for i in 0..NUM_FULL_ROUNDS / 2 {
+    for rks in round_keys {
         // keep track of the state after adding round keys
-        for (s, round_key) in zip(&mut state, round_keys[i]) {
-            *s = *s + round_key;
+        for (s, rk) in zip(&mut state, rks) {
+            *s += rk;
         }
         let after_add_round_keys = state;
 
@@ -185,7 +185,8 @@ fn permute(input: [Fp; 3]) -> [Fp; 3] {
 
 /// Computes the Poseidon hash using StarkWare's parameters. Source:
 /// <https://extgit.iaik.tugraz.at/krypto/hadeshash/-/blob/master/code/starkadperm_x5_256_3.sage>
-fn permute_optimized(input: [Fp; 3]) -> [Fp; 3] {
+// TODO: docs for optimized version
+fn _permute_optimized(input: [Fp; 3]) -> [Fp; 3] {
     let mut state = input;
     let mut round = 0;
     // first full rounds
@@ -204,23 +205,24 @@ fn permute_optimized(input: [Fp; 3]) -> [Fp; 3] {
     }
     todo!();
 
-    // last full rounds
-    for _ in 0..NUM_FULL_ROUNDS / 2 {
-        // round constants, nonlinear layer, matrix multiplication
-        for (s, round_key) in zip(&mut state, ROUND_KEYS[round]) {
-            *s = (*s + round_key).pow([3]);
-        }
-        state = Mat3x3(MDS_MATRIX) * state;
-        round += 1;
-    }
-    state
+    // // last full rounds
+    // for _ in 0..NUM_FULL_ROUNDS / 2 {
+    //     // round constants, nonlinear layer, matrix multiplication
+    //     for (s, round_key) in zip(&mut state, ROUND_KEYS[round]) {
+    //         *s = (*s + round_key).pow([3]);
+    //     }
+    //     state = Mat3x3(MDS_MATRIX) * state;
+    //     round += 1;
+    // }
+    // state
 }
 
 // This is mentioned in section B of the Poseidon paper. Sources:
 // * <https://eprint.iacr.org/2019/458.pdf>
 // * <https://extgit.iaik.tugraz.at/krypto/hadeshash/-/blob/master/code/poseidonperm_x3_64_24_optimized.sage>
 // * <https://github.com/CryptoExperts/poseidon/blob/main/sage/poseidon_variant.sage#L3>
-fn calc_optimized_partial_round_keys() -> [[Fp; 3]; NUM_PARTIAL_ROUNDS] {
+// TODO: consider removing
+fn _calc_optimized_partial_round_keys() -> [[Fp; 3]; NUM_PARTIAL_ROUNDS] {
     let mds_matrix_transpose = Mat3x3(MDS_MATRIX).transpose();
     let mds_matrix_transpose_inv = mds_matrix_transpose.inverse().unwrap();
     // Start moving round constants up
@@ -236,7 +238,7 @@ fn calc_optimized_partial_round_keys() -> [[Fp; 3]; NUM_PARTIAL_ROUNDS] {
         res[i][2] += c_i_prime[2];
         res[i + 1] = [c_i_prime[0], Fp::ZERO, Fp::ZERO];
     }
-    res
+    todo!()
 }
 
 #[cfg(test)]
