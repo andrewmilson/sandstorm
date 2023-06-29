@@ -65,11 +65,19 @@ func main{output_ptr, pedersen_ptr: HashBuiltin*, range_check_ptr, ecdsa_ptr: Si
     // reference to pedersen_ptr + 3.
     local pedersen_ptr: HashBuiltin* = pedersen_ptr;
     let (res) = hash2{hash_ptr=pedersen_ptr}(1, 2);
-    assert [output_ptr] = res;
+    // assert [output_ptr] = res;
+
+    let myval = 0x666;
+    assert [output_ptr] = myval;
 
     // Manually update the output builtin pointer.
     let output_ptr = output_ptr + 1;
 
+
+    let myval = 0x987;
+    assert [output_ptr] = myval;
+
+    let output_ptr = output_ptr + 1;
     // assert [range_check_ptr] = 340282366920938463463374607431768211455;
     // let range_check_ptr = range_check_ptr + 1;
 
@@ -123,3 +131,12 @@ func main{output_ptr, pedersen_ptr: HashBuiltin*, range_check_ptr, ecdsa_ptr: Si
     // output_ptr and pedersen_ptr will be implicitly returned.
     return ();
 }
+
+// cairo-run --program bootloader_compiled.json \
+//           --air_private_input ./air-private-input.json \
+//           --air_public_input ./air-public-input.json \
+//           --trace_file ./trace.bin \
+//           --memory_file ./memory.bin \
+//           --layout starknet \
+//           --min_steps 128 \
+//           --proof_mode --print_info

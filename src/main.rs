@@ -15,7 +15,7 @@ use ministark::ProofOptions;
 use ministark_gpu::fields::p18446744069414584321;
 use ministark_gpu::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481;
 use sandstorm::prover::DefaultCairoProver;
-use sharp::StarkWareProver;
+use sharp::prover::StarkWareProver;
 use std::fs;
 use std::fs::File;
 use std::io::Write;

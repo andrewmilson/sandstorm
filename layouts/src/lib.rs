@@ -73,7 +73,7 @@ impl<F: Field> CairoAuxInput<F> {
         const OFFSET_RANGE_CHECK_STOP_PTR: usize = 13;
 
         const NUM_BASE_VALS: usize = OFFSET_RANGE_CHECK_STOP_PTR + 1;
-        let mut base_vals = [None; NUM_BASE_VALS];
+        let mut base_vals = vec![None; NUM_BASE_VALS];
         base_vals[OFFSET_LOG_N_STEPS] = Some(self.log_n_steps.into());
         base_vals[OFFSET_RC_MIN] = Some(self.range_check_min.into());
         base_vals[OFFSET_RC_MAX] = Some(self.range_check_max.into());
@@ -104,10 +104,37 @@ impl<F: Field> CairoAuxInput<F> {
                 const OFFSET_N_PUBLIC_MEMORY_PAGES: usize = 24;
                 const OFFSET_PUBLIC_MEMORY: usize = 25;
 
-                // const NUM_VALS: usize = OFFSET_PUBLIC_MEMORY + 1;
-                // let vals =
-                // TODO:
-                base_vals.map(|v| v.unwrap()).to_vec()
+                const NUM_VALS: usize = OFFSET_PUBLIC_MEMORY + 1;
+                let mut vals = vec![None; NUM_VALS];
+                vals[..NUM_BASE_VALS].copy_from_slice(&base_vals);
+                vals[OFFSET_ECDSA_BEGIN_ADDR] = self.ecdsa_segment.map(|s| s.begin_addr.into());
+                vals[OFFSET_ECDSA_STOP_PTR] = self.ecdsa_segment.map(|s| s.stop_ptr.into());
+                vals[OFFSET_BITWISE_BEGIN_ADDR] = self.bitwise_segment.map(|s| s.begin_addr.into());
+                vals[OFFSET_BITWISE_STOP_ADDR] = self.bitwise_segment.map(|s| s.stop_ptr.into());
+                vals[OFFSET_EC_OP_BEGIN_ADDR] = self.ec_op_segment.map(|s| s.begin_addr.into());
+                vals[OFFSET_EC_OP_STOP_ADDR] = self.ec_op_segment.map(|s| s.stop_ptr.into());
+                vals[OFFSET_POSEIDON_BEGIN_ADDR] =
+                    self.poseidon_segment.map(|s| s.begin_addr.into());
+                vals[OFFSET_POSEIDON_STOP_PTR] = self.poseidon_segment.map(|s| s.stop_ptr.into());
+
+                let MemoryEntry {
+                    address: mem_padding_addr,
+                    value: mem_padding_val,
+                } = self.public_memory_padding;
+                vals[OFFSET_PUBLIC_MEMORY_PADDING_ADDR] = Some(mem_padding_addr.into());
+                vals[OFFSET_PUBLIC_MEMORY_PADDING_VALUE] = Some(mem_padding_val);
+
+                // TODO: these need to be checked
+                vals[OFFSET_N_PUBLIC_MEMORY_PAGES] = Some(F::ONE);
+
+                // For each page:
+                // * First address in the page (this field is not included for the first page).
+                // * Page size.
+                // * Page hash.
+                vals[OFFSET_PUBLIC_MEMORY] = Some(F::ONE);
+                vals[OFFSET_PUBLIC_MEMORY + 1] = Some(F::ONE);
+
+                vals.into_iter().map(Option::unwrap).collect()
             }
             _ => unimplemented!(),
         }

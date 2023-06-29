@@ -10,4 +10,6 @@ ministark-gpu = { version = "0.1", path = "../../playground/ministark/gpu" }
 ministark = { path = "../../playground/ministark" }
 ruint = { version = "1.7", features = [ "serde", "num-bigint" ] }
 sha2 = "0.10"
+sha3 = "0.10"
+num-bigint = "0.4"
 ark-poly = "0.4"
