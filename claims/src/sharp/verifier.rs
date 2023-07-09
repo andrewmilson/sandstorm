@@ -1,29 +1,27 @@
 extern crate alloc;
 
 use super::CairoClaim;
-use ark_ff::PrimeField;
 use binary::CairoAuxInput;
 use layouts::CairoTrace;
 use ministark::air::AirConfig;
 use ministark::random::PublicCoin;
 use ministark::Verifiable;
-use ministark_gpu::GpuFftField;
+use ministark_gpu::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481::ark::Fp;
 use sha2::Digest;
 
 impl<
-        Fp: GpuFftField + PrimeField,
-        A: AirConfig<Fp = Fp, PublicInputs = CairoAuxInput<Fp>>,
-        T: CairoTrace<Fp = Fp, Fq = A::Fq>,
+        A: AirConfig<Fp = Fp, Fq = Fp, PublicInputs = CairoAuxInput<Fp>>,
+        T: CairoTrace<Fp = Fp, Fq = Fp>,
         D: Digest,
-    > Verifiable for CairoClaim<Fp, A, T, D>
+    > Verifiable for CairoClaim<A, T, D>
 {
-    type Fp = A::Fp;
-    type Fq = A::Fq;
+    type Fp = Fp;
+    type Fq = Fp;
     type AirConfig = A;
     type Digest = D;
 
     fn get_public_inputs(&self) -> CairoAuxInput<Fp> {
-        self.0.auxiliary_input()
+        self.0.get_public_inputs()
     }
 
     fn gen_public_coin(&self, air: &ministark::Air<A>) -> PublicCoin<D> {

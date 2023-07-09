@@ -1,6 +1,5 @@
 use crate::starknet::PUBLIC_MEMORY_STEP;
 use ark_ff::PrimeField;
-use binary::CompiledProgram;
 use binary::MemoryEntry;
 use ministark::StarkExtensionOf;
 use ministark_gpu::GpuFftField;
@@ -149,36 +148,28 @@ pub fn get_ordered_memory_accesses<F: PrimeField>(
     ordered_accesses.to_vec()
 }
 
-pub struct MemoryPool<F> {
-    program: CompiledProgram,
-    memory: Vec<MemoryEntry<F>>,
-}
+pub struct MemoryPool<F>(Vec<MemoryEntry<F>>);
 
 impl<F: PrimeField> MemoryPool<F> {
-    pub fn new(program: &CompiledProgram) -> Self {
-        Self {
-            // TODO: improve later
-            program: program.clone(),
-            memory: Vec::new(),
-        }
+    pub fn new() -> Self {
+        Self(Vec::new())
     }
 
     /// Pushes a memory access to the pool
     pub fn push(&mut self, entry: MemoryEntry<F>) {
-        self.memory.push(entry);
+        self.0.push(entry);
     }
 
     pub fn get_ordered_accesses_with_padding(
         &self,
         trace_len: usize,
+        public_memory: Vec<MemoryEntry<F>>,
+        padding_entry: MemoryEntry<F>,
     ) -> (Vec<MemoryEntry<F>>, Vec<MemoryEntry<F>>) {
-        let public_memory = self.program.program_memory();
-        let padding_access = self.program.get_public_memory_padding();
-
         // order all memory accesses by address
         // memory accesses are of the form (address, value)
         let mut ordered_accesses = self
-            .memory
+            .0
             .iter()
             .copied()
             .chain(public_memory)
@@ -191,8 +182,8 @@ impl<F: PrimeField> MemoryPool<F> {
         let mut padding_accesses = Vec::new();
         for &[a, b] in ordered_accesses.array_windows() {
             for padding_addr in a.address.saturating_add(1)..b.address {
-                padding_accesses.push(if a.address == padding_access.address {
-                    padding_access
+                padding_accesses.push(if a.address == padding_entry.address {
+                    padding_entry
                 } else {
                     MemoryEntry {
                         address: padding_addr,
@@ -203,7 +194,7 @@ impl<F: PrimeField> MemoryPool<F> {
         }
 
         while padding_accesses.len() + ordered_accesses.len() != trace_len {
-            padding_accesses.push(padding_access);
+            padding_accesses.push(padding_entry);
         }
 
         // Add padding to the ordered vals
@@ -230,6 +221,12 @@ impl<F: PrimeField> MemoryPool<F> {
             });
 
         (ordered_accesses, padding_accesses)
+    }
+}
+
+impl<F: PrimeField> Default for MemoryPool<F> {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

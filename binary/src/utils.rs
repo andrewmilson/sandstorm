@@ -3,33 +3,53 @@ use alloc::vec::Vec;
 use ark_ff::PrimeField;
 use num_bigint::BigUint;
 use ruint::aliases::U256;
-use ruint::Uint;
 use serde::de;
 use serde::Deserialize;
 use serde::Deserializer;
 use serde_json::value::Number;
+use std::fmt::Display;
 
-/// Deserializes a hex string into a field element
-pub fn deserialize_hex_str_as_field<'de, D: Deserializer<'de>, F: PrimeField>(
-    deserializer: D,
-) -> Result<F, D::Error> {
-    let num = F::BigInt::try_from(BigUint::from(deserialize_hex_str(deserializer)?)).map_err(op);
-    if num < F::MODULUS {
-    } else {
-        Err()
-    }
-    let base_field = F::from(BigUint::from(num));
-    Ok(T::from_base_prime_field(base_field))
+#[derive(Debug)]
+pub struct OutOfRangeError {
+    value: BigUint,
+    modulus: BigUint,
 }
 
+impl Display for OutOfRangeError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "Invalid value: {}, must be less than the modulus {}",
+            self.value, self.modulus
+        )
+    }
+}
+
+impl std::error::Error for OutOfRangeError {}
+
+fn try_felt_from_u256<F: PrimeField>(value: U256) -> Result<F, OutOfRangeError> {
+    let value = BigUint::from(value);
+    let modulus = F::MODULUS.into();
+    if value < modulus {
+        Ok(value.into())
+    } else {
+        Err(OutOfRangeError { value, modulus })
+    }
+}
+
+// /// Deserializes a hex string into a field element
+// pub fn deserialize_hex_str_as_field<'de, D: Deserializer<'de>, T: Field>(
+//     deserializer: D,
+// ) -> Result<T, D::Error> {
+//     let num = deserialize_hex_str(deserializer)?;
+//     let base_field = T::BasePrimeField::from(BigUint::from(num));
+//     Ok(T::from_base_prime_field(base_field))
+// }
+
 /// Deserializes a hex string into a big integer
-pub fn deserialize_hex_str<'de, D: Deserializer<'de>, const BITS: usize, const LIMBS: usize>(
-    deserializer: D,
-) -> Result<Uint<BITS, LIMBS>, D::Error> {
+pub fn deserialize_hex_str<'de, D: Deserializer<'de>>(deserializer: D) -> Result<U256, D::Error> {
     let hex_str = String::deserialize(deserializer)?;
-    hex_str
-        .parse::<Uint<BITS, LIMBS>>()
-        .map_err(de::Error::custom)
+    hex_str.parse::<U256>().map_err(de::Error::custom)
 }
 
 /// Deserializes a list of memory entries of the form

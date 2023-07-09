@@ -553,11 +553,11 @@ impl<Fp: GpuFftField + PrimeField, Fq: StarkExtensionOf<Fp>> ministark::air::Air
             bitwise_segment: _,
             ec_op_segment: _,
             log_n_steps: _,
-            layout: _,
             program_segment: _,
             execution_segment: _,
             output_segment: _,
             poseidon_segment: _,
+            layout: _,
         } = aux_input;
 
         let memory_product = utils::compute_public_memory_quotient(

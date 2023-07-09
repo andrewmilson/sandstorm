@@ -11,7 +11,6 @@ use super::PUBLIC_MEMORY_STEP;
 use super::RANGE_CHECK_STEP;
 use crate::utils::get_ordered_memory_accesses;
 use crate::utils::RangeCheckPool;
-use crate::CairoAuxInput;
 use crate::CairoTrace;
 use crate::CairoWitness;
 use alloc::vec;
@@ -21,7 +20,6 @@ use ark_ff::FftField;
 use ark_ff::PrimeField;
 use binary::AirPublicInput;
 use binary::CompiledProgram;
-use binary::Layout;
 use binary::Memory;
 use binary::MemoryEntry;
 use binary::RegisterState;
@@ -261,6 +259,7 @@ impl<Fp: GpuFftField + PrimeField, Fq: StarkExtensionOf<Fp>> CairoTrace for Exec
         ExecutionTrace {
             air_public_input,
             public_memory,
+            padding_entry,
             initial_registers,
             final_registers,
             npc_column,
@@ -273,35 +272,6 @@ impl<Fp: GpuFftField + PrimeField, Fq: StarkExtensionOf<Fp>> CairoTrace for Exec
             _memory: memory,
             _register_states: register_states,
             _marker: PhantomData,
-        }
-    }
-
-    fn auxiliary_input(&self) -> CairoAuxInput<Self::Fp> {
-        assert_eq!(self.initial_registers.ap, self.initial_registers.fp);
-        assert_eq!(self.initial_registers.ap, self.final_registers.fp);
-        let public_input = &self.air_public_input;
-        let memory_segments = &public_input.memory_segments;
-        CairoAuxInput {
-            initial_ap: (self.initial_registers.ap as u64).into(),
-            initial_pc: (self.initial_registers.pc as u64).into(),
-            final_ap: (self.final_registers.ap as u64).into(),
-            final_pc: (self.final_registers.pc as u64).into(),
-            public_memory: self.public_memory.clone(),
-            range_check_min: public_input.rc_max,
-            range_check_max: public_input.rc_min,
-            public_memory_padding: self.program.get_public_memory_padding(),
-            log_n_steps: public_input.n_steps.ilog2(),
-            // TODO: use proper layout code
-            layout: Layout::Plain,
-            program_segment: memory_segments.program,
-            execution_segment: memory_segments.execution,
-            output_segment: memory_segments.output,
-            pedersen_segment: None,
-            rc_segment: None,
-            ecdsa_segment: None,
-            bitwise_segment: None,
-            ec_op_segment: None,
-            poseidon_segment: None,
         }
     }
 }

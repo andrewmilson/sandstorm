@@ -14,6 +14,8 @@ num-bigint = { version = "0.4" }
 ministark-gpu = { version = "0.1", path = "../../playground/ministark/gpu" }
 ark-serialize = "0.4"
 zip = "0.6"
+num-traits = "0.2"
+ark-ec = "0.4"
 bincode = "1.2"
 digest = "0.10"
 

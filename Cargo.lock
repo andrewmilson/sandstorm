@@ -974,12 +974,14 @@ dependencies = [
 name = "sandstorm-binary"
 version = "0.1.0"
 dependencies = [
+ "ark-ec",
  "ark-ff",
  "ark-serialize",
  "bincode",
  "digest",
  "ministark-gpu",
  "num-bigint",
+ "num-traits",
  "ruint",
  "serde",
  "serde_json",

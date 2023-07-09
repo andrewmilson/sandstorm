@@ -45,38 +45,6 @@ impl<Fp: GpuFftField + PrimeField, A: AirConfig<Fp = Fp>, T: CairoTrace<Fp = Fp>
     pub fn program(&self) -> &CompiledProgram {
         &self.program
     }
-
-    pub fn auxiliary_input(&self) -> CairoAuxInput<Fp> {
-        // assert_eq!(self.initial_registers.ap, self.initial_registers.fp);
-        // assert_eq!(self.initial_registers.ap, self.final_registers.fp);
-        let public_input = &self.air_public_input;
-        let memory_segments = &public_input.memory_segments;
-        let initial_pc = memory_segments.program.begin_addr.into();
-        let final_pc = memory_segments.program.stop_ptr.into();
-        let initial_ap = memory_segments.execution.begin_addr.into();
-        let final_ap = memory_segments.execution.stop_ptr.into();
-        CairoAuxInput {
-            initial_ap,
-            initial_pc,
-            final_ap,
-            final_pc,
-            public_memory: self.public_memory.clone(),
-            log_n_steps: public_input.n_steps.ilog2(),
-            layout: public_input.layout,
-            range_check_min: public_input.rc_min,
-            range_check_max: public_input.rc_max,
-            public_memory_padding: self.program.get_public_memory_padding(),
-            program_segment: memory_segments.program,
-            execution_segment: memory_segments.execution,
-            output_segment: memory_segments.output,
-            pedersen_segment: memory_segments.pedersen,
-            rc_segment: memory_segments.range_check,
-            ecdsa_segment: memory_segments.ecdsa,
-            bitwise_segment: memory_segments.bitwise,
-            ec_op_segment: memory_segments.ec_op,
-            poseidon_segment: memory_segments.poseidon,
-        }
-    }
 }
 
 impl<
@@ -92,7 +60,39 @@ impl<
     type Digest = D;
 
     fn get_public_inputs(&self) -> CairoAuxInput<Fp> {
-        self.auxiliary_input()
+        CairoAuxInput {
+            log_n_steps: self.air_public_input.n_steps.ilog2(),
+            layout: self.air_public_input.layout,
+            initial_ap: self.air_public_input.initial_ap().into(),
+            initial_pc: self.air_public_input.initial_pc().into(),
+            final_ap: self.air_public_input.final_ap().into(),
+            final_pc: self.air_public_input.final_pc().into(),
+            range_check_min: self.air_public_input.rc_min,
+            range_check_max: self.air_public_input.rc_max,
+            public_memory_padding: self
+                .air_public_input
+                .public_memory_padding()
+                .try_into_felt_entry()
+                .unwrap(),
+            program_segment: self.air_public_input.memory_segments.program,
+            execution_segment: self.air_public_input.memory_segments.execution,
+            output_segment: self.air_public_input.memory_segments.output,
+            pedersen_segment: self.air_public_input.memory_segments.pedersen,
+            rc_segment: self.air_public_input.memory_segments.range_check,
+            ecdsa_segment: self.air_public_input.memory_segments.ecdsa,
+            bitwise_segment: self.air_public_input.memory_segments.bitwise,
+            ec_op_segment: self.air_public_input.memory_segments.ec_op,
+            poseidon_segment: self.air_public_input.memory_segments.poseidon,
+            public_memory: self
+                .air_public_input
+                .public_memory
+                .iter()
+                .map(|&MemoryEntry { address, value }| MemoryEntry {
+                    address,
+                    value: Fp::from(BigUint::from(value)),
+                })
+                .collect(),
+        }
     }
 }
 
@@ -107,8 +107,6 @@ impl<
     type Trace = T;
 
     fn generate_trace(&self, witness: CairoWitness<Fp>) -> T {
-        let trace = T::new(self.program.clone(), self.air_public_input.clone(), witness);
-        assert_eq!(trace.auxiliary_input(), self.auxiliary_input());
-        trace
+        T::new(self.program.clone(), self.air_public_input.clone(), witness)
     }
 }

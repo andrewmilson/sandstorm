@@ -1,21 +1,19 @@
 extern crate alloc;
 
 use super::CairoClaim;
-use ark_ff::PrimeField;
 use binary::CairoAuxInput;
 use layouts::CairoTrace;
 use layouts::CairoWitness;
 use ministark::air::AirConfig;
 use ministark::Provable;
-use ministark_gpu::GpuFftField;
+use ministark_gpu::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481::ark::Fp;
 use sha2::Digest;
 
 impl<
-        Fp: GpuFftField + PrimeField,
-        A: AirConfig<Fp = Fp, PublicInputs = CairoAuxInput<Fp>>,
-        T: CairoTrace<Fp = Fp, Fq = A::Fq>,
+        A: AirConfig<Fp = Fp, Fq = Fp, PublicInputs = CairoAuxInput<Fp>>,
+        T: CairoTrace<Fp = Fp, Fq = Fp>,
         D: Digest,
-    > Provable for CairoClaim<Fp, A, T, D>
+    > Provable for CairoClaim<A, T, D>
 {
     type Witness = CairoWitness<Fp>;
     type Trace = T;

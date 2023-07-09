@@ -8,7 +8,6 @@ use super::PUBLIC_MEMORY_STEP;
 use super::RANGE_CHECK_STEP;
 use ark_ff::Zero;
 use binary::BitwiseInstance;
-use binary::Layout;
 use binary::MemoryEntry;
 use binary::PedersenInstance;
 use binary::PoseidonInstance;
@@ -24,7 +23,6 @@ use builtins::poseidon;
 use builtins::range_check;
 use num_bigint::BigUint;
 use ruint::aliases::U256;
-use crate::CairoAuxInput;
 use crate::CairoWitness;
 use crate::starknet::air::Poseidon;
 use super::BITWISE_RATIO;
@@ -74,6 +72,7 @@ use strum::IntoEnumIterator;
 pub struct ExecutionTrace {
     pub air_public_input: AirPublicInput,
     pub public_memory: Vec<MemoryEntry<Fp>>,
+    pub padding_entry: MemoryEntry<Fp>,
     pub range_check_min: u16,
     pub range_check_max: u16,
     pub initial_registers: RegisterState,
@@ -124,7 +123,10 @@ impl CairoTrace for ExecutionTrace {
         let mut flags_column = Vec::new_in(GpuAllocator);
         flags_column.resize(trace_len, Fp::zero());
 
-        let padding_entry = program.get_public_memory_padding();
+        let padding_entry = air_public_input
+            .public_memory_padding()
+            .try_into_felt_entry()
+            .unwrap();
         let mut npc_column = Vec::new_in(GpuAllocator);
         npc_column.resize(trace_len, Fp::zero());
         {
@@ -955,6 +957,7 @@ impl CairoTrace for ExecutionTrace {
         ExecutionTrace {
             air_public_input,
             public_memory,
+            padding_entry,
             range_check_min,
             range_check_max,
             initial_registers,
@@ -973,34 +976,6 @@ impl CairoTrace for ExecutionTrace {
             _auxiliary_column: auxiliary_column,
             _memory: memory,
             _register_states: register_states,
-        }
-    }
-
-    fn auxiliary_input(&self) -> CairoAuxInput<Self::Fp> {
-        assert_eq!(self.initial_registers.ap, self.initial_registers.fp);
-        assert_eq!(self.initial_registers.ap, self.final_registers.fp);
-        let public_input = &self.air_public_input;
-        let memory_segments = &public_input.memory_segments;
-        CairoAuxInput {
-            initial_ap: (self.initial_registers.ap as u64).into(),
-            initial_pc: (self.initial_registers.pc as u64).into(),
-            final_ap: (self.final_registers.ap as u64).into(),
-            final_pc: (self.final_registers.pc as u64).into(),
-            public_memory: self.public_memory.clone(),
-            log_n_steps: public_input.n_steps.ilog2(),
-            layout: Layout::Starknet,
-            range_check_min: public_input.rc_min,
-            range_check_max: public_input.rc_max,
-            public_memory_padding: self.program.get_public_memory_padding(),
-            program_segment: memory_segments.program,
-            execution_segment: memory_segments.execution,
-            output_segment: memory_segments.output,
-            pedersen_segment: memory_segments.pedersen,
-            rc_segment: memory_segments.range_check,
-            ecdsa_segment: memory_segments.ecdsa,
-            bitwise_segment: memory_segments.bitwise,
-            ec_op_segment: memory_segments.ec_op,
-            poseidon_segment: memory_segments.poseidon,
         }
     }
 }

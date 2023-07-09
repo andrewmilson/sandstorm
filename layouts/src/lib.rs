@@ -9,22 +9,13 @@
 extern crate alloc;
 
 use ark_ff::Field;
-use ark_ff::PrimeField;
-use ark_serialize::CanonicalDeserialize;
-use ark_serialize::CanonicalSerialize;
 use binary::AirPrivateInput;
 use binary::AirPublicInput;
 use binary::CairoAuxInput;
 use binary::CompiledProgram;
-use binary::Layout;
 use binary::Memory;
-use binary::MemoryEntry;
 use binary::RegisterStates;
-use binary::Segment;
 use ministark::Trace;
-use num_bigint::BigUint;
-use ruint::aliases::U256;
-use ruint::uint;
 
 pub mod plain;
 pub mod starknet;
@@ -57,6 +48,4 @@ pub trait CairoTrace: Trace {
         public_input: AirPublicInput,
         witness: CairoWitness<Self::Fp>,
     ) -> Self;
-
-    fn auxiliary_input(&self) -> CairoAuxInput<Self::Fp>;
 }

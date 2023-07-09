@@ -25,6 +25,7 @@ use utils::deserialize_hex_str;
 use utils::deserialize_hex_str_memory_entries;
 use utils::deserialize_vec_hex_str;
 use utils::field_bytes;
+use utils::OutOfRangeError;
 
 mod utils;
 
@@ -219,8 +220,8 @@ impl<T: CanonicalSerialize> CanonicalSerialize for MemoryEntry<T> {
 }
 
 impl MemoryEntry<U256> {
-    /// Converts into an equivalent field element memory entry.
-    /// Returns none if the value is outside the range of the field.
+    /// Converts into an equivalent memory entry where the value is a field
+    /// element. Returns none if the value is outside the range of the field.
     pub fn try_into_felt_entry<F: PrimeField>(self) -> Option<MemoryEntry<F>> {
         let value = BigUint::from(self.value);
         if value < F::MODULUS.into() {
@@ -283,35 +284,34 @@ pub struct MemorySegments {
 }
 
 #[derive(Deserialize, Clone, Debug)]
-#[serde(bound = "F: PrimeField")]
-pub struct AirPublicInput<F> {
+pub struct AirPublicInput {
     pub rc_min: u16,
     pub rc_max: u16,
     pub n_steps: u64,
     pub layout: Layout,
     pub memory_segments: MemorySegments,
     #[serde(deserialize_with = "deserialize_hex_str_memory_entries")]
-    pub public_memory: Vec<MemoryEntry<F>>,
+    pub public_memory: Vec<MemoryEntry<U256>>,
 }
 
-impl<F: Field> AirPublicInput<F> {
-    pub fn initial_pc(&self) -> F {
-        self.memory_segments.program.begin_addr.into()
+impl AirPublicInput {
+    pub fn initial_pc(&self) -> u32 {
+        self.memory_segments.program.begin_addr
     }
 
-    pub fn final_pc(&self) -> F {
-        self.memory_segments.program.stop_ptr.into()
+    pub fn final_pc(&self) -> u32 {
+        self.memory_segments.program.stop_ptr
     }
 
-    pub fn initial_ap(&self) -> F {
-        self.memory_segments.execution.begin_addr.into()
+    pub fn initial_ap(&self) -> u32 {
+        self.memory_segments.execution.begin_addr
     }
 
-    pub fn final_ap(&self) -> F {
-        self.memory_segments.execution.stop_ptr.into()
+    pub fn final_ap(&self) -> u32 {
+        self.memory_segments.execution.stop_ptr
     }
 
-    pub fn public_memory_padding(&self) -> MemoryEntry<F> {
+    pub fn public_memory_padding(&self) -> MemoryEntry<U256> {
         *self.public_memory.iter().find(|e| e.address == 1).unwrap()
     }
 }
@@ -725,6 +725,15 @@ pub struct CairoAuxInput<F: Field> {
     pub ec_op_segment: Option<Segment>,
     pub poseidon_segment: Option<Segment>,
     pub public_memory: Vec<MemoryEntry<F>>,
+}
+
+impl<F: PrimeField> TryFrom<AirPublicInput> for CairoAuxInput<F> {
+    // TODO: proper error
+    type Error = OutOfRangeError;
+
+    fn try_from(value: AirPublicInput) -> Result<Self, OutOfRangeError> {
+        todo!()
+    }
 }
 
 impl<F: Field> CairoAuxInput<F> {
