@@ -75,13 +75,14 @@ cairo-run --program example/pedersen/main_compiled.json \
 # 3. generate the proof
 cargo +nightly run -r -F parallel,asm -- \
     --program example/pedersen/main_compiled.json --layout starknet \
+    --air-public-input example/pedersen/air-public-input.json \
     prove --air-private-input example/pedersen/air-private-input.json \
-          --air-public-input example/pedersen/air-public-input.json \
           --output example/array-sum.proof
 
 # 4. verify the proof
 cargo +nightly run -r -F parallel,asm -- \
     --program example/pedersen/main_compiled.json --layout starknet \
+    --air-public-input example/pedersen/air-public-input.json \
     verify --proof example/array-sum.proof
 ```
 

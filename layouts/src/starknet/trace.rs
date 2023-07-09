@@ -4,8 +4,6 @@ use super::air::MemoryPermutation;
 use super::air::Npc;
 use super::air::RangeCheck;
 use super::CYCLE_HEIGHT;
-use super::NUM_BASE_COLUMNS;
-use super::NUM_EXTENSION_COLUMNS;
 use super::PUBLIC_MEMORY_STEP;
 use super::RANGE_CHECK_STEP;
 use ark_ff::Zero;
@@ -21,13 +19,13 @@ use builtins::ec_op;
 use builtins::ecdsa;
 use builtins::pedersen;
 use ark_ff::One;
-use binary::AirPrivateInput;
 use binary::AirPublicInput;
 use builtins::poseidon;
 use builtins::range_check;
 use num_bigint::BigUint;
 use ruint::aliases::U256;
 use crate::CairoAuxInput;
+use crate::CairoWitness;
 use crate::starknet::air::Poseidon;
 use super::BITWISE_RATIO;
 use super::DILUTED_CHECK_N_BITS;
@@ -54,7 +52,7 @@ use super::air::RangeCheckPermutation;
 use ark_ff::Field;
 use super::MEMORY_STEP;
 use crate::utils::get_ordered_memory_accesses;
-use crate::CairoExecutionTrace;
+use crate::CairoTrace;
 use alloc::vec;
 use alloc::vec::Vec;
 use ark_ff::batch_inversion;
@@ -68,7 +66,6 @@ use ministark::utils::GpuAllocator;
 use ministark::utils::GpuVec;
 use ministark::Matrix;
 use ministark::Trace;
-use ministark::TraceInfo;
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;
 use ministark_gpu::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481::ark::Fp;
@@ -87,28 +84,31 @@ pub struct ExecutionTrace {
     pub initial_bitwise_address: u32,
     pub initial_ec_op_address: u32,
     pub program: CompiledProgram,
-    _register_states: RegisterStates,
-    _mem: Memory<Fp>,
-    _flags_column: GpuVec<Fp>,
     npc_column: GpuVec<Fp>,
     memory_column: GpuVec<Fp>,
     range_check_column: GpuVec<Fp>,
-    _auxiliary_column: GpuVec<Fp>,
     base_trace: Matrix<Fp>,
+    _register_states: RegisterStates,
+    _memory: Memory<Fp>,
+    _flags_column: GpuVec<Fp>,
+    _auxiliary_column: GpuVec<Fp>,
 }
 
-impl CairoExecutionTrace for ExecutionTrace {
+impl CairoTrace for ExecutionTrace {
     fn new(
         program: CompiledProgram,
         air_public_input: AirPublicInput,
-        air_private_input: AirPrivateInput,
-        mem: Memory<Fp>,
-        register_states: RegisterStates,
+        witness: CairoWitness<Fp>,
     ) -> Self {
+        let CairoWitness {
+            air_private_input,
+            register_states,
+            memory,
+        } = witness;
+
         let num_cycles = register_states.len();
         assert!(num_cycles.is_power_of_two());
         let trace_len = num_cycles * CYCLE_HEIGHT;
-        assert!(trace_len >= TraceInfo::MIN_TRACE_LENGTH);
         let public_memory = air_public_input
             .public_memory
             .iter()
@@ -143,7 +143,7 @@ impl CairoExecutionTrace for ExecutionTrace {
 
         // add offsets to the range check pool
         for &RegisterState { pc, .. } in register_states.iter() {
-            let word = mem[pc].unwrap();
+            let word = memory[pc].unwrap();
             rc_pool.push(word.get_off_dst());
             rc_pool.push(word.get_off_op0());
             rc_pool.push(word.get_off_op1());
@@ -186,7 +186,7 @@ impl CairoExecutionTrace for ExecutionTrace {
             .for_each(
                 |((((rc_cycle, aux_cycle), npc_cycle), flag_cycle), registers)| {
                     let &RegisterState { pc, ap, fp } = registers;
-                    let insrtuction = mem[pc].unwrap();
+                    let insrtuction = memory[pc].unwrap();
                     let insrtuction_felt = insrtuction.into_felt();
                     debug_assert!(!insrtuction.get_flag(Flag::Zero.into()));
 
@@ -196,13 +196,13 @@ impl CairoExecutionTrace for ExecutionTrace {
                     let off_op1 = insrtuction.get_off_op1() as u32;
                     let dst_addr = insrtuction.get_dst_addr(ap, fp) as u32;
                     let op0_addr = insrtuction.get_op0_addr(ap, fp) as u32;
-                    let op1_addr = insrtuction.get_op1_addr(pc, ap, fp, &mem) as u32;
-                    let dst = insrtuction.get_dst(ap, fp, &mem);
-                    let op0 = insrtuction.get_op0(ap, fp, &mem);
-                    let op1 = insrtuction.get_op1(pc, ap, fp, &mem);
-                    let res = insrtuction.get_res(pc, ap, fp, &mem);
-                    let tmp0 = insrtuction.get_tmp0(ap, fp, &mem);
-                    let tmp1 = insrtuction.get_tmp1(pc, ap, fp, &mem);
+                    let op1_addr = insrtuction.get_op1_addr(pc, ap, fp, &memory) as u32;
+                    let dst = insrtuction.get_dst(ap, fp, &memory);
+                    let op0 = insrtuction.get_op0(ap, fp, &memory);
+                    let op1 = insrtuction.get_op1(pc, ap, fp, &memory);
+                    let res = insrtuction.get_res(pc, ap, fp, &memory);
+                    let tmp0 = insrtuction.get_tmp0(ap, fp, &memory);
+                    let tmp1 = insrtuction.get_tmp1(pc, ap, fp, &memory);
 
                     // FLAGS
                     for flag in Flag::iter() {
@@ -971,7 +971,7 @@ impl CairoExecutionTrace for ExecutionTrace {
             program,
             _flags_column: flags_column,
             _auxiliary_column: auxiliary_column,
-            _mem: mem,
+            _memory: memory,
             _register_states: register_states,
         }
     }
@@ -988,7 +988,7 @@ impl CairoExecutionTrace for ExecutionTrace {
             final_pc: (self.final_registers.pc as u64).into(),
             public_memory: self.public_memory.clone(),
             log_n_steps: public_input.n_steps.ilog2(),
-            layout_code: Layout::Starknet.sharp_code(),
+            layout: Layout::Starknet,
             range_check_min: public_input.rc_min,
             range_check_max: public_input.rc_max,
             public_memory_padding: self.program.get_public_memory_padding(),
@@ -1006,8 +1006,6 @@ impl CairoExecutionTrace for ExecutionTrace {
 }
 
 impl Trace for ExecutionTrace {
-    const NUM_BASE_COLUMNS: usize = NUM_BASE_COLUMNS;
-    const NUM_EXTENSION_COLUMNS: usize = NUM_EXTENSION_COLUMNS;
     type Fp = Fp;
     type Fq = Fp;
 

@@ -6,7 +6,7 @@ use ark_ff::PrimeField;
 use sha3::Digest;
 use sha3::Keccak256;
 
-use crate::utils::from_montgomery;
+use super::utils::from_montgomery;
 
 /// Channel based of StarkWare solidity verifier
 struct Channel {

@@ -2,12 +2,14 @@
 
 extern crate alloc;
 
+use crate::utils::sharp::hash_elements;
 use alloc::vec::Vec;
 use ark_ff::Field;
 use ark_ff::PrimeField;
 use ark_serialize::CanonicalDeserialize;
 use ark_serialize::CanonicalSerialize;
 use ark_serialize::Valid;
+use digest::Digest;
 use num_bigint::BigUint;
 use ruint::aliases::U256;
 use ruint::uint;
@@ -55,7 +57,8 @@ pub struct RegisterState {
 
 // TODO: not being used at all ATM
 /// https://www.youtube.com/live/jPxD9h7BdzU?feature=share&t=2800
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum Layout {
     Plain = 0,
     Small = 1,
@@ -68,22 +71,57 @@ pub enum Layout {
 }
 
 impl Layout {
+    const SHARP_CODE_STARKNET: u64 = 8319381555716711796;
+
     // Returns the unique code used by SHARP associated to this layout
-    pub fn sharp_code(&self) -> u64 {
+    pub const fn sharp_code(&self) -> u64 {
         match self {
-            Self::Starknet => 8319381555716711796,
+            Self::Starknet => Self::SHARP_CODE_STARKNET,
             _ => unimplemented!(),
         }
     }
 
-    pub fn from_sharp_code(code: u64) -> Self {
+    pub const fn from_sharp_code(code: u64) -> Self {
         match code {
-            8319381555716711796 => Self::Starknet,
+            Self::SHARP_CODE_STARKNET => Self::Starknet,
             _ => unimplemented!(),
         }
     }
 }
 
+impl CanonicalSerialize for Layout {
+    fn serialize_with_mode<W: ark_serialize::Write>(
+        &self,
+        writer: W,
+        compress: ark_serialize::Compress,
+    ) -> Result<(), ark_serialize::SerializationError> {
+        self.sharp_code().serialize_with_mode(writer, compress)
+    }
+
+    fn serialized_size(&self, _compress: ark_serialize::Compress) -> usize {
+        core::mem::size_of::<u64>()
+    }
+}
+
+impl Valid for Layout {
+    fn check(&self) -> Result<(), ark_serialize::SerializationError> {
+        Ok(())
+    }
+}
+
+impl CanonicalDeserialize for Layout {
+    fn deserialize_with_mode<R: Read>(
+        reader: R,
+        compress: ark_serialize::Compress,
+        validate: ark_serialize::Validate,
+    ) -> Result<Self, ark_serialize::SerializationError> {
+        Ok(Self::from_sharp_code(u64::deserialize_with_mode(
+            reader, compress, validate,
+        )?))
+    }
+}
+
+#[derive(Debug)]
 pub struct RegisterStates(Vec<RegisterState>);
 
 impl RegisterStates {
@@ -180,6 +218,22 @@ impl<T: CanonicalSerialize> CanonicalSerialize for MemoryEntry<T> {
     }
 }
 
+impl MemoryEntry<U256> {
+    /// Converts into an equivalent field element memory entry.
+    /// Returns none if the value is outside the range of the field.
+    pub fn try_into_felt_entry<F: PrimeField>(self) -> Option<MemoryEntry<F>> {
+        let value = BigUint::from(self.value);
+        if value < F::MODULUS.into() {
+            Some(MemoryEntry {
+                address: self.address,
+                value: value.into(),
+            })
+        } else {
+            None
+        }
+    }
+}
+
 impl<T: Valid> Valid for MemoryEntry<T> {
     fn check(&self) -> Result<(), ark_serialize::SerializationError> {
         self.value.check()?;
@@ -199,7 +253,17 @@ impl<T: CanonicalDeserialize> CanonicalDeserialize for MemoryEntry<T> {
     }
 }
 
-#[derive(Deserialize, Clone, Copy, Debug, CanonicalSerialize, CanonicalDeserialize)]
+#[derive(
+    Serialize,
+    Deserialize,
+    Clone,
+    Copy,
+    Debug,
+    PartialEq,
+    Eq,
+    CanonicalSerialize,
+    CanonicalDeserialize,
+)]
 pub struct Segment {
     pub begin_addr: u32,
     pub stop_ptr: u32,
@@ -219,15 +283,37 @@ pub struct MemorySegments {
 }
 
 #[derive(Deserialize, Clone, Debug)]
-pub struct AirPublicInput {
+#[serde(bound = "F: PrimeField")]
+pub struct AirPublicInput<F> {
     pub rc_min: u16,
     pub rc_max: u16,
     pub n_steps: u64,
-    // TODO: change from string
-    pub layout: String,
+    pub layout: Layout,
     pub memory_segments: MemorySegments,
     #[serde(deserialize_with = "deserialize_hex_str_memory_entries")]
-    pub public_memory: Vec<MemoryEntry<U256>>,
+    pub public_memory: Vec<MemoryEntry<F>>,
+}
+
+impl<F: Field> AirPublicInput<F> {
+    pub fn initial_pc(&self) -> F {
+        self.memory_segments.program.begin_addr.into()
+    }
+
+    pub fn final_pc(&self) -> F {
+        self.memory_segments.program.stop_ptr.into()
+    }
+
+    pub fn initial_ap(&self) -> F {
+        self.memory_segments.execution.begin_addr.into()
+    }
+
+    pub fn final_ap(&self) -> F {
+        self.memory_segments.execution.stop_ptr.into()
+    }
+
+    pub fn public_memory_padding(&self) -> MemoryEntry<F> {
+        *self.public_memory.iter().find(|e| e.address == 1).unwrap()
+    }
 }
 
 #[derive(Deserialize, Clone, Copy, Debug)]
@@ -409,7 +495,7 @@ impl PoseidonInstance {
     }
 }
 
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize)]
 pub struct AirPrivateInput {
     pub trace_path: PathBuf,
     pub memory_path: PathBuf,
@@ -438,7 +524,7 @@ impl CompiledProgram {
         assert_eq!(format!("{:#x}", modulus), self.prime.to_lowercase());
     }
 
-    pub fn get_program_memory<F: PrimeField>(&self) -> Vec<MemoryEntry<F>> {
+    pub fn program_memory<F: PrimeField>(&self) -> Vec<MemoryEntry<F>> {
         self.validate::<F>();
         self.data
             .iter()
@@ -451,14 +537,6 @@ impl CompiledProgram {
                 }
             })
             .collect()
-    }
-
-    pub fn get_public_memory_padding<F: PrimeField>(&self) -> MemoryEntry<F> {
-        // Use the first entry
-        MemoryEntry {
-            address: 1,
-            value: Word::new(self.data[0]).into_felt(),
-        }
     }
 }
 
@@ -621,6 +699,157 @@ impl<F: PrimeField> Word<F> {
 
     pub fn into_felt(self) -> F {
         BigUint::from(self.0).into()
+    }
+}
+
+// Section 9.2 https://eprint.iacr.org/2021/1063.pdf
+// TODO: might need to have an type info per layout
+#[derive(Debug, CanonicalSerialize, CanonicalDeserialize, Clone, PartialEq, Eq)]
+pub struct CairoAuxInput<F: Field> {
+    pub log_n_steps: u32,
+    pub layout: Layout,
+    pub initial_ap: F,
+    pub initial_pc: F,
+    pub final_ap: F,
+    pub final_pc: F,
+    pub range_check_min: u16,
+    pub range_check_max: u16,
+    pub public_memory_padding: MemoryEntry<F>,
+    pub program_segment: Segment,
+    pub execution_segment: Segment,
+    pub output_segment: Option<Segment>,
+    pub pedersen_segment: Option<Segment>,
+    pub rc_segment: Option<Segment>,
+    pub ecdsa_segment: Option<Segment>,
+    pub bitwise_segment: Option<Segment>,
+    pub ec_op_segment: Option<Segment>,
+    pub poseidon_segment: Option<Segment>,
+    pub public_memory: Vec<MemoryEntry<F>>,
+}
+
+impl<F: Field> CairoAuxInput<F> {
+    /// Serializes the data to be compatible with StarkWare's solidity verifier
+    pub fn serialize_sharp<D: Digest>(&self) -> Vec<U256>
+    where
+        F: PrimeField,
+    {
+        const OFFSET_LOG_N_STEPS: usize = 0;
+        const OFFSET_RC_MIN: usize = 1;
+        const OFFSET_RC_MAX: usize = 2;
+        const OFFSET_LAYOUT_CODE: usize = 3;
+        const OFFSET_PROGRAM_BEGIN_ADDR: usize = 4;
+        const OFFSET_PROGRAM_STOP_PTR: usize = 5;
+        const OFFSET_EXECUTION_BEGIN_ADDR: usize = 6;
+        const OFFSET_EXECUTION_STOP_PTR: usize = 7;
+        const OFFSET_OUTPUT_BEGIN_ADDR: usize = 8;
+        const OFFSET_OUTPUT_STOP_PTR: usize = 9;
+        const OFFSET_PEDERSEN_BEGIN_ADDR: usize = 10;
+        const OFFSET_PEDERSEN_STOP_PTR: usize = 11;
+        const OFFSET_RANGE_CHECK_BEGIN_ADDR: usize = 12;
+        const OFFSET_RANGE_CHECK_STOP_PTR: usize = 13;
+
+        const NUM_BASE_VALS: usize = OFFSET_RANGE_CHECK_STOP_PTR + 1;
+        let mut base_vals = vec![None; NUM_BASE_VALS];
+        base_vals[OFFSET_LOG_N_STEPS] = Some(U256::from(self.log_n_steps));
+        base_vals[OFFSET_RC_MIN] = Some(U256::from(self.range_check_min));
+        base_vals[OFFSET_RC_MAX] = Some(U256::from(self.range_check_max));
+        base_vals[OFFSET_LAYOUT_CODE] = Some(U256::from(self.layout.sharp_code()));
+        base_vals[OFFSET_PROGRAM_BEGIN_ADDR] = Some(U256::from(self.program_segment.begin_addr));
+        base_vals[OFFSET_PROGRAM_STOP_PTR] = Some(U256::from(self.program_segment.stop_ptr));
+        base_vals[OFFSET_EXECUTION_BEGIN_ADDR] =
+            Some(U256::from(self.execution_segment.begin_addr));
+        base_vals[OFFSET_EXECUTION_STOP_PTR] = Some(U256::from(self.execution_segment.stop_ptr));
+        base_vals[OFFSET_OUTPUT_BEGIN_ADDR] = self.output_segment.map(|s| U256::from(s.begin_addr));
+        base_vals[OFFSET_OUTPUT_STOP_PTR] = self.output_segment.map(|s| U256::from(s.stop_ptr));
+        base_vals[OFFSET_PEDERSEN_BEGIN_ADDR] =
+            self.pedersen_segment.map(|s| U256::from(s.begin_addr));
+        base_vals[OFFSET_PEDERSEN_STOP_PTR] = self.pedersen_segment.map(|s| U256::from(s.stop_ptr));
+        base_vals[OFFSET_RANGE_CHECK_BEGIN_ADDR] =
+            self.rc_segment.map(|s| U256::from(s.begin_addr));
+        base_vals[OFFSET_RANGE_CHECK_STOP_PTR] = self.rc_segment.map(|s| U256::from(s.stop_ptr));
+
+        let layout_vals = match self.layout {
+            Layout::Starknet => {
+                const OFFSET_ECDSA_BEGIN_ADDR: usize = 0;
+                const OFFSET_ECDSA_STOP_PTR: usize = 1;
+                const OFFSET_BITWISE_BEGIN_ADDR: usize = 2;
+                const OFFSET_BITWISE_STOP_ADDR: usize = 3;
+                const OFFSET_EC_OP_BEGIN_ADDR: usize = 4;
+                const OFFSET_EC_OP_STOP_ADDR: usize = 5;
+                const OFFSET_POSEIDON_BEGIN_ADDR: usize = 6;
+                const OFFSET_POSEIDON_STOP_PTR: usize = 7;
+                const OFFSET_PUBLIC_MEMORY_PADDING_ADDR: usize = 8;
+                const OFFSET_PUBLIC_MEMORY_PADDING_VALUE: usize = 9;
+                const OFFSET_N_PUBLIC_MEMORY_PAGES: usize = 10;
+
+                const NUM_VALS: usize = OFFSET_N_PUBLIC_MEMORY_PAGES + 1;
+                let mut vals = vec![None; NUM_VALS];
+                vals[OFFSET_ECDSA_BEGIN_ADDR] =
+                    self.ecdsa_segment.map(|s| U256::from(s.begin_addr));
+                vals[OFFSET_ECDSA_STOP_PTR] = self.ecdsa_segment.map(|s| U256::from(s.stop_ptr));
+                vals[OFFSET_BITWISE_BEGIN_ADDR] =
+                    self.bitwise_segment.map(|s| U256::from(s.begin_addr));
+                vals[OFFSET_BITWISE_STOP_ADDR] =
+                    self.bitwise_segment.map(|s| U256::from(s.stop_ptr));
+                vals[OFFSET_EC_OP_BEGIN_ADDR] =
+                    self.ec_op_segment.map(|s| U256::from(s.begin_addr));
+                vals[OFFSET_EC_OP_STOP_ADDR] = self.ec_op_segment.map(|s| U256::from(s.stop_ptr));
+                vals[OFFSET_POSEIDON_BEGIN_ADDR] =
+                    self.poseidon_segment.map(|s| U256::from(s.begin_addr));
+                vals[OFFSET_POSEIDON_STOP_PTR] =
+                    self.poseidon_segment.map(|s| U256::from(s.stop_ptr));
+                vals[OFFSET_PUBLIC_MEMORY_PADDING_ADDR] =
+                    Some(U256::from(self.public_memory_padding.address));
+                vals[OFFSET_PUBLIC_MEMORY_PADDING_VALUE] = Some(U256::from::<BigUint>(
+                    self.public_memory_padding.value.into(),
+                ));
+                // Only 1 memory page currently for the main memory page
+                // TODO: support more memory pages
+                vals[OFFSET_N_PUBLIC_MEMORY_PAGES] = Some(uint!(1_U256));
+                vals
+            }
+            _ => unimplemented!(),
+        };
+
+        // The public memory consists of individual memory pages.
+        // The first page is for main memory.
+        // For each page:
+        // * First address in the page (this field is not included for the first page).
+        // * Page size. (number of memory pairs)
+        // * Page hash (hash of memory pairs)
+        // TODO: support other memory pages
+        let public_memory = {
+            const _PAGE_INFO_ADDRESS_OFFSET: usize = 0;
+            const _PAGE_INFO_SIZE_OFFSET: usize = 1;
+            const _PAGE_INFO_HASH_OFFSET: usize = 2;
+
+            // Hash the address value pairs of the main memory page
+            let main_page_hash: [u8; 32] = {
+                let pairs = self
+                    .public_memory
+                    .iter()
+                    .flat_map(|e| [e.address.into(), e.value])
+                    .collect::<Vec<F>>();
+
+                let mut hasher = D::new();
+                hash_elements(&mut hasher, &pairs);
+                (*hasher.finalize()).try_into().unwrap()
+            };
+
+            // NOTE: no address main memory page because It's implicitly "1".
+            let mut main_page = vec![None; 2];
+            main_page[0] = Some(U256::from(self.public_memory.len()));
+            main_page[1] = Some(U256::try_from_be_slice(&main_page_hash).unwrap());
+
+            main_page
+        };
+
+        [base_vals, layout_vals, public_memory]
+            .into_iter()
+            .flatten()
+            // ensure there are no unfilled gaps
+            .map(Option::unwrap)
+            .collect()
     }
 }
 

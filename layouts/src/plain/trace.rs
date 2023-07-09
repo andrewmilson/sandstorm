@@ -7,22 +7,21 @@ use super::air::RangeCheck;
 use super::air::RangeCheckPermutation;
 use super::CYCLE_HEIGHT;
 use super::MEMORY_STEP;
-use super::NUM_BASE_COLUMNS;
-use super::NUM_EXTENSION_COLUMNS;
 use super::PUBLIC_MEMORY_STEP;
 use super::RANGE_CHECK_STEP;
 use crate::utils::get_ordered_memory_accesses;
 use crate::utils::RangeCheckPool;
 use crate::CairoAuxInput;
-use crate::CairoExecutionTrace;
+use crate::CairoTrace;
+use crate::CairoWitness;
 use alloc::vec;
 use alloc::vec::Vec;
 use ark_ff::batch_inversion;
 use ark_ff::FftField;
 use ark_ff::PrimeField;
-use binary::AirPrivateInput;
 use binary::AirPublicInput;
 use binary::CompiledProgram;
+use binary::Layout;
 use binary::Memory;
 use binary::MemoryEntry;
 use binary::RegisterState;
@@ -34,7 +33,6 @@ use ministark::utils::GpuVec;
 use ministark::Matrix;
 use ministark::StarkExtensionOf;
 use ministark::Trace;
-use ministark::TraceInfo;
 use ministark_gpu::GpuFftField;
 use num_bigint::BigUint;
 #[cfg(feature = "parallel")]
@@ -45,11 +43,12 @@ use strum::IntoEnumIterator;
 pub struct ExecutionTrace<Fp, Fq> {
     pub air_public_input: AirPublicInput,
     pub public_memory: Vec<MemoryEntry<Fp>>,
+    pub padding_entry: MemoryEntry<Fp>,
     pub initial_registers: RegisterState,
     pub final_registers: RegisterState,
     pub program: CompiledProgram,
     _register_states: RegisterStates,
-    _mem: Memory<Fp>,
+    _memory: Memory<Fp>,
     _flags_column: GpuVec<Fp>,
     npc_column: GpuVec<Fp>,
     memory_column: GpuVec<Fp>,
@@ -59,20 +58,21 @@ pub struct ExecutionTrace<Fp, Fq> {
     _marker: PhantomData<Fq>,
 }
 
-impl<Fp: GpuFftField + PrimeField, Fq: StarkExtensionOf<Fp>> CairoExecutionTrace
-    for ExecutionTrace<Fp, Fq>
-{
+impl<Fp: GpuFftField + PrimeField, Fq: StarkExtensionOf<Fp>> CairoTrace for ExecutionTrace<Fp, Fq> {
     fn new(
         program: CompiledProgram,
         air_public_input: AirPublicInput,
-        _air_private_input: AirPrivateInput,
-        mem: Memory<Fp>,
-        register_states: RegisterStates,
+        witness: CairoWitness<Fp>,
     ) -> Self {
+        let CairoWitness {
+            air_private_input: _,
+            register_states,
+            memory,
+        } = witness;
+
         let num_cycles = register_states.len();
         assert!(num_cycles.is_power_of_two());
         let trace_len = num_cycles * CYCLE_HEIGHT;
-        assert!(trace_len >= TraceInfo::MIN_TRACE_LENGTH);
         let public_memory = air_public_input
             .public_memory
             .iter()
@@ -85,7 +85,10 @@ impl<Fp: GpuFftField + PrimeField, Fq: StarkExtensionOf<Fp>> CairoExecutionTrace
         let mut flags_column = Vec::new_in(GpuAllocator);
         flags_column.resize(trace_len, Fp::zero());
 
-        let padding_entry = program.get_public_memory_padding();
+        let padding_entry = air_public_input
+            .public_memory_padding()
+            .try_into_felt_entry()
+            .unwrap();
         let mut npc_column = Vec::new_in(GpuAllocator);
         npc_column.resize(trace_len, Fp::zero());
         {
@@ -103,7 +106,7 @@ impl<Fp: GpuFftField + PrimeField, Fq: StarkExtensionOf<Fp>> CairoExecutionTrace
         // skip the memory at address 0 - this is a special memory address in Cairo
         // TODO: a little brittle. investigate more.
         let mut npc_gap_iter = npc_column.array_chunks_mut().skip(7).step_by(8);
-        for (a, v) in mem.iter().enumerate().skip(1) {
+        for (a, v) in memory.iter().enumerate().skip(1) {
             if v.is_none() {
                 *npc_gap_iter.next().unwrap() = [(a as u64).into(), Fp::zero()];
             }
@@ -112,7 +115,7 @@ impl<Fp: GpuFftField + PrimeField, Fq: StarkExtensionOf<Fp>> CairoExecutionTrace
         // add offsets to the range check pool
         let mut rc_pool = RangeCheckPool::new();
         for &RegisterState { pc, .. } in register_states.iter() {
-            let word = mem[pc].unwrap();
+            let word = memory[pc].unwrap();
             rc_pool.push(word.get_off_dst());
             rc_pool.push(word.get_off_op0());
             rc_pool.push(word.get_off_op1());
@@ -142,7 +145,7 @@ impl<Fp: GpuFftField + PrimeField, Fq: StarkExtensionOf<Fp>> CairoExecutionTrace
             .for_each(
                 |((((rc_cycle, aux_cycle), npc_cycle), flag_cycle), registers)| {
                     let &RegisterState { pc, ap, fp } = registers;
-                    let word = mem[pc].unwrap();
+                    let word = memory[pc].unwrap();
                     debug_assert!(!word.get_flag(Flag::Zero.into()));
 
                     // range check all offset values
@@ -151,13 +154,13 @@ impl<Fp: GpuFftField + PrimeField, Fq: StarkExtensionOf<Fp>> CairoExecutionTrace
                     let off_op1 = (word.get_off_op1() as u64).into();
                     let dst_addr = (word.get_dst_addr(ap, fp) as u64).into();
                     let op0_addr = (word.get_op0_addr(ap, fp) as u64).into();
-                    let op1_addr = (word.get_op1_addr(pc, ap, fp, &mem) as u64).into();
-                    let dst = word.get_dst(ap, fp, &mem);
-                    let op0 = word.get_op0(ap, fp, &mem);
-                    let op1 = word.get_op1(pc, ap, fp, &mem);
-                    let res = word.get_res(pc, ap, fp, &mem);
-                    let tmp0 = word.get_tmp0(ap, fp, &mem);
-                    let tmp1 = word.get_tmp1(pc, ap, fp, &mem);
+                    let op1_addr = (word.get_op1_addr(pc, ap, fp, &memory) as u64).into();
+                    let dst = word.get_dst(ap, fp, &memory);
+                    let op0 = word.get_op0(ap, fp, &memory);
+                    let op1 = word.get_op1(pc, ap, fp, &memory);
+                    let res = word.get_res(pc, ap, fp, &memory);
+                    let tmp0 = word.get_tmp0(ap, fp, &memory);
+                    let tmp1 = word.get_tmp1(pc, ap, fp, &memory);
 
                     // FLAGS
                     for flag in Flag::iter() {
@@ -267,7 +270,7 @@ impl<Fp: GpuFftField + PrimeField, Fq: StarkExtensionOf<Fp>> CairoExecutionTrace
             program,
             _flags_column: flags_column,
             _auxiliary_column: auxiliary_column,
-            _mem: mem,
+            _memory: memory,
             _register_states: register_states,
             _marker: PhantomData,
         }
@@ -289,7 +292,7 @@ impl<Fp: GpuFftField + PrimeField, Fq: StarkExtensionOf<Fp>> CairoExecutionTrace
             public_memory_padding: self.program.get_public_memory_padding(),
             log_n_steps: public_input.n_steps.ilog2(),
             // TODO: use proper layout code
-            layout_code: 123,
+            layout: Layout::Plain,
             program_segment: memory_segments.program,
             execution_segment: memory_segments.execution,
             output_segment: memory_segments.output,
@@ -304,8 +307,6 @@ impl<Fp: GpuFftField + PrimeField, Fq: StarkExtensionOf<Fp>> CairoExecutionTrace
 }
 
 impl<Fp: GpuFftField + FftField, Fq: StarkExtensionOf<Fp>> Trace for ExecutionTrace<Fp, Fq> {
-    const NUM_BASE_COLUMNS: usize = NUM_BASE_COLUMNS;
-    const NUM_EXTENSION_COLUMNS: usize = NUM_EXTENSION_COLUMNS;
     type Fp = Fp;
     type Fq = Fq;
 

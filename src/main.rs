@@ -1,52 +1,37 @@
+use ark_ff::Field;
 use ark_ff::PrimeField;
 use ark_serialize::CanonicalDeserialize;
 use ark_serialize::CanonicalSerialize;
 use binary::AirPrivateInput;
 use binary::AirPublicInput;
 use binary::CompiledProgram;
+use binary::Layout;
 use binary::Memory;
-use ministark::Trace;
-use sandstorm::CairoProver;
 use binary::RegisterStates;
-use layouts::CairoAirConfig;
-use layouts::CairoExecutionTrace;
+use layouts::CairoWitness;
+use ministark::prover::Provable;
 use ministark::Proof;
 use ministark::ProofOptions;
+use ministark::Verifiable;
 use ministark_gpu::fields::p18446744069414584321;
 use ministark_gpu::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481;
-use sandstorm::prover::DefaultCairoProver;
-use sharp::prover::StarkWareProver;
+use sha2::Sha256;
 use std::fs;
 use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
 use std::time::Instant;
 use structopt::StructOpt;
-use strum::EnumString;
-use strum::EnumVariantNames;
-use strum::VariantNames;
 
 #[derive(StructOpt, Debug)]
 #[structopt(name = "sandstorm", about = "cairo prover")]
 struct SandstormOptions {
     #[structopt(long, parse(from_os_str))]
     program: PathBuf,
-    #[structopt(
-        long, 
-        possible_values = Layout::VARIANTS, 
-        case_insensitive = true,
-        default_value = "plain"
-    )]
-    layout: Layout,
+    #[structopt(long, parse(from_os_str))]
+    air_public_input: PathBuf,
     #[structopt(subcommand)]
     command: Command,
-}
-
-#[derive(EnumString, EnumVariantNames, Debug)]
-#[strum(serialize_all = "kebab_case")]
-enum Layout {
-    Plain,
-    Starknet,
 }
 
 #[derive(StructOpt, Debug)]
@@ -56,8 +41,6 @@ enum Command {
         output: PathBuf,
         #[structopt(long, parse(from_os_str))]
         air_private_input: PathBuf,
-        #[structopt(long, parse(from_os_str))]
-        air_public_input: PathBuf,
     },
     Verify {
         #[structopt(long, parse(from_os_str))]
@@ -84,98 +67,92 @@ fn main() {
     // read command-line args
     let SandstormOptions {
         program,
-        layout,
+        air_public_input,
         command,
     } = SandstormOptions::from_args();
     let program_file = File::open(program).expect("could not open program file");
     let program: CompiledProgram = serde_json::from_reader(program_file).unwrap();
+    let air_public_input_file =
+        File::open(air_public_input).expect("failed to read air public input");
+    let air_public_input: AirPublicInput = serde_json::from_reader(air_public_input_file).unwrap();
     match &*program.prime.to_lowercase() {
         // Starkware's 252-bit Cairo field
         "0x800000000000011000000000000000000000000000000000000000000000001" => {
             use p3618502788666131213697322783095070105623107215331596699973092056135872020481::ark::Fp;
-            match layout {
+            match air_public_input.layout {
                 Layout::Plain => {
                     type A = layouts::plain::AirConfig<Fp, Fp>;
                     type T = layouts::plain::ExecutionTrace<Fp, Fp>;
-                    type P = DefaultCairoProver<A, T>;
-                    execute_command::<P>(command, options, program);
+                    type C = claims::base::CairoClaim<Fp, A, T, Sha256>;
+                    let claim = C::new(program, air_public_input);
+                    execute_command(command, options, claim);
                 }
                 Layout::Starknet => {
                     type A = layouts::starknet::AirConfig;
                     type T = layouts::starknet::ExecutionTrace;
-                    type P = StarkWareProver<A, T>;
-                    execute_command::<P>(command, options, program);
+                    type C = claims::sharp::CairoClaim<A, T, Sha256>;
+                    let claim = C::new(program, air_public_input);
+                    execute_command(command, options, claim);
                 }
+                _ => unimplemented!(),
             }
         }
         // Goldilocks
         "0xffffffff00000001" => {
             use p18446744069414584321::ark::Fp;
             use p18446744069414584321::ark::Fq3;
-            match layout {
+            match air_public_input.layout {
                 Layout::Plain => {
                     type A = layouts::plain::AirConfig<Fp, Fq3>;
                     type T = layouts::plain::ExecutionTrace<Fp, Fq3>;
-                    type P = DefaultCairoProver<A, T>;
-                    execute_command::<P>(command, options, program);
+                    type C = claims::base::CairoClaim<Fp, A, T, Sha256>;
+                    let claim = C::new(program, air_public_input);
+                    execute_command(command, options, claim);
                 }
-                Layout::Starknet => unimplemented!("'starknet' layout does not support Goldilocks field"),
+                Layout::Starknet => {
+                    unimplemented!("'starknet' layout does not support Goldilocks field")
+                }
+                _ => unimplemented!(),
             }
         }
         prime => unimplemented!("prime field p={prime} is not supported yet"),
     }
 }
 
-fn execute_command<P: CairoProver>(
+fn execute_command<Fp: PrimeField, Claim: Provable<Fp = Fp, Witness = CairoWitness<Fp>>>(
     command: Command,
     options: ProofOptions,
-    program: CompiledProgram,
-) where 
-P::Fp: PrimeField,
-P::AirConfig: CairoAirConfig,
-P::Trace: CairoExecutionTrace
-{
+    claim: Claim,
+) {
     match command {
         Command::Prove {
             output,
             air_private_input,
-            air_public_input,
-        } => prove::<P>(
-            options,
-            program,
-            &air_private_input,
-            &air_public_input,
-            &output,
-        ),
-        Command::Verify { proof } => verify::<P::AirConfig>(options, &proof),
+        } => prove(options, &air_private_input, &output, claim),
+        Command::Verify { proof } => verify(options, &proof, claim),
     }
 }
 
-fn verify<A: CairoAirConfig>(options: ProofOptions, proof_path: &PathBuf)
-where
-    A::Fp: PrimeField,
-{
+fn verify<Claim: Verifiable<Fp = impl Field>>(
+    options: ProofOptions,
+    proof_path: &PathBuf,
+    claim: Claim,
+) {
     let proof_bytes = fs::read(proof_path).unwrap();
-    let proof: Proof<A> = Proof::deserialize_compressed(proof_bytes.as_slice()).unwrap();
+    let proof: Proof<Claim::Fp, Claim::Fq> =
+        Proof::deserialize_compressed(proof_bytes.as_slice()).unwrap();
     assert_eq!(options, proof.options);
     let now = Instant::now();
-    proof.verify().unwrap();
+    claim.verify(proof).unwrap();
     println!("Proof verified in: {:?}", now.elapsed());
 }
 
-fn prove<P: CairoProver>(
+fn prove<Fp: PrimeField, Claim: Provable<Fp = Fp, Witness = CairoWitness<Fp>>>(
     options: ProofOptions,
-    program: CompiledProgram,
     air_private_input_path: &PathBuf,
-    air_public_input_path: &PathBuf,
     output_path: &PathBuf,
-) where 
-P::Fp: PrimeField,
-P::AirConfig: CairoAirConfig,
-P::Trace: CairoExecutionTrace
- {
-    let now = Instant::now();
-
+    claim: Claim,
+) {
     let air_private_input_file =
         File::open(air_private_input_path).expect("could not open the air private input file");
     let air_private_input: AirPrivateInput =
@@ -186,35 +163,16 @@ P::Trace: CairoExecutionTrace
     let register_states = RegisterStates::from_reader(trace_file);
 
     let memory_path = &air_private_input.memory_path;
-    let memory_file = File::open(memory_path).expect("could not open memory file {}");
+    let memory_file = File::open(memory_path).expect("could not open memory file");
     let memory = Memory::from_reader(memory_file);
 
-    let air_public_input_file =
-        File::open(air_public_input_path).expect("could not open the air public input file");
-    let air_public_input: AirPublicInput = serde_json::from_reader(air_public_input_file).unwrap();
+    let witness = CairoWitness::new(air_private_input, register_states, memory);
 
-    let execution_trace = P::Trace::new(
-        program,
-        air_public_input,
-        air_private_input,
-        memory,
-        register_states,
-    );
-    println!(
-        "Generated execution trace (cols={}, rows={}) in {:.0?}",
-        execution_trace.base_columns().num_cols(),
-        execution_trace.base_columns().num_rows(),
-        now.elapsed(),
-    );
-
-    let prover = P::new(options);
     let now = Instant::now();
-    let proof = pollster::block_on(prover.generate_proof(execution_trace)).unwrap();
+    let proof = pollster::block_on(claim.generate_proof(options, witness)).unwrap();
     println!("Proof generated in: {:?}", now.elapsed());
-    println!(
-        "Proof security (conjectured): {}bit",
-        proof.conjectured_security_level()
-    );
+    let security_level_bits = proof.conjectured_security_level();
+    println!("Proof security (conjectured): {security_level_bits}bit");
 
     let mut proof_bytes = Vec::new();
     proof.serialize_compressed(&mut proof_bytes).unwrap();

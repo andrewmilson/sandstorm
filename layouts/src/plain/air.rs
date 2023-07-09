@@ -553,7 +553,7 @@ impl<Fp: GpuFftField + PrimeField, Fq: StarkExtensionOf<Fp>> ministark::air::Air
             bitwise_segment: _,
             ec_op_segment: _,
             log_n_steps: _,
-            layout_code: _,
+            layout: _,
             program_segment: _,
             execution_segment: _,
             output_segment: _,

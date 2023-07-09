@@ -1,15 +1,17 @@
 [package]
-name = "sandstorm-sharp"
+name = "sandstorm-claims"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
 ark-ff = "0.4"
 layouts = { path = "../layouts", package = "sandstorm-layouts" }
+binary = { path = "../binary", package = "sandstorm-binary" }
 ministark-gpu = { version = "0.1", path = "../../playground/ministark/gpu" }
 ministark = { path = "../../playground/ministark" }
 ruint = { version = "1.7", features = [ "serde", "num-bigint" ] }
 sha2 = "0.10"
 sha3 = "0.10"
 num-bigint = "0.4"
+ark-serialize = "0.4"
 ark-poly = "0.4"

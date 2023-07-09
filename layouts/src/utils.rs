@@ -172,7 +172,7 @@ impl<F: PrimeField> MemoryPool<F> {
         &self,
         trace_len: usize,
     ) -> (Vec<MemoryEntry<F>>, Vec<MemoryEntry<F>>) {
-        let public_memory = self.program.get_program_memory();
+        let public_memory = self.program.program_memory();
         let padding_access = self.program.get_public_memory_padding();
 
         // order all memory accesses by address

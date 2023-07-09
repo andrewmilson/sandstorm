@@ -840,8 +840,8 @@ impl ministark::air::AirConfig for AirConfig {
         let pedersen_points_y = Polynomial::new(pedersen_y_coeffs.to_vec());
 
         // TODO: double check if the value that's being evaluated is correct
-        let pedersen_point_x = pedersen_points_x.eval(X.pow(n / 512));
-        let pedersen_point_y = pedersen_points_y.eval(X.pow(n / 512));
+        let pedersen_point_x = pedersen_points_x.horner_eval(X.pow(n / 512));
+        let pedersen_point_y = pedersen_points_y.horner_eval(X.pow(n / 512));
 
         // let `P = (Px, Py)` be the point to be added (see above)
         // let `Q = (Qx, Qy)` be the partial result
@@ -1137,8 +1137,8 @@ impl ministark::air::AirConfig for AirConfig {
         let ecdsa_generator_points_y = Polynomial::new(ecdsa_generator_y_coeffs.to_vec());
 
         // TODO: double check if the value that's being evaluated is correct
-        let ecdsa_generator_point_x = ecdsa_generator_points_x.eval(X.pow(n / 32768));
-        let ecdsa_generator_point_y = ecdsa_generator_points_y.eval(X.pow(n / 32768));
+        let ecdsa_generator_point_x = ecdsa_generator_points_x.horner_eval(X.pow(n / 32768));
+        let ecdsa_generator_point_y = ecdsa_generator_points_y.horner_eval(X.pow(n / 32768));
 
         // let `P = (Px, Py)` be the point to be added (see above)
         // let `Q = (Qx, Qy)` be the partial result
@@ -1921,13 +1921,16 @@ impl ministark::air::AirConfig for AirConfig {
             Polynomial::new(poseidon_partial_rounds_key0_coeffs.to_vec());
         let poseidon_partial_rounds_key1_poly =
             Polynomial::new(poseidon_partial_rounds_key1_coeffs.to_vec());
-        let poseidon_poseidon_full_round_key0 = poseidon_full_rounds_key0_poly.eval(X.pow(n / 512));
-        let poseidon_poseidon_full_round_key1 = poseidon_full_rounds_key1_poly.eval(X.pow(n / 512));
-        let poseidon_poseidon_full_round_key2 = poseidon_full_rounds_key2_poly.eval(X.pow(n / 512));
+        let poseidon_poseidon_full_round_key0 =
+            poseidon_full_rounds_key0_poly.horner_eval(X.pow(n / 512));
+        let poseidon_poseidon_full_round_key1 =
+            poseidon_full_rounds_key1_poly.horner_eval(X.pow(n / 512));
+        let poseidon_poseidon_full_round_key2 =
+            poseidon_full_rounds_key2_poly.horner_eval(X.pow(n / 512));
         let poseidon_poseidon_partial_round_key0 =
-            poseidon_partial_rounds_key0_poly.eval(X.pow(n / 512));
+            poseidon_partial_rounds_key0_poly.horner_eval(X.pow(n / 512));
         let poseidon_poseidon_partial_round_key1 =
-            poseidon_partial_rounds_key1_poly.eval(X.pow(n / 512));
+            poseidon_partial_rounds_key1_poly.horner_eval(X.pow(n / 512));
 
         // examples for trace length n=512
         // ===============================
@@ -2381,7 +2384,7 @@ impl ministark::air::AirConfig for AirConfig {
             ec_op_segment,
             poseidon_segment,
             log_n_steps: _,
-            layout_code: _,
+            layout: _,
             program_segment: _,
             execution_segment: _,
             output_segment: _,
@@ -3285,13 +3288,10 @@ impl<T: Clone + One + Zero + Mul<Output = T> + Add<Output = T>> Polynomial<T> {
         Polynomial(coeffs)
     }
 
-    fn eval(&self, x: Expr<AlgebraicItem<T>>) -> Expr<AlgebraicItem<T>> {
-        let mut res = Expr::Leaf(AlgebraicItem::Constant(T::zero()));
-        let mut acc = Expr::from(AlgebraicItem::Constant(T::one()));
-        for coeff in &self.0 {
-            res += &acc * AlgebraicItem::Constant(coeff.clone());
-            acc *= &x;
-        }
-        res
+    fn horner_eval(&self, point: Expr<AlgebraicItem<T>>) -> Expr<AlgebraicItem<T>> {
+        self.0.iter().rfold(
+            Expr::Leaf(AlgebraicItem::Constant(T::zero())),
+            move |result, coeff| result * &point + AlgebraicItem::Constant(coeff.clone()),
+        )
     }
 }
