@@ -70,7 +70,7 @@ use ministark_gpu::fields::p3618502788666131213697322783095070105623107215331596
 use strum::IntoEnumIterator;
 
 pub struct ExecutionTrace {
-    pub air_public_input: AirPublicInput,
+    pub air_public_input: AirPublicInput<Fp>,
     pub public_memory: Vec<MemoryEntry<Fp>>,
     pub padding_entry: MemoryEntry<Fp>,
     pub range_check_min: u16,
@@ -82,7 +82,7 @@ pub struct ExecutionTrace {
     pub initial_ecdsa_address: u32,
     pub initial_bitwise_address: u32,
     pub initial_ec_op_address: u32,
-    pub program: CompiledProgram,
+    pub program: CompiledProgram<Fp>,
     npc_column: GpuVec<Fp>,
     memory_column: GpuVec<Fp>,
     range_check_column: GpuVec<Fp>,
@@ -95,8 +95,8 @@ pub struct ExecutionTrace {
 
 impl CairoTrace for ExecutionTrace {
     fn new(
-        program: CompiledProgram,
-        air_public_input: AirPublicInput,
+        program: CompiledProgram<Fp>,
+        air_public_input: AirPublicInput<Fp>,
         witness: CairoWitness<Fp>,
     ) -> Self {
         let CairoWitness {
@@ -123,10 +123,7 @@ impl CairoTrace for ExecutionTrace {
         let mut flags_column = Vec::new_in(GpuAllocator);
         flags_column.resize(trace_len, Fp::zero());
 
-        let padding_entry = air_public_input
-            .public_memory_padding()
-            .try_into_felt_entry()
-            .unwrap();
+        let padding_entry = air_public_input.public_memory_padding();
         let mut npc_column = Vec::new_in(GpuAllocator);
         npc_column.resize(trace_len, Fp::zero());
         {

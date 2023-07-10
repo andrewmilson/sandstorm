@@ -16,6 +16,7 @@ use ministark::Verifiable;
 use ministark_gpu::fields::p18446744069414584321;
 use ministark_gpu::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481;
 use sha2::Sha256;
+use sha3::Keccak256;
 use std::fs;
 use std::fs::File;
 use std::io::Write;
@@ -51,7 +52,7 @@ enum Command {
 fn main() {
     // TODO:
     // proof options for 95 bit security level
-    let num_queries = 100;
+    let num_queries = 40;
     let lde_blowup_factor = 2;
     let grinding_factor = 16;
     let fri_folding_factor = 8;
@@ -71,14 +72,17 @@ fn main() {
         command,
     } = SandstormOptions::from_args();
     let program_file = File::open(program).expect("could not open program file");
-    let program: CompiledProgram = serde_json::from_reader(program_file).unwrap();
     let air_public_input_file =
-        File::open(air_public_input).expect("failed to read air public input");
-    let air_public_input: AirPublicInput = serde_json::from_reader(air_public_input_file).unwrap();
-    match &*program.prime.to_lowercase() {
+        File::open(air_public_input).expect("could not open air public input");
+    let program_json: serde_json::Value = serde_json::from_reader(program_file).unwrap();
+    let prime: String = serde_json::from_value(program_json["prime"].clone()).unwrap();
+    match prime.to_lowercase().as_str() {
         // Starkware's 252-bit Cairo field
         "0x800000000000011000000000000000000000000000000000000000000000001" => {
             use p3618502788666131213697322783095070105623107215331596699973092056135872020481::ark::Fp;
+            let program: CompiledProgram<Fp> = serde_json::from_value(program_json).unwrap();
+            let air_public_input: AirPublicInput<Fp> =
+                serde_json::from_reader(air_public_input_file).unwrap();
             match air_public_input.layout {
                 Layout::Plain => {
                     type A = layouts::plain::AirConfig<Fp, Fp>;
@@ -90,7 +94,7 @@ fn main() {
                 Layout::Starknet => {
                     type A = layouts::starknet::AirConfig;
                     type T = layouts::starknet::ExecutionTrace;
-                    type C = claims::sharp::CairoClaim<A, T, Sha256>;
+                    type C = claims::sharp::CairoClaim<A, T, Keccak256>;
                     let claim = C::new(program, air_public_input);
                     execute_command(command, options, claim);
                 }
@@ -101,6 +105,9 @@ fn main() {
         "0xffffffff00000001" => {
             use p18446744069414584321::ark::Fp;
             use p18446744069414584321::ark::Fq3;
+            let program: CompiledProgram<Fp> = serde_json::from_value(program_json).unwrap();
+            let air_public_input: AirPublicInput<Fp> =
+                serde_json::from_reader(air_public_input_file).unwrap();
             match air_public_input.layout {
                 Layout::Plain => {
                     type A = layouts::plain::AirConfig<Fp, Fq3>;

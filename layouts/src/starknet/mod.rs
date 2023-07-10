@@ -1,8 +1,8 @@
 //! Matches `starknet` layout from StarkWare's open source verifier
 //! <https://github.com/starkware-libs/cairo-lang/blob/361fe32d5930db340ea78fe05aedfe706f6c9405/src/starkware/cairo/lang/instances.py#L157>
 
-mod air;
-mod trace;
+pub mod air;
+pub mod trace;
 
 pub use air::AirConfig;
 use builtins::{utils::curve::StarkwareCurve, pedersen};

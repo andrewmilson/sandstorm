@@ -17,6 +17,7 @@ use alloc::vec;
 use alloc::vec::Vec;
 use ark_ff::batch_inversion;
 use ark_ff::FftField;
+use ark_ff::Field;
 use ark_ff::PrimeField;
 use binary::AirPublicInput;
 use binary::CompiledProgram;
@@ -38,13 +39,11 @@ use rayon::prelude::*;
 use std::marker::PhantomData;
 use strum::IntoEnumIterator;
 
-pub struct ExecutionTrace<Fp, Fq> {
-    pub air_public_input: AirPublicInput,
-    pub public_memory: Vec<MemoryEntry<Fp>>,
-    pub padding_entry: MemoryEntry<Fp>,
+pub struct ExecutionTrace<Fp: Field, Fq: Field> {
+    pub air_public_input: AirPublicInput<Fp>,
     pub initial_registers: RegisterState,
     pub final_registers: RegisterState,
-    pub program: CompiledProgram,
+    pub program: CompiledProgram<Fp>,
     _register_states: RegisterStates,
     _memory: Memory<Fp>,
     _flags_column: GpuVec<Fp>,
@@ -58,8 +57,8 @@ pub struct ExecutionTrace<Fp, Fq> {
 
 impl<Fp: GpuFftField + PrimeField, Fq: StarkExtensionOf<Fp>> CairoTrace for ExecutionTrace<Fp, Fq> {
     fn new(
-        program: CompiledProgram,
-        air_public_input: AirPublicInput,
+        program: CompiledProgram<Fp>,
+        air_public_input: AirPublicInput<Fp>,
         witness: CairoWitness<Fp>,
     ) -> Self {
         let CairoWitness {
@@ -71,22 +70,11 @@ impl<Fp: GpuFftField + PrimeField, Fq: StarkExtensionOf<Fp>> CairoTrace for Exec
         let num_cycles = register_states.len();
         assert!(num_cycles.is_power_of_two());
         let trace_len = num_cycles * CYCLE_HEIGHT;
-        let public_memory = air_public_input
-            .public_memory
-            .iter()
-            .map(|e| MemoryEntry {
-                address: e.address,
-                value: Fp::from(BigUint::from(e.value)),
-            })
-            .collect::<Vec<MemoryEntry<Fp>>>();
 
         let mut flags_column = Vec::new_in(GpuAllocator);
         flags_column.resize(trace_len, Fp::zero());
 
-        let padding_entry = air_public_input
-            .public_memory_padding()
-            .try_into_felt_entry()
-            .unwrap();
+        let padding_entry = air_public_input.public_memory_padding();
         let mut npc_column = Vec::new_in(GpuAllocator);
         npc_column.resize(trace_len, Fp::zero());
         {
@@ -237,8 +225,12 @@ impl<Fp: GpuFftField + PrimeField, Fq: StarkExtensionOf<Fp>> CairoTrace for Exec
                 }
             })
             .collect();
-        let ordered_memory_accesses =
-            get_ordered_memory_accesses(trace_len, &memory_accesses, &public_memory, padding_entry);
+        let ordered_memory_accesses = get_ordered_memory_accesses(
+            trace_len,
+            &memory_accesses,
+            &air_public_input.public_memory,
+            padding_entry,
+        );
         let memory_column = ordered_memory_accesses
             .into_iter()
             .flat_map(|e| [e.address.into(), e.value])
@@ -258,8 +250,6 @@ impl<Fp: GpuFftField + PrimeField, Fq: StarkExtensionOf<Fp>> CairoTrace for Exec
 
         ExecutionTrace {
             air_public_input,
-            public_memory,
-            padding_entry,
             initial_registers,
             final_registers,
             npc_column,

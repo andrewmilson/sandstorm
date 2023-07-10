@@ -3,10 +3,10 @@ use super::MEMORY_STEP;
 use super::PUBLIC_MEMORY_STEP;
 use super::RANGE_CHECK_STEP;
 use crate::utils;
-use crate::CairoAuxInput;
 use ark_ff::PrimeField;
 use ark_poly::EvaluationDomain;
 use ark_poly::Radix2EvaluationDomain;
+use binary::AirPublicInput;
 use ministark::challenges::Challenges;
 use ministark::constraints::AlgebraicItem;
 use ministark::constraints::Constraint;
@@ -31,7 +31,7 @@ impl<Fp: GpuFftField + PrimeField, Fq: StarkExtensionOf<Fp>> ministark::air::Air
     const NUM_EXTENSION_COLUMNS: usize = 1;
     type Fp = Fp;
     type Fq = Fq;
-    type PublicInputs = CairoAuxInput<Fp>;
+    type PublicInputs = AirPublicInput<Fp>;
 
     fn constraints(trace_len: usize) -> Vec<Constraint<FieldVariant<Fp, Fq>>> {
         use AlgebraicItem::*;
@@ -534,52 +534,35 @@ impl<Fp: GpuFftField + PrimeField, Fq: StarkExtensionOf<Fp>> ministark::air::Air
 
     fn gen_hints(
         trace_len: usize,
-        aux_input: &CairoAuxInput<Self::Fp>,
+        public_input: &AirPublicInput<Self::Fp>,
         challenges: &Challenges<Self::Fq>,
     ) -> Hints<Self::Fq> {
         use PublicInputHint::*;
-        let CairoAuxInput {
-            initial_ap,
-            initial_pc,
-            final_ap,
-            final_pc,
-            range_check_min,
-            range_check_max,
-            public_memory,
-            public_memory_padding,
-            pedersen_segment: _,
-            rc_segment: _,
-            ecdsa_segment: _,
-            bitwise_segment: _,
-            ec_op_segment: _,
-            log_n_steps: _,
-            program_segment: _,
-            execution_segment: _,
-            output_segment: _,
-            poseidon_segment: _,
-            layout: _,
-        } = aux_input;
 
         let memory_product = utils::compute_public_memory_quotient(
             challenges[MemoryPermutation::Z],
             challenges[MemoryPermutation::A],
             trace_len,
-            public_memory,
-            *public_memory_padding,
+            &public_input.public_memory,
+            public_input.public_memory_padding(),
         );
 
-        assert!(range_check_min <= range_check_max);
+        // assert!(range_check_min <= range_check_max);
+        let initial_ap = public_input.initial_ap().into();
+        let final_ap = public_input.final_ap().into();
+        let initial_pc = public_input.initial_pc().into();
+        let final_pc = public_input.final_pc().into();
 
         Hints::new(vec![
-            (InitialAp.index(), (*initial_ap).into()),
-            (InitialPc.index(), (*initial_pc).into()),
-            (FinalAp.index(), (*final_ap).into()),
-            (FinalPc.index(), (*final_pc).into()),
+            (InitialAp.index(), initial_ap),
+            (InitialPc.index(), initial_pc),
+            (FinalAp.index(), final_ap),
+            (FinalPc.index(), final_pc),
             // TODO: this is a wrong value. Must fix
             (MemoryProduct.index(), memory_product),
             (RangeCheckProduct.index(), Fq::one()),
-            (RangeCheckMin.index(), (*range_check_min as u64).into()),
-            (RangeCheckMax.index(), (*range_check_max as u64).into()),
+            (RangeCheckMin.index(), public_input.rc_min.into()),
+            (RangeCheckMax.index(), public_input.rc_max.into()),
         ])
     }
 }

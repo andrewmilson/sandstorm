@@ -15,12 +15,13 @@ use super::DILUTED_CHECK_N_BITS;
 use super::DILUTED_CHECK_SPACING;
 use super::ECDSA_SIG_CONFIG_ALPHA;
 use super::ECDSA_SIG_CONFIG_BETA;
+use crate::SharpAirConfig;
 use crate::utils;
-use crate::CairoAuxInput;
 use crate::utils::compute_diluted_cumulative_value;
 use ark_ff::MontFp;
 use ark_poly::EvaluationDomain;
 use ark_poly::Radix2EvaluationDomain;
+use binary::AirPublicInput;
 use builtins::ecdsa;
 use builtins::pedersen;
 use builtins::poseidon;
@@ -50,7 +51,7 @@ impl ministark::air::AirConfig for AirConfig {
     const NUM_EXTENSION_COLUMNS: usize = 1;
     type Fp = Fp;
     type Fq = Fp;
-    type PublicInputs = CairoAuxInput<Fp>;
+    type PublicInputs = AirPublicInput<Fp>;
 
     fn constraints(trace_len: usize) -> Vec<Constraint<FieldVariant<Fp, Fp>>> {
         use AlgebraicItem::*;
@@ -2364,38 +2365,18 @@ impl ministark::air::AirConfig for AirConfig {
 
     fn gen_hints(
         trace_len: usize,
-        execution_info: &CairoAuxInput<Self::Fp>,
+        execution_info: &AirPublicInput<Self::Fp>,
         challenges: &Challenges<Self::Fq>,
     ) -> Hints<Self::Fq> {
         use PublicInputHint::*;
-        let CairoAuxInput {
-            initial_ap,
-            initial_pc,
-            final_ap,
-            final_pc,
-            range_check_min,
-            range_check_max,
-            public_memory,
-            public_memory_padding,
-            pedersen_segment,
-            rc_segment,
-            ecdsa_segment,
-            bitwise_segment,
-            ec_op_segment,
-            poseidon_segment,
-            log_n_steps: _,
-            layout: _,
-            program_segment: _,
-            execution_segment: _,
-            output_segment: _,
-        } = execution_info;
 
-        let pedersen_segment = pedersen_segment.expect("layout requires Pedersen");
-        let rc_segment = rc_segment.expect("layout requires range check");
-        let ecdsa_segment = ecdsa_segment.expect("layout requires ECDSA");
-        let bitwise_segment = bitwise_segment.expect("layout requires bitwise");
-        let ec_op_segment = ec_op_segment.expect("layout requires EC op");
-        let poseidon_segment = poseidon_segment.expect("layout requires poseidon");
+        let segments = execution_info.memory_segments;
+        let pedersen_segment = segments.pedersen.expect("layout requires Pedersen");
+        let rc_segment = segments.range_check.expect("layout requires range check");
+        let ecdsa_segment = segments.ecdsa.expect("layout requires ECDSA");
+        let bitwise_segment = segments.bitwise.expect("layout requires bitwise");
+        let ec_op_segment = segments.ec_op.expect("layout requires EC op");
+        let poseidon_segment = segments.poseidon.expect("layout requires poseidon");
 
         let initial_perdersen_address = pedersen_segment.begin_addr.into();
         let initial_rc_address = rc_segment.begin_addr.into();
@@ -2408,8 +2389,8 @@ impl ministark::air::AirConfig for AirConfig {
             challenges[MemoryPermutation::Z],
             challenges[MemoryPermutation::A],
             trace_len,
-            public_memory,
-            *public_memory_padding,
+            &execution_info.public_memory,
+            execution_info.public_memory_padding(),
         );
 
         let diluted_cumulative_val = compute_diluted_cumulative_value::<
@@ -2422,18 +2403,23 @@ impl ministark::air::AirConfig for AirConfig {
             challenges[DilutedCheckAggregation::A],
         );
 
-        assert!(range_check_min <= range_check_max);
+        // TODO: add validation on the AirPublicInput struct
+        // assert!(range_check_min <= range_check_max);
+        let initial_ap = execution_info.initial_ap().into();
+        let final_ap = execution_info.final_ap().into();
+        let initial_pc = execution_info.initial_pc().into();
+        let final_pc = execution_info.final_pc().into();
 
         Hints::new(vec![
-            (InitialAp.index(), *initial_ap),
-            (InitialPc.index(), *initial_pc),
-            (FinalAp.index(), *final_ap),
-            (FinalPc.index(), *final_pc),
+            (InitialAp.index(), initial_ap),
+            (InitialPc.index(), initial_pc),
+            (FinalAp.index(), final_ap),
+            (FinalPc.index(), final_pc),
             // TODO: this is a wrong value. Must fix
             (MemoryProduct.index(), memory_product),
             (RangeCheckProduct.index(), Fp::ONE),
-            (RangeCheckMin.index(), (*range_check_min as u64).into()),
-            (RangeCheckMax.index(), (*range_check_max as u64).into()),
+            (RangeCheckMin.index(), execution_info.rc_min.into()),
+            (RangeCheckMax.index(), execution_info.rc_max.into()),
             (DilutedCheckProduct.index(), Fp::ONE),
             (DilutedCheckFirst.index(), Fp::ZERO),
             (DilutedCheckCumulativeValue.index(), diluted_cumulative_val),
@@ -3068,6 +3054,15 @@ impl ExecutionTraceColumn for Npc {
         let column = self.index();
         let trace_offset = step * offset + *self as isize;
         AlgebraicItem::Trace(column, trace_offset).into()
+    }
+}
+
+impl SharpAirConfig for AirConfig {
+    fn public_memory_challenges(challenges: &Challenges<Self::Fp>) -> (Self::Fp, Self::Fp) {
+        (
+            challenges[MemoryPermutation::Z],
+            challenges[MemoryPermutation::A],
+        )
     }
 }
 
