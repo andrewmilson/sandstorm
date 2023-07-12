@@ -1,7 +1,7 @@
 use std::str::FromStr;
 use digest::Digest;
 use num_bigint::BigUint;
-use ark_ff::{PrimeField, BigInteger};
+use ark_ff::{PrimeField, BigInteger, MontFp as Fp};
 use ministark_gpu::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481::ark::Fp;
 
 pub(crate) fn get_public_input_hash(public_input: &[Fp]) {
@@ -18,16 +18,21 @@ pub fn hash_elements<F: PrimeField, D: Digest>(hasher: &mut D, elements: &[F]) {
 }
 
 pub(crate) fn from_montgomery(v: BigUint) -> Fp {
-    let k_montgomery_r_inv = BigUint::from_str(
-        "113078212145816603762751633895895194930089271709401121343797004406777446400",
-    )
-    .unwrap();
-    let modulus = BigUint::from(Fp::MODULUS);
-    (k_montgomery_r_inv * v % modulus).into()
+    const MONTGOMERY_R_INV: Fp =
+        Fp!("113078212145816603762751633895895194930089271709401121343797004406777446400");
+    MONTGOMERY_R_INV * Fp::from(v)
+}
+
+pub fn to_montgomery(v: Fp) -> BigUint {
+    const MONTGOMERY_R: Fp =
+        Fp!("3618502788666127798953978732740734578953660990361066340291730267701097005025");
+    BigUint::from(MONTGOMERY_R * v)
 }
 
 #[cfg(test)]
 mod tests {
+    use crate::sharp::utils::{to_montgomery, from_montgomery};
+
     use super::hash_elements;
     use sha3::Keccak256;
     use digest::Digest;
@@ -48,5 +53,12 @@ mod tests {
             ],
             &*hash
         )
+    }
+
+    #[test]
+    fn to_montgomery_is_inverse_of_from_montgomery() {
+        let five = Fp::from(5u8);
+
+        assert_eq!(five, from_montgomery(to_montgomery(five)));
     }
 }

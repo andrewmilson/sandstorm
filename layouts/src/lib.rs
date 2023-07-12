@@ -26,7 +26,11 @@ pub mod utils;
 pub trait SharpAirConfig: AirConfig {
     /// Public memory permutation challenges
     /// Output is of the form: (z, alpha)
-    fn public_memory_challenges(challenges: &Challenges<Self::Fp>) -> (Self::Fp, Self::Fp);
+    fn public_memory_challenges(challenges: &Challenges<Self::Fq>) -> (Self::Fq, Self::Fq);
+
+    /// Public memory quotient
+    // TODO: docs
+    fn public_memory_quotient(hints: &Hints<Self::Fq>) -> Self::Fq;
 }
 
 #[derive(Debug)]

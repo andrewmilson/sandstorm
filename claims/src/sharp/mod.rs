@@ -1,8 +1,8 @@
 //! Claim prover and verifier compatible with Starkware's SHARed Prover (SHARP)
 
-pub mod channel;
 pub mod input;
 pub mod prover;
+pub mod random;
 pub mod utils;
 pub mod verifier;
 
@@ -11,9 +11,6 @@ use binary::AirPublicInput;
 use binary::CompiledProgram;
 use layouts::CairoTrace;
 use layouts::SharpAirConfig;
-use ministark::air::AirConfig;
-use ministark::challenges::Challenges;
-use ministark::hints::Hints;
 use ministark_gpu::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481::ark::Fp;
 use sha2::Digest;
 use std::ops::Deref;

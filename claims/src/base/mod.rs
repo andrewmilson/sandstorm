@@ -6,6 +6,7 @@ use binary::CompiledProgram;
 use layouts::CairoTrace;
 use layouts::CairoWitness;
 use ministark::air::AirConfig;
+use ministark::random::PublicCoinImpl;
 use ministark::Provable;
 use ministark::Verifiable;
 use ministark_gpu::GpuFftField;
@@ -41,6 +42,7 @@ impl<
     type Fq = A::Fq;
     type AirConfig = A;
     type Digest = D;
+    type PublicCoin = PublicCoinImpl<D, A::Fq>;
 
     fn get_public_inputs(&self) -> AirPublicInput<Fp> {
         self.public_input.clone()

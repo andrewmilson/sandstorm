@@ -5,18 +5,20 @@ use std::collections::BTreeMap;
 use crate::sharp::input::CairoAuxInput;
 
 use super::CairoClaim;
+use super::random::PublicCoinImpl;
 use ark_ff::Field;
+use ark_serialize::CanonicalSerialize;
 use binary::AirPublicInput;
 use binary::MemoryEntry;
 use layouts::CairoTrace;
+use ministark::random::draw_multiple;
 use layouts::SharpAirConfig;
-use ministark::air::AirConfig;
+use ministark::challenges::Challenges;
 use ministark::fri::FriVerifier;
 use ministark::verifier::VerificationError;
 use ministark::random::PublicCoin;
 use ministark::verifier::verify_positions;
 use ministark::verifier::deep_composition_evaluations;
-use rand::Rng;
 use ministark::utils::horner_evaluate;
 use ministark::Verifiable;
 use ministark::Air;
@@ -25,10 +27,10 @@ use ministark::verifier::ood_constraint_evaluation;
 use ministark_gpu::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481::ark::Fp;
 use digest::Digest;
 use digest::Output;
-use ruint::uint;
 
 pub struct SharpMetadata {
     pub public_memory_product: Fp,
+    pub public_memory_quotient: Fp,
     pub public_memory_alpha: Fp,
     pub public_memory_z: Fp,
 }
@@ -39,6 +41,15 @@ impl<
         D: Digest,
     > CairoClaim<A, T, D>
 {
+    fn public_coin_seed(&self, air: &Air<A>) -> Vec<u8> {
+        let aux_input = CairoAuxInput(air.public_inputs());
+        let mut seed = Vec::new();
+        for element in aux_input.public_input_elements::<D>() {
+            seed.extend_from_slice(&element.to_be_bytes::<32>())
+        }
+        seed
+    }
+
     pub fn verify_with_artifacts(
         &self,
         proof: Proof<Fp>,
@@ -63,12 +74,18 @@ impl<
         let mut public_coin = self.gen_public_coin(&air);
 
         let base_trace_commitment = Output::<D>::from_iter(base_trace_commitment);
-        public_coin.reseed(&&*base_trace_commitment);
-        let challenges = air.gen_challenges(&mut public_coin);
+        public_coin.reseed(&base_trace_commitment);
+        let num_challenges = air.num_challenges();
+        let challenges = Challenges::new(draw_multiple(&mut public_coin, num_challenges));
         let hints = air.gen_hints(&challenges);
+
+        for challenge in &*challenges {
+            println!("challenge: {}", challenge);
+        }
 
         // let public_memory_product = A::public_memory_product(&hints);
         let (public_memory_z, public_memory_alpha) = A::public_memory_challenges(&challenges);
+        let public_memory_quotient = A::public_memory_quotient(&hints);
         let mut public_memory_product = Fp::ONE;
         for &MemoryEntry { address, value } in &air.public_inputs().public_memory {
             let address = Fp::from(address);
@@ -77,16 +94,27 @@ impl<
 
         let extension_trace_commitment = extension_trace_commitment.map(|commitment| {
             let commitment = Output::<D>::from_iter(commitment);
-            public_coin.reseed(&&*commitment);
+            public_coin.reseed(&commitment);
             commitment
         });
 
-        let composition_coeffs = air.gen_composition_constraint_coeffs(&mut public_coin);
+        let num_composition_coeffs = air.num_composition_constraint_coeffs();
+        let composition_coeffs = draw_multiple(&mut public_coin, num_composition_coeffs);
+        for coeff in &*composition_coeffs {
+            println!("composition: {}", coeff);
+        }
         let composition_trace_commitment = Output::<D>::from_iter(composition_trace_commitment);
-        public_coin.reseed(&&*composition_trace_commitment);
+        public_coin.reseed(&composition_trace_commitment);
 
-        let z = public_coin.draw::<Fp>();
-        public_coin.reseed(&execution_trace_ood_evals);
+        let z = public_coin.draw();
+        println!("OODS point: {}", z);
+        {
+            let mut bytes = Vec::new();
+            execution_trace_ood_evals
+                .serialize_compressed(&mut bytes)
+                .unwrap();
+            public_coin.reseed(&D::digest(&bytes));
+        }
         // execution trace ood evaluation map
         let trace_ood_eval_map = air
             .trace_arguments()
@@ -102,14 +130,20 @@ impl<
             z,
         );
 
-        public_coin.reseed(&composition_trace_ood_evals);
+        {
+            let mut bytes = Vec::new();
+            composition_trace_ood_evals
+                .serialize_compressed(&mut bytes)
+                .unwrap();
+            public_coin.reseed(&D::digest(&bytes));
+        }
         let provided_ood_constraint_evaluation = horner_evaluate(&composition_trace_ood_evals, &z);
 
         if calculated_ood_constraint_evaluation != provided_ood_constraint_evaluation {
             return Err(InconsistentOodConstraintEvaluations);
         }
 
-        let deep_coeffs = air.gen_deep_composition_coeffs(&mut public_coin);
+        let deep_coeffs = self.gen_deep_coeffs(&mut public_coin, &air);
         let fri_verifier = FriVerifier::<Fp, D>::new(
             &mut public_coin,
             options.into_fri_options(),
@@ -117,17 +151,17 @@ impl<
             trace_len - 1,
         )?;
 
-        if options.grinding_factor != 0 {
-            public_coin.reseed(&pow_nonce);
-            if public_coin.seed_leading_zeros() < u32::from(options.grinding_factor) {
+        let grinding_factor = u32::from(options.grinding_factor);
+        if grinding_factor != 0 {
+            if !public_coin.verify_proof_of_work(grinding_factor, pow_nonce) {
                 return Err(FriProofOfWork);
             }
+            public_coin.reseed_with_int(pow_nonce);
         }
 
-        let mut rng = public_coin.draw_rng();
         let lde_domain_size = air.trace_len() * air.lde_blowup_factor();
         let query_positions = (0..options.num_queries)
-            .map(|_| rng.gen_range(0..lde_domain_size))
+            .map(|_| public_coin.draw_int(lde_domain_size))
             .collect::<Vec<usize>>();
 
         let base_trace_rows = trace_queries
@@ -195,6 +229,7 @@ impl<
             public_memory_product,
             public_memory_z,
             public_memory_alpha,
+            public_memory_quotient,
         })
     }
 }
@@ -209,22 +244,15 @@ impl<
     type Fq = Fp;
     type AirConfig = A;
     type Digest = D;
+    type PublicCoin = PublicCoinImpl<D>;
 
     fn get_public_inputs(&self) -> AirPublicInput<Fp> {
         self.0.get_public_inputs()
     }
 
-    fn gen_public_coin(&self, air: &Air<A>) -> PublicCoin<D> {
+    fn gen_public_coin(&self, air: &Air<A>) -> PublicCoinImpl<D> {
         println!("Generating public coin from SHARP verifier!");
-        // let auxiliary_elements = air.public_inputs().serialize_sharp::<D>();
-        let aux_input = CairoAuxInput(air.public_inputs());
-        let mut seed = Vec::new();
-        for element in aux_input.public_input_elements::<D>() {
-            seed.extend_from_slice(element.as_le_slice())
-        }
-        let public_coin = PublicCoin::new(&seed);
-        println!("public coin seed is: {:?}", public_coin.seed);
-        public_coin
+        PublicCoinImpl::new(D::digest(self.public_coin_seed(air)))
     }
 
     fn verify(&self, proof: Proof<Fp>) -> Result<(), VerificationError> {

@@ -5,7 +5,6 @@ use binary::AirPublicInput;
 use layouts::CairoTrace;
 use layouts::CairoWitness;
 use layouts::SharpAirConfig;
-use ministark::air::AirConfig;
 use ministark::Provable;
 use ministark_gpu::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481::ark::Fp;
 use sha2::Digest;

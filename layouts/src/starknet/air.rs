@@ -25,6 +25,8 @@ use binary::AirPublicInput;
 use builtins::ecdsa;
 use builtins::pedersen;
 use builtins::poseidon;
+use ministark::constraints::CompositionConstraint;
+use ministark::constraints::CompositionItem;
 use ministark_gpu::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481::ark::Fp;
 use num_traits::One;
 use core::ops::Add;
@@ -533,7 +535,7 @@ impl ministark::air::AirConfig for AirConfig {
             * &every_second_row_except_last_zerofier_inv;
         // Check the last permutation value to verify public memory
         let memory_multi_column_perm_perm_last =
-            (Permutation::Memory.curr() - MemoryProduct.hint()) / &second_last_row_zerofier;
+            (Permutation::Memory.curr() - MemoryQuotient.hint()) / &second_last_row_zerofier;
         // Constraint expression for memory/diff_is_bit
         // checks the address doesn't change or increases by 1
         // "Continuity" constraint in cairo whitepaper 9.7.2
@@ -2363,6 +2365,24 @@ impl ministark::air::AirConfig for AirConfig {
         .collect()
     }
 
+    fn composition_constraint(
+        _trace_len: usize,
+        constraints: &[Constraint<FieldVariant<Self::Fp, Self::Fq>>],
+    ) -> CompositionConstraint<FieldVariant<Self::Fp, Self::Fq>> {
+        use CompositionItem::*;
+        let alpha = Expr::Leaf(CompositionCoeff(0));
+        let expr = constraints
+            .iter()
+            .enumerate()
+            .map(|(i, constraint)| {
+                let constraint = constraint.map_leaves(&mut |&leaf| Item(leaf));
+                constraint * (&alpha).pow(i)
+            })
+            .sum::<Expr<CompositionItem<FieldVariant<Self::Fp, Self::Fq>>>>()
+            .reuse_shared_nodes();
+        CompositionConstraint::new(expr)
+    }
+
     fn gen_hints(
         trace_len: usize,
         execution_info: &AirPublicInput<Self::Fp>,
@@ -2385,7 +2405,7 @@ impl ministark::air::AirConfig for AirConfig {
         let initial_ec_op_address = ec_op_segment.begin_addr.into();
         let initial_poseidon_address = poseidon_segment.begin_addr.into();
 
-        let memory_product = utils::compute_public_memory_quotient(
+        let memory_quotient = utils::compute_public_memory_quotient(
             challenges[MemoryPermutation::Z],
             challenges[MemoryPermutation::A],
             trace_len,
@@ -2416,7 +2436,7 @@ impl ministark::air::AirConfig for AirConfig {
             (FinalAp.index(), final_ap),
             (FinalPc.index(), final_pc),
             // TODO: this is a wrong value. Must fix
-            (MemoryProduct.index(), memory_product),
+            (MemoryQuotient.index(), memory_quotient),
             (RangeCheckProduct.index(), Fp::ONE),
             (RangeCheckMin.index(), execution_info.rc_min.into()),
             (RangeCheckMax.index(), execution_info.rc_max.into()),
@@ -3058,11 +3078,15 @@ impl ExecutionTraceColumn for Npc {
 }
 
 impl SharpAirConfig for AirConfig {
-    fn public_memory_challenges(challenges: &Challenges<Self::Fp>) -> (Self::Fp, Self::Fp) {
+    fn public_memory_challenges(challenges: &Challenges<Self::Fq>) -> (Self::Fq, Self::Fq) {
         (
             challenges[MemoryPermutation::Z],
             challenges[MemoryPermutation::A],
         )
+    }
+
+    fn public_memory_quotient(hints: &Hints<Self::Fq>) -> Self::Fq {
+        hints[PublicInputHint::MemoryQuotient]
     }
 }
 
@@ -3199,7 +3223,7 @@ pub enum PublicInputHint {
     InitialPc,
     FinalAp,
     FinalPc,
-    MemoryProduct, // TODO
+    MemoryQuotient, // TODO
     RangeCheckProduct,
     RangeCheckMin,
     RangeCheckMax,
