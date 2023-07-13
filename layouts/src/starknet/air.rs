@@ -202,7 +202,9 @@ impl ministark::air::AirConfig for AirConfig {
         let flag0_offset =
             FieldVariant::Fp(g.pow([(Flag::Zero as usize * n / CYCLE_HEIGHT) as u64]));
         let flag0_zerofier = X.pow(n / CYCLE_HEIGHT) - Constant(flag0_offset);
-        let flags_zerofier_inv = &flag0_zerofier / (X.pow(n) - &one);
+        let every_row_zerofier = X.pow(n) - &one;
+        let every_row_zerofier_inv = &one / every_row_zerofier;
+        let flags_zerofier_inv = &flag0_zerofier * &every_row_zerofier_inv;
 
         // check decoded flag values are 0 or 1
         // NOTE: This expression is a bit confusing. The zerofier forces this constraint
@@ -714,8 +716,8 @@ impl ministark::air::AirConfig for AirConfig {
         // vanishes on groups of 256 consecutive rows except the last row in each group
         // TODO: come up with better names for these
         let pedersen_transition_zerofier_inv = (X.pow(n / 256)
-            * Constant(FieldVariant::Fp(g.pow([(255 * n / 256) as u64]))))
-            * &all_cycles_zerofier_inv;
+            - Constant(FieldVariant::Fp(g.pow([(255 * n / 256) as u64]))))
+            * &every_row_zerofier_inv;
 
         // Constraint operated on groups of 256 rows.
         // Each row shifts a large number to the right. E.g.
@@ -1810,15 +1812,14 @@ impl ministark::air::AirConfig for AirConfig {
         // poseidon_inputs_outputs_step_zerofier_inv = 1/(x-ω^(64*0))..(x-ω^(64*4))
         let domain14 = (X.pow(n / 512) - Constant(FieldVariant::Fp(g.pow([3 * n as u64 / 4]))))
             * (X.pow(n / 512) - Constant(FieldVariant::Fp(g.pow([7 * n as u64 / 8]))));
-        let poseidon_inputs_outputs_step_zerofier_inv = (X.pow(n / 512)
-            - Constant(FieldVariant::Fp(g.pow([5 * n as u64 / 8]))))
-            * &domain14
-            * &every_64_row_zerofier_inv;
+        let domain15 =
+            (X.pow(n / 512) - Constant(FieldVariant::Fp(g.pow([5 * n as u64 / 8])))) * &domain14;
+        let poseidon_inputs_outputs_step_zerofier_inv = &domain15 * &every_64_row_zerofier_inv;
         // TODO: this constraint while accurate isn't expressed well here
         // note that the constraint checks the memory addresses are continuous for the 6
         // memory locations used per poseidon hash instance
-        let poseidon_addr_input_output_step_inner = (Npc::PoseidonInput0Addr.curr()
-            - (Npc::PoseidonInput1Addr.curr() - &one))
+        let poseidon_addr_input_output_step_inner = (Npc::PoseidonInput1Addr.curr()
+            - (Npc::PoseidonInput0Addr.curr() + &one))
             * &poseidon_inputs_outputs_step_zerofier_inv;
 
         let all_poseidon_zerofier = X.pow(n / 512) - &one;
@@ -2002,13 +2003,13 @@ impl ministark::air::AirConfig for AirConfig {
         // `61 + 22 = 83` unique partial rounds.
         let poseidon_poseidon_copy_partial_rounds0_i0 = (Poseidon::PartialRoundsState0.offset(61)
             - Poseidon::PartialRoundsState1.offset(0))
-            * &all_poseidon_zerofier_except_last_inv;
+            * &all_poseidon_zerofier_inv;
         let poseidon_poseidon_copy_partial_rounds0_i1 = (Poseidon::PartialRoundsState0.offset(62)
             - Poseidon::PartialRoundsState1.offset(1))
-            * &all_poseidon_zerofier_except_last_inv;
+            * &all_poseidon_zerofier_inv;
         let poseidon_poseidon_copy_partial_rounds0_i2 = (Poseidon::PartialRoundsState0.offset(63)
             - Poseidon::PartialRoundsState1.offset(2))
-            * &all_poseidon_zerofier_except_last_inv;
+            * &all_poseidon_zerofier_inv;
 
         // Check the last state of full rounds (first half) is copied into the first
         // state of partial rounds. NOTE: also checks the last full round (first half
@@ -2020,7 +2021,7 @@ impl ministark::air::AirConfig for AirConfig {
             - (&poseidon_poseidon_full_rounds_state0_cubed_3
                 + &poseidon_poseidon_full_rounds_state1_cubed_3
                 + Constant(FieldVariant::Fp(margin_full_to_partial_round_keys[2]))))
-            * &all_poseidon_zerofier_except_last_inv;
+            * &all_poseidon_zerofier_inv;
         let margin_full_to_partial1_round_key =
             MontFp!("2006642341318481906727563724340978325665491359415674592697055778067937914672");
         let poseidon_poseidon_margin_full_to_partial1 = (Poseidon::PartialRoundsState0.offset(1)
@@ -2033,7 +2034,7 @@ impl ministark::air::AirConfig for AirConfig {
                 + &poseidon_poseidon_partial_rounds_state0_cubed_0
                     * Constant(FieldVariant::Fp(-Fp::from(2)))
                 + Constant(FieldVariant::Fp(margin_full_to_partial1_round_key))))
-            * &all_poseidon_zerofier_except_last_inv;
+            * &all_poseidon_zerofier_inv;
         let margin_full_to_partial2_round_key =
             MontFp!("427751140904099001132521606468025610873158555767197326325930641757709538586");
         let poseidon_poseidon_margin_full_to_partial2 = (Poseidon::PartialRoundsState0.offset(2)
@@ -2048,7 +2049,7 @@ impl ministark::air::AirConfig for AirConfig {
                 + &poseidon_poseidon_partial_rounds_state0_cubed_1
                     * Constant(FieldVariant::Fp(-Fp::from(2)))
                 + Constant(FieldVariant::Fp(margin_full_to_partial2_round_key))))
-            * &all_poseidon_zerofier_except_last_inv;
+            * &all_poseidon_zerofier_inv;
 
         // examples for trace length n=512
         // ===============================
@@ -2091,8 +2092,6 @@ impl ministark::air::AirConfig for AirConfig {
         //             * domain15 * domain17
         //          = (x-ω^(16*19))(x-ω^(16*21)) * domain15 * domain17
         //          = (x-ω^(16*19))..(x-ω^(16*31))
-        let domain15 =
-            (X.pow(n / 512) - Constant(FieldVariant::Fp(g.pow([5 * n as u64 / 8])))) * &domain14;
         let domain20 = (X.pow(n / 512) - Constant(FieldVariant::Fp(g.pow([19 * n as u64 / 32]))))
             * (X.pow(n / 512) - Constant(FieldVariant::Fp(g.pow([21 * n as u64 / 32]))))
             * &domain15

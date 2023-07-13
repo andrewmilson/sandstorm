@@ -1,4 +1,3 @@
-use std::str::FromStr;
 use digest::Digest;
 use num_bigint::BigUint;
 use ark_ff::{PrimeField, BigInteger, MontFp as Fp};
