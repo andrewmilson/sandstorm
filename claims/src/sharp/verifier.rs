@@ -7,7 +7,6 @@ use crate::sharp::input::CairoAuxInput;
 use super::CairoClaim;
 use super::random::PublicCoinImpl;
 use ark_ff::Field;
-use ark_serialize::CanonicalSerialize;
 use binary::AirPublicInput;
 use binary::MemoryEntry;
 use layouts::CairoTrace;
@@ -74,7 +73,7 @@ impl<
         let mut public_coin = self.gen_public_coin(&air);
 
         let base_trace_commitment = Output::<D>::from_iter(base_trace_commitment);
-        public_coin.reseed(&base_trace_commitment);
+        public_coin.reseed_with_hash(&base_trace_commitment);
         let num_challenges = air.num_challenges();
         let challenges = Challenges::new(draw_multiple(&mut public_coin, num_challenges));
         let hints = air.gen_hints(&challenges);
@@ -94,7 +93,7 @@ impl<
 
         let extension_trace_commitment = extension_trace_commitment.map(|commitment| {
             let commitment = Output::<D>::from_iter(commitment);
-            public_coin.reseed(&commitment);
+            public_coin.reseed_with_hash(&commitment);
             commitment
         });
 
@@ -104,16 +103,11 @@ impl<
             println!("composition: {}", coeff);
         }
         let composition_trace_commitment = Output::<D>::from_iter(composition_trace_commitment);
-        public_coin.reseed(&composition_trace_commitment);
+        public_coin.reseed_with_hash(&composition_trace_commitment);
 
         let z = public_coin.draw();
-        println!("OODS point: {}", z);
-        {
-            let mut bytes = Vec::new();
-            execution_trace_ood_evals
-                .serialize_compressed(&mut bytes)
-                .unwrap();
-            public_coin.reseed(&D::digest(&bytes));
+        for eval in &execution_trace_ood_evals {
+            public_coin.reseed_with_field_element(eval)
         }
         // execution trace ood evaluation map
         let trace_ood_eval_map = air
@@ -130,12 +124,8 @@ impl<
             z,
         );
 
-        {
-            let mut bytes = Vec::new();
-            composition_trace_ood_evals
-                .serialize_compressed(&mut bytes)
-                .unwrap();
-            public_coin.reseed(&D::digest(&bytes));
+        for eval in &composition_trace_ood_evals {
+            public_coin.reseed_with_field_element(eval);
         }
         let provided_ood_constraint_evaluation = horner_evaluate(&composition_trace_ood_evals, &z);
 
@@ -144,6 +134,9 @@ impl<
         }
 
         let deep_coeffs = self.gen_deep_coeffs(&mut public_coin, &air);
+
+        println!("OODS: alpha {}", deep_coeffs.execution_trace[0]);
+
         let fri_verifier = FriVerifier::<Fp, D>::new(
             &mut public_coin,
             options.into_fri_options(),
@@ -151,18 +144,16 @@ impl<
             trace_len - 1,
         )?;
 
-        let grinding_factor = u32::from(options.grinding_factor);
-        if grinding_factor != 0 {
-            if !public_coin.verify_proof_of_work(grinding_factor, pow_nonce) {
+        if options.grinding_factor != 0 {
+            if !public_coin.verify_proof_of_work(options.grinding_factor, pow_nonce) {
                 return Err(FriProofOfWork);
             }
             public_coin.reseed_with_int(pow_nonce);
         }
 
         let lde_domain_size = air.trace_len() * air.lde_blowup_factor();
-        let query_positions = (0..options.num_queries)
-            .map(|_| public_coin.draw_int(lde_domain_size))
-            .collect::<Vec<usize>>();
+        let query_positions =
+            Vec::from_iter(public_coin.draw_queries(options.num_queries.into(), lde_domain_size));
 
         let base_trace_rows = trace_queries
             .base_trace_values

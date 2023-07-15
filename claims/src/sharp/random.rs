@@ -1,4 +1,6 @@
+use std::collections::BTreeSet;
 use std::fmt::Debug;
+use std::iter;
 
 use ministark::random::PublicCoin;
 use ministark_gpu::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481::ark::Fp;
@@ -7,8 +9,9 @@ use ruint::aliases::U256;
 use ruint::uint;
 use sha3::digest::Output;
 use ark_ff::PrimeField;
+use ministark::random::leading_zeros;
 use sha3::Digest;
-
+use super::utils::to_montgomery;
 use super::utils::from_montgomery;
 
 /// Public coin based off of StarkWare's solidity verifier
@@ -26,6 +29,25 @@ impl<D: Digest> Debug for PublicCoinImpl<D> {
     }
 }
 
+impl<D: Digest> PublicCoinImpl<D> {
+    fn reseed_with_bytes(&mut self, bytes: impl AsRef<[u8]>) {
+        let digest = U256::try_from_be_slice(&self.digest).unwrap();
+        let mut hasher = D::new();
+        hasher.update((digest + uint!(1_U256)).to_be_bytes::<32>());
+        hasher.update(bytes);
+        self.digest = hasher.finalize();
+        self.counter = 0;
+    }
+
+    fn draw_bytes(&mut self) -> [u8; 32] {
+        let mut hasher = D::new();
+        hasher.update(&self.digest);
+        hasher.update(U256::from(self.counter).to_be_bytes::<32>());
+        self.counter += 1;
+        (*hasher.finalize()).try_into().unwrap()
+    }
+}
+
 impl<D: Digest> PublicCoin for PublicCoinImpl<D> {
     type Digest = D;
     type Field = Fp;
@@ -34,42 +56,72 @@ impl<D: Digest> PublicCoin for PublicCoinImpl<D> {
         Self { digest, counter: 0 }
     }
 
-    fn reseed(&mut self, val: &Output<D>) {
-        let digest = U256::try_from_be_slice(&self.digest).unwrap();
-        let mut hasher = D::new();
-        hasher.update((digest + uint!(1_U256)).to_be_bytes::<32>());
-        hasher.update(val);
-        self.digest = hasher.finalize();
-        self.counter = 0;
+    fn reseed_with_hash(&mut self, val: &Output<D>) {
+        self.reseed_with_bytes(val);
+    }
+
+    fn reseed_with_field_element(&mut self, val: &Fp) {
+        let bytes = U256::from(to_montgomery(*val)).to_be_bytes::<32>();
+        self.reseed_with_bytes(bytes);
+    }
+
+    fn reseed_with_field_elements(&mut self, vals: &[Self::Field]) {
+        let mut bytes = Vec::new();
+        for val in vals {
+            let val_bytes = U256::from(to_montgomery(*val)).to_be_bytes::<32>();
+            bytes.extend_from_slice(&val_bytes)
+        }
+        self.reseed_with_bytes(bytes);
     }
 
     fn reseed_with_int(&mut self, val: u64) {
-        let bytes = U256::from(val).to_be_bytes::<32>();
-        self.reseed(&Output::<D>::from_iter(bytes))
+        let bytes = val.to_be_bytes();
+        self.reseed_with_bytes(bytes);
     }
 
     fn draw(&mut self) -> Fp {
         let bound = BigUint::from(Fp::MODULUS) * 31u32;
         let mut field_element = bound.clone();
         while field_element >= bound {
-            let mut hasher = D::new();
-            hasher.update(&self.digest);
-            hasher.update(U256::from(self.counter).to_be_bytes::<32>());
-            let digest = hasher.finalize();
-            field_element = BigUint::from_bytes_be(&digest[0..32]);
-            self.counter += 1;
+            field_element = BigUint::from_bytes_be(&self.draw_bytes());
         }
         from_montgomery(field_element)
     }
 
-    fn draw_int(&mut self, max: usize) -> usize {
-        let num: BigUint = self.draw().into();
-        (num % BigUint::from(max)).try_into().unwrap()
+    fn draw_queries(&mut self, max_n: usize, domain_size: usize) -> BTreeSet<usize> {
+        let mut bytes = iter::from_fn(|| Some(self.draw_bytes())).flatten();
+        let ints = iter::from_fn(|| {
+            Some(u64::from_be_bytes([
+                bytes.next()?,
+                bytes.next()?,
+                bytes.next()?,
+                bytes.next()?,
+                bytes.next()?,
+                bytes.next()?,
+                bytes.next()?,
+                bytes.next()?,
+            ]))
+        });
+
+        let domain_size = domain_size as u64;
+        ints.take(max_n)
+            .map(|v| (v % domain_size).try_into().unwrap())
+            .collect()
     }
 
-    fn verify_proof_of_work(&self, proof_of_work_bits: u32, nonce: u64) -> bool {
-        // TODO:
-        true
+    fn verify_proof_of_work(&self, proof_of_work_bits: u8, nonce: u64) -> bool {
+        let mut prefix_hasher = D::new();
+        prefix_hasher.update(0x0123456789ABCDEDu64.to_be_bytes());
+        prefix_hasher.update(&self.digest);
+        prefix_hasher.update([proof_of_work_bits]);
+        let prefix_hash = prefix_hasher.finalize();
+
+        let mut proof_of_work_hasher = D::new();
+        proof_of_work_hasher.update(prefix_hash);
+        proof_of_work_hasher.update(nonce.to_be_bytes());
+        let proof_of_work_hash = proof_of_work_hasher.finalize();
+
+        leading_zeros(&proof_of_work_hash) >= u32::from(proof_of_work_bits)
     }
 }
 

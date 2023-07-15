@@ -31,7 +31,6 @@ pub fn to_montgomery(v: Fp) -> BigUint {
 #[cfg(test)]
 mod tests {
     use crate::sharp::utils::{to_montgomery, from_montgomery};
-
     use super::hash_elements;
     use sha3::Keccak256;
     use digest::Digest;
