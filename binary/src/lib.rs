@@ -660,7 +660,7 @@ impl<F: PrimeField> Word<F> {
                     unreachable!()
                 }
             }
-            0 | 1 | 2 => {
+            0..=2 => {
                 let op0: F = mem[self.get_op0_addr(ap, fp)].unwrap().into_felt();
                 let op1: F = mem[self.get_op1_addr(pc, ap, fp, mem)].unwrap().into_felt();
                 match res_logic {
