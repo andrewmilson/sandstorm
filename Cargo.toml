@@ -12,7 +12,7 @@ members = ["layouts", "binary", "builtins", "claims"]
 default = [ ]
 asm = [ "ministark/asm" ]
 gpu = [ "ministark/gpu" ]
-parallel = [ "dep:rayon", "ministark/parallel" ]
+parallel = [ "dep:rayon", "ark-std/parallel", "ministark/parallel", "ministark-gpu/parallel" ]
 
 [dependencies]
 layouts = { path = "./layouts", package = "sandstorm-layouts" }

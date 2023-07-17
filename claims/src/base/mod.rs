@@ -6,9 +6,9 @@ use binary::CompiledProgram;
 use layouts::CairoTrace;
 use layouts::CairoWitness;
 use ministark::air::AirConfig;
+use ministark::merkle::MatrixMerkleTreeImpl;
 use ministark::random::PublicCoinImpl;
-use ministark::Provable;
-use ministark::Verifiable;
+use ministark::stark::Stark;
 use ministark_gpu::GpuFftField;
 use sha2::Digest;
 use std::marker::PhantomData;
@@ -35,31 +35,23 @@ impl<
         Fp: GpuFftField + PrimeField,
         A: AirConfig<Fp = Fp, PublicInputs = AirPublicInput<Fp>>,
         T: CairoTrace<Fp = Fp, Fq = A::Fq>,
-        D: Digest,
-    > Verifiable for CairoClaim<Fp, A, T, D>
+        D: Digest + Send + Sync + 'static,
+    > Stark for CairoClaim<Fp, A, T, D>
 {
     type Fp = A::Fp;
     type Fq = A::Fq;
     type AirConfig = A;
     type Digest = D;
     type PublicCoin = PublicCoinImpl<D, A::Fq>;
-
-    fn get_public_inputs(&self) -> AirPublicInput<Fp> {
-        self.public_input.clone()
-    }
-}
-
-impl<
-        Fp: GpuFftField + PrimeField,
-        A: AirConfig<Fp = Fp, PublicInputs = AirPublicInput<Fp>>,
-        T: CairoTrace<Fp = Fp, Fq = A::Fq>,
-        D: Digest,
-    > Provable for CairoClaim<Fp, A, T, D>
-{
     type Witness = CairoWitness<Fp>;
+    type MerkleTree = MatrixMerkleTreeImpl<D>;
     type Trace = T;
 
     fn generate_trace(&self, witness: CairoWitness<Fp>) -> T {
         T::new(self.program.clone(), self.get_public_inputs(), witness)
+    }
+
+    fn get_public_inputs(&self) -> AirPublicInput<Fp> {
+        self.public_input.clone()
     }
 }

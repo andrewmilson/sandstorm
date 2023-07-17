@@ -30,7 +30,8 @@ pub fn to_montgomery(v: Fp) -> BigUint {
 
 #[cfg(test)]
 mod tests {
-    use crate::sharp::utils::{to_montgomery, from_montgomery};
+    use crate::sharp::utils::to_montgomery;
+    use crate::sharp::utils::from_montgomery;
     use super::hash_elements;
     use sha3::Keccak256;
     use digest::Digest;
@@ -38,19 +39,17 @@ mod tests {
 
     #[test]
     fn hash_elements_with_starkware_field_matches_solidity() {
-        // test matches `keccak256(abi.encodePacked([1, 2]))` in solidity
-        // (which is what StarkWare uses in their L1 Cairo verifier)
         let mut hasher = Keccak256::new();
         hash_elements(&mut hasher, &[Fp::from(1u8), Fp::from(2u8)]);
         let hash = hasher.finalize();
 
-        assert_eq!(
-            &[
-                233, 11, 123, 206, 182, 231, 223, 84, 24, 251, 120, 216, 238, 84, 110, 151, 200,
-                58, 8, 187, 204, 192, 26, 6, 68, 213, 153, 204, 210, 167, 194, 224
-            ],
-            &*hash
-        )
+        // result of `keccak256(abi.encodePacked([1, 2]))` in solidity
+        // (which is what StarkWare uses in their L1 Cairo verifier)
+        let hash_from_solidity = &[
+            233, 11, 123, 206, 182, 231, 223, 84, 24, 251, 120, 216, 238, 84, 110, 151, 200, 58, 8,
+            187, 204, 192, 26, 6, 68, 213, 153, 204, 210, 167, 194, 224,
+        ];
+        assert_eq!(hash_from_solidity, &*hash)
     }
 
     #[test]

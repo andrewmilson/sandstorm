@@ -345,7 +345,7 @@ impl CairoTrace for ExecutionTrace {
                 |((((((partial_xs, partial_ys), suffixes), slopes), npc), aux), pedersen_trace)| {
                     let a_steps = pedersen_trace.a_steps;
                     let b_steps = pedersen_trace.b_steps;
-                    let partial_steps = vec![a_steps, b_steps].concat();
+                    let partial_steps = [a_steps, b_steps].concat();
 
                     for ((((suffix, partial_x), partial_y), slope), step) in
                         zip(suffixes.iter_mut(), partial_xs.iter_mut())
@@ -616,12 +616,7 @@ impl CairoTrace for ExecutionTrace {
                         dilution_step[Bitwise::Bits16Chunk3Offset2 as usize] = chunk3[2].into();
                         dilution_step[Bitwise::Bits16Chunk3Offset3 as usize] = chunk3[3].into();
 
-                        for v in chunk0
-                            .into_iter()
-                            .chain(chunk1.into_iter())
-                            .chain(chunk2.into_iter())
-                            .chain(chunk3.into_iter())
-                        {
+                        for v in [*chunk0, *chunk1, *chunk2, *chunk3].concat() {
                             diluted_pool.push_diluted(U256::from(v))
                         }
                     }

@@ -9,10 +9,9 @@ use binary::Layout;
 use binary::Memory;
 use binary::RegisterStates;
 use layouts::CairoWitness;
-use ministark::prover::Provable;
+use ministark::stark::Stark;
 use ministark::Proof;
 use ministark::ProofOptions;
-use ministark::Verifiable;
 use ministark_gpu::fields::p18446744069414584321;
 use ministark_gpu::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481;
 use sha2::Sha256;
@@ -126,7 +125,7 @@ fn main() {
     }
 }
 
-fn execute_command<Fp: PrimeField, Claim: Provable<Fp = Fp, Witness = CairoWitness<Fp>>>(
+fn execute_command<Fp: PrimeField, Claim: Stark<Fp = Fp, Witness = CairoWitness<Fp>>>(
     command: Command,
     options: ProofOptions,
     claim: Claim,
@@ -140,13 +139,13 @@ fn execute_command<Fp: PrimeField, Claim: Provable<Fp = Fp, Witness = CairoWitne
     }
 }
 
-fn verify<Claim: Verifiable<Fp = impl Field>>(
+fn verify<Claim: Stark<Fp = impl Field>>(
     options: ProofOptions,
     proof_path: &PathBuf,
     claim: Claim,
 ) {
     let proof_bytes = fs::read(proof_path).unwrap();
-    let proof: Proof<Claim::Fp, Claim::Fq> =
+    let proof: Proof<Claim::Fp, Claim::Fq, Claim::Digest, Claim::MerkleTree> =
         Proof::deserialize_compressed(proof_bytes.as_slice()).unwrap();
     assert_eq!(options, proof.options);
     let now = Instant::now();
@@ -154,7 +153,7 @@ fn verify<Claim: Verifiable<Fp = impl Field>>(
     println!("Proof verified in: {:?}", now.elapsed());
 }
 
-fn prove<Fp: PrimeField, Claim: Provable<Fp = Fp, Witness = CairoWitness<Fp>>>(
+fn prove<Fp: PrimeField, Claim: Stark<Fp = Fp, Witness = CairoWitness<Fp>>>(
     options: ProofOptions,
     air_private_input_path: &PathBuf,
     output_path: &PathBuf,
@@ -176,7 +175,7 @@ fn prove<Fp: PrimeField, Claim: Provable<Fp = Fp, Witness = CairoWitness<Fp>>>(
     let witness = CairoWitness::new(air_private_input, register_states, memory);
 
     let now = Instant::now();
-    let proof = pollster::block_on(claim.generate_proof(options, witness)).unwrap();
+    let proof = pollster::block_on(claim.prove(options, witness)).unwrap();
     println!("Proof generated in: {:?}", now.elapsed());
     let security_level_bits = proof.conjectured_security_level();
     println!("Proof security (conjectured): {security_level_bits}bit");

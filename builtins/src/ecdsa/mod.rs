@@ -277,6 +277,7 @@ fn verify(msg_hash: Fp, r: Fp, s: Fr, pubkey_x: Fp) -> Option<Affine<StarkwareCu
     let (y1, y0) =
         Affine::<StarkwareCurve>::get_ys_from_x_unchecked(pubkey_x).expect("not on the curve");
 
+    #[allow(clippy::tuple_array_conversions)]
     for pubkey_y in [y1, y0] {
         let pubkey = Affine::<StarkwareCurve>::new_unchecked(pubkey_x, pubkey_y);
         // Signature validation.

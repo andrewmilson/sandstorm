@@ -68,10 +68,13 @@ impl<D: Digest> PublicCoin for PublicCoinImpl<D> {
     fn reseed_with_field_elements(&mut self, vals: &[Self::Field]) {
         let mut bytes = Vec::new();
         for val in vals {
-            let val_bytes = U256::from(to_montgomery(*val)).to_be_bytes::<32>();
+            let val = U256::from(to_montgomery(*val));
+            println!("val is: {}", val);
+            let val_bytes = val.to_be_bytes::<32>();
             bytes.extend_from_slice(&val_bytes)
         }
         self.reseed_with_bytes(bytes);
+        println!("post remainder digest: {:?}", self.digest);
     }
 
     fn reseed_with_int(&mut self, val: u64) {
@@ -129,8 +132,12 @@ impl<D: Digest> PublicCoin for PublicCoinImpl<D> {
 mod tests {
     use super::PublicCoinImpl;
     use ark_ff::MontFp as Fp;
+    use ark_poly::Radix2EvaluationDomain;
+    use ark_poly::EvaluationDomain;
     use ministark::random::PublicCoin;
+    use ministark_gpu::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481::ark::Fp;
     use sha2::digest::Output;
+    use ark_ff::FftField;
     use sha3::Keccak256;
 
     #[test]
@@ -154,5 +161,32 @@ mod tests {
             Fp!("539395842685339476048032152056539303790683868668644006005689195830492067187"),
             public_coin.draw()
         );
+    }
+
+    #[test]
+    fn roots_of_unity() {
+        let trace_domain_size = 2;
+        let lde_domain_size = trace_domain_size * 2;
+        let domain_offset = Fp::GENERATOR;
+        let lde_domain = Radix2EvaluationDomain::new_coset(lde_domain_size, domain_offset).unwrap();
+
+        for element in lde_domain.elements() {
+            println!("e: {}", element);
+        }
+
+        let half_lde_domain0 =
+            Radix2EvaluationDomain::new_coset(lde_domain_size / 2, domain_offset).unwrap();
+        let half_lde_domain1 = Radix2EvaluationDomain::new_coset(
+            lde_domain_size / 2,
+            domain_offset * lde_domain.group_gen,
+        )
+        .unwrap();
+
+        for element in half_lde_domain0.elements() {
+            println!("e0: {}", element);
+        }
+        for element in half_lde_domain1.elements() {
+            println!("e1: {}", element);
+        }
     }
 }

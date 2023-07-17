@@ -3,8 +3,13 @@ name = "sandstorm-claims"
 version = "0.1.0"
 edition = "2021"
 
+[features]
+parallel = [ "dep:rayon", "ark-std/parallel", "ministark/parallel", "ministark-gpu/parallel" ]
+
+
 [dependencies]
 ark-ff = "0.4"
+ark-std = "0.4"
 layouts = { path = "../layouts", package = "sandstorm-layouts" }
 binary = { path = "../binary", package = "sandstorm-binary" }
 ministark-gpu = { version = "0.1", path = "../../playground/ministark/gpu" }
@@ -17,3 +22,4 @@ num-bigint = "0.4"
 ark-serialize = "0.4"
 ark-poly = "0.4"
 digest = "0.10"
+rayon = { version = "1.5", optional = true }

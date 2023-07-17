@@ -3,6 +3,11 @@ name = "sandstorm-layouts"
 version = "0.1.0"
 edition = "2021"
 
+[features]
+default = [ ]
+# TODO: add parallel feature and fix issues
+# parallel = [ "ark-std/parallel", "ministark/parallel", "ministark-gpu/parallel" ]
+
 [dependencies]
 ministark-gpu = { version = "0.1", path = "../../playground/ministark/gpu" }
 ministark = { path = "../../playground/ministark" }
