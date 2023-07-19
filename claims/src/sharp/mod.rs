@@ -8,6 +8,9 @@ pub mod utils;
 pub mod verifier;
 
 use crate::base;
+use crate::sharp::utils::to_montgomery;
+use ark_ff::Field;
+use ministark::composer::DeepCompositionCoeffs;
 use ministark::stark::Stark;
 use binary::CompiledProgram;
 use random::PublicCoinImpl;
@@ -62,7 +65,7 @@ impl<
     type Fq = Fp;
     type AirConfig = A;
     type Digest = D;
-    type MerkleTree = MerkleTreeVariant<D, Fp>;
+    type MerkleTree = MerkleTreeVariant<D>;
     type PublicCoin = random::PublicCoinImpl<D>;
     type Witness = CairoWitness<Fp>;
     type Trace = T;
@@ -75,21 +78,36 @@ impl<
         self.0.generate_trace(witness)
     }
 
+    fn gen_deep_coeffs(
+        &self,
+        public_coin: &mut Self::PublicCoin,
+        air: &Air<Self::AirConfig>,
+    ) -> DeepCompositionCoeffs<Self::Fq> {
+        let alpha = public_coin.draw();
+        println!("oods alpha: {}", alpha);
+        let mut coeff_iter = (0..).map(|i| alpha.pow([i]));
+        let num_execution_trace = air.trace_arguments().len();
+        let num_composition_trace = air.ce_blowup_factor();
+        DeepCompositionCoeffs {
+            execution_trace: (&mut coeff_iter).take(num_execution_trace).collect(),
+            composition_trace: (&mut coeff_iter).take(num_composition_trace).collect(),
+            degree: (Fp::ONE, Fp::ZERO),
+        }
+    }
+
     fn gen_public_coin(&self, air: &Air<A>) -> PublicCoinImpl<D> {
         println!("Generating public coin from SHARP verifier!");
         PublicCoinImpl::new(D::digest(self.public_coin_seed(air)))
     }
 
-    async fn prove(
-        &self,
-        options: ministark::ProofOptions,
-        witness: Self::Witness,
-    ) -> Result<
-        Proof<Self::Fp, Self::Fq, Self::Digest, Self::MerkleTree>,
-        ministark::prover::ProvingError,
-    > {
-        self.prove_sharp(options, witness).await
-    }
+    // async fn prove(
+    //     &self,
+    //     options: ministark::ProofOptions,
+    //     witness: Self::Witness,
+    // ) -> Result< Proof<Self::Fp, Self::Fq, Self::Digest, Self::MerkleTree>,
+    //   ministark::prover::ProvingError,
+    // > { self.prove_sharp(options, witness).await
+    // }
 
     fn verify(&self, proof: Proof<Fp, Fp, D, Self::MerkleTree>) -> Result<(), VerificationError> {
         self.verify_sharp(proof)?;

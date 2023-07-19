@@ -4,7 +4,6 @@ use std::time::Instant;
 
 use super::CairoClaim;
 use super::merkle::MerkleTreeVariant;
-// use super::merkle::MerkleTreeImpl;
 use ark_poly::EvaluationDomain;
 use ministark::merkle::MatrixMerkleTree;
 use binary::AirPublicInput;
@@ -40,7 +39,7 @@ impl<
         &self,
         options: ProofOptions,
         witness: CairoWitness<Fp>,
-    ) -> Result<Proof<Fp, Fp, D, MerkleTreeVariant<D, Fp>>, ProvingError> {
+    ) -> Result<Proof<Fp, Fp, D, MerkleTreeVariant<D>>, ProvingError> {
         let now = Instant::now();
         let trace = self.generate_trace(witness);
         println!(
@@ -70,7 +69,7 @@ impl<
         // TODO: naturally cooley-tuckey fft results in bit reversed evaluations
         // bit reverse should be more optimally integrated into this code
         // base_trace_lde.bit_reverse_rows();
-        let base_trace_tree = MerkleTreeVariant::<D, Fp>::from_matrix(&base_trace_lde);
+        let base_trace_tree = MerkleTreeVariant::<D>::from_matrix(&base_trace_lde);
         // base_trace_lde.bit_reverse_rows();
         channel.commit_base_trace(base_trace_tree.root());
         let num_challenges = air.num_challenges();
@@ -86,7 +85,7 @@ impl<
         let mut extension_trace_lde = extension_trace_polys.as_ref().map(|p| p.evaluate(lde_xs));
         let extension_trace_tree = if let Some(extension_trace_lde) = extension_trace_lde.as_mut() {
             // extension_trace_lde.bit_reverse_rows();
-            let extension_trace_tree = MerkleTreeVariant::<D, Fp>::from_matrix(extension_trace_lde);
+            let extension_trace_tree = MerkleTreeVariant::<D>::from_matrix(extension_trace_lde);
             // extension_trace_lde.bit_reverse_rows();
             channel.commit_extension_trace(extension_trace_tree.root());
             Some(extension_trace_tree)
@@ -128,8 +127,7 @@ impl<
         );
         let mut composition_trace_lde = composition_trace_polys.evaluate(air.lde_domain());
         // composition_trace_lde.bit_reverse_rows();
-        let composition_trace_tree =
-            MerkleTreeVariant::<D, Fp>::from_matrix(&composition_trace_lde);
+        let composition_trace_tree = MerkleTreeVariant::<D>::from_matrix(&composition_trace_lde);
         // composition_trace_lde.bit_reverse_rows();
 
         channel.commit_composition_trace(composition_trace_tree.root());
@@ -155,7 +153,7 @@ impl<
 
         let now = Instant::now();
         let fri_options = options.into_fri_options();
-        let mut fri_prover = FriProver::<Fp, D, MerkleTreeVariant<D, Fp>>::new(fri_options);
+        let mut fri_prover = FriProver::<Fp, D, MerkleTreeVariant<D>>::new(fri_options);
         fri_prover.build_layers(&mut channel, deep_composition_lde.try_into().unwrap());
 
         channel.grind_fri_commitments();

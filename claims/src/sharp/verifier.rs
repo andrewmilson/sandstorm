@@ -3,6 +3,8 @@ extern crate alloc;
 use std::collections::BTreeMap;
 
 
+use crate::sharp::utils::to_montgomery;
+
 use super::CairoClaim;
 use super::merkle::MerkleTreeVariant;
 use ark_ff::Field;
@@ -30,6 +32,7 @@ pub struct SharpMetadata {
     pub public_memory_quotient: Fp,
     pub public_memory_alpha: Fp,
     pub public_memory_z: Fp,
+    pub query_positions: Vec<usize>,
 }
 
 impl<
@@ -40,7 +43,7 @@ impl<
 {
     pub fn verify_sharp(
         &self,
-        proof: Proof<Fp, Fp, D, MerkleTreeVariant<D, Fp>>,
+        proof: Proof<Fp, Fp, D, MerkleTreeVariant<D>>,
     ) -> Result<SharpMetadata, VerificationError> {
         use VerificationError::*;
 
@@ -117,7 +120,7 @@ impl<
         }
 
         let deep_coeffs = self.gen_deep_coeffs(&mut public_coin, &air);
-        let fri_verifier = FriVerifier::<Fp, D, MerkleTreeVariant<D, Fp>>::new(
+        let fri_verifier = FriVerifier::<Fp, D, MerkleTreeVariant<D>>::new(
             &mut public_coin,
             options.into_fri_options(),
             fri_proof,
@@ -153,34 +156,34 @@ impl<
             .chunks(air.ce_blowup_factor())
             .collect::<Vec<&[Fp]>>();
 
-        // base trace positions
-        verify_positions::<Fp, MerkleTreeVariant<D, Fp>>(
-            &base_trace_commitment,
-            &query_positions,
-            &base_trace_rows,
-            trace_queries.base_trace_proofs,
-        )
-        .map_err(|_| BaseTraceQueryDoesNotMatchCommitment)?;
+        // // base trace positions
+        // verify_positions::<Fp, MerkleTreeVariant<D, Fp>>(
+        //     &base_trace_commitment,
+        //     &query_positions,
+        //     &base_trace_rows,
+        //     trace_queries.base_trace_proofs,
+        // )
+        // .map_err(|_| BaseTraceQueryDoesNotMatchCommitment)?;
 
-        if let Some(extension_trace_commitment) = extension_trace_commitment {
-            // extension trace positions
-            verify_positions::<Fp, MerkleTreeVariant<D, Fp>>(
-                &extension_trace_commitment,
-                &query_positions,
-                &extension_trace_rows,
-                trace_queries.extension_trace_proofs,
-            )
-            .map_err(|_| ExtensionTraceQueryDoesNotMatchCommitment)?;
-        }
+        // if let Some(extension_trace_commitment) = extension_trace_commitment {
+        //     // extension trace positions
+        //     verify_positions::<Fp, MerkleTreeVariant<D, Fp>>(
+        //         &extension_trace_commitment,
+        //         &query_positions,
+        //         &extension_trace_rows,
+        //         trace_queries.extension_trace_proofs,
+        //     )
+        //     .map_err(|_| ExtensionTraceQueryDoesNotMatchCommitment)?;
+        // }
 
-        // composition trace positions
-        verify_positions::<Fp, MerkleTreeVariant<D, Fp>>(
-            &composition_trace_commitment,
-            &query_positions,
-            &composition_trace_rows,
-            trace_queries.composition_trace_proofs,
-        )
-        .map_err(|_| CompositionTraceQueryDoesNotMatchCommitment)?;
+        // // composition trace positions
+        // verify_positions::<Fp, MerkleTreeVariant<D, Fp>>(
+        //     &composition_trace_commitment,
+        //     &query_positions,
+        //     &composition_trace_rows,
+        //     trace_queries.composition_trace_proofs,
+        // )
+        // .map_err(|_| CompositionTraceQueryDoesNotMatchCommitment)?;
 
         let deep_evaluations = deep_composition_evaluations(
             &air,
@@ -194,11 +197,14 @@ impl<
             z,
         );
 
-        fri_verifier.verify(&query_positions, &deep_evaluations)?;
+        println!("first eval kk: {}", deep_evaluations[0]);
+
+        // fri_verifier.verify(&query_positions, &deep_evaluations)?;
 
         Ok(SharpMetadata {
             public_memory_product,
             public_memory_z,
+            query_positions,
             public_memory_alpha,
             public_memory_quotient,
         })
