@@ -16,7 +16,7 @@ pub fn hash_elements<F: PrimeField, D: Digest>(hasher: &mut D, elements: &[F]) {
     }
 }
 
-pub(crate) fn from_montgomery(v: BigUint) -> Fp {
+pub fn from_montgomery(v: BigUint) -> Fp {
     const MONTGOMERY_R_INV: Fp =
         Fp!("113078212145816603762751633895895194930089271709401121343797004406777446400");
     MONTGOMERY_R_INV * Fp::from(v)

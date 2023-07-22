@@ -84,7 +84,6 @@ impl<
         air: &Air<Self::AirConfig>,
     ) -> DeepCompositionCoeffs<Self::Fq> {
         let alpha = public_coin.draw();
-        println!("oods alpha: {}", alpha);
         let mut coeff_iter = (0..).map(|i| alpha.pow([i]));
         let num_execution_trace = air.trace_arguments().len();
         let num_composition_trace = air.ce_blowup_factor();

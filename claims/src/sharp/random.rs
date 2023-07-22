@@ -69,7 +69,6 @@ impl<D: Digest> PublicCoin for PublicCoinImpl<D> {
         let mut bytes = Vec::new();
         for val in vals {
             let val = U256::from(to_montgomery(*val));
-            println!("val is: {}", val);
             let val_bytes = val.to_be_bytes::<32>();
             bytes.extend_from_slice(&val_bytes)
         }
