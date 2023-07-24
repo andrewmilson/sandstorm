@@ -14,9 +14,22 @@ use ministark::utils::SerdeOutput;
 use ministark::Matrix;
 use ministark_gpu::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481::ark::Fp;
 use ruint::aliases::U256;
+use std::iter::zip;
 use std::marker::PhantomData;
 
 use super::utils::to_montgomery;
+
+pub const HASH_MASK: [u8; 32] = [
+    0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+    0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+];
+
+#[inline]
+pub fn mask_bytes(bytes: &mut [u8], mask: &[u8]) {
+    for (byte, mask) in zip(bytes, mask) {
+        *byte &= mask;
+    }
+}
 
 #[derive(Default)]
 pub struct UnhashedLeafConfig<D>(PhantomData<(D, Fp)>);
@@ -29,7 +42,14 @@ impl<D: Digest + Send + Sync + 'static> MerkleTreeConfig for UnhashedLeafConfig<
         let mut hasher = D::new();
         hasher.update(U256::from(to_montgomery(*l0)).to_be_bytes::<32>());
         hasher.update(U256::from(to_montgomery(*l1)).to_be_bytes::<32>());
-        hasher.finalize()
+        let mut hash = hasher.finalize();
+        mask_bytes(&mut hash, &HASH_MASK);
+        hash
+    }
+
+    #[inline]
+    fn pre_process_node_hash(hash: &mut Output<D>) {
+        mask_bytes(hash, &HASH_MASK);
     }
 }
 
@@ -44,7 +64,14 @@ impl<D: Digest + Send + Sync + 'static> MerkleTreeConfig for HashedLeafConfig<D>
         let mut hasher = D::new();
         hasher.update(&**l0);
         hasher.update(&**l1);
-        hasher.finalize()
+        let mut hash = hasher.finalize();
+        mask_bytes(&mut hash, &HASH_MASK);
+        hash
+    }
+
+    #[inline]
+    fn pre_process_node_hash(hash: &mut Output<D>) {
+        mask_bytes(hash, &HASH_MASK);
     }
 }
 
@@ -159,7 +186,10 @@ impl<D: Digest + Send + Sync + 'static> MatrixMerkleTree<Fp> for MerkleTreeVaria
                 Self::Unhashed(MerkleTreeImpl::new(leaves).unwrap())
             }
             _ => {
-                let row_hashes = hash_rows::<D>(matrix);
+                let mut row_hashes = hash_rows::<D>(matrix);
+                for hash in &mut row_hashes {
+                    mask_bytes(hash, &HASH_MASK);
+                }
                 let leaves = row_hashes.into_iter().map(SerdeOutput::new).collect();
                 Self::Hashed(MerkleTreeImpl::new(leaves).unwrap())
             }
@@ -186,7 +216,8 @@ impl<D: Digest + Send + Sync + 'static> MatrixMerkleTree<Fp> for MerkleTreeVaria
                 }
             }
             (row, MerkleTreeVariantProof::Hashed(proof)) => {
-                let row_hash = hash_row::<D>(row);
+                let mut row_hash = hash_row::<D>(row);
+                mask_bytes(&mut row_hash, &HASH_MASK);
                 if **proof.leaf() == row_hash {
                     MerkleTreeImpl::<HashedLeafConfig<D>>::verify(root, proof, row_idx)
                 } else {
