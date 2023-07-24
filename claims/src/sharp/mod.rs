@@ -8,7 +8,6 @@ pub mod utils;
 pub mod verifier;
 
 use crate::base;
-use crate::sharp::utils::to_montgomery;
 use ark_ff::Field;
 use ministark::composer::DeepCompositionCoeffs;
 use ministark::stark::Stark;

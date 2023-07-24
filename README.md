@@ -44,8 +44,8 @@ cairo-run --program example/array-sum.json \
 # make sure latest macOS is installed
 cargo +nightly run -r -F gpu,parallel,asm -- \
     --program example/array-sum.json \
+    --air-public-input example/air-public-input.json \
     prove --air-private-input example/air-private-input.json \
-          --air-public-input example/air-public-input.json \
           --output example/array-sum.proof
 
 # 4. verify the proof
