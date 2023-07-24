@@ -73,7 +73,6 @@ impl<D: Digest> PublicCoin for PublicCoinImpl<D> {
             bytes.extend_from_slice(&val_bytes)
         }
         self.reseed_with_bytes(bytes);
-        println!("post remainder digest: {:?}", self.digest);
     }
 
     fn reseed_with_int(&mut self, val: u64) {

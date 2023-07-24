@@ -51,17 +51,17 @@ enum Command {
 fn main() {
     // TODO:
     // proof options for 95 bit security level
-    let num_queries = 40;
+    let num_queries = 16;
     let lde_blowup_factor = 2;
     let grinding_factor = 16;
     let fri_folding_factor = 8;
-    let fri_max_remainder_size = 64;
+    let fri_max_remainder_coeffs = 16;
     let options = ProofOptions::new(
         num_queries,
         lde_blowup_factor,
         grinding_factor,
         fri_folding_factor,
-        fri_max_remainder_size,
+        fri_max_remainder_coeffs,
     );
 
     // read command-line args
