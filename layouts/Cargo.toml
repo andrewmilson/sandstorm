@@ -9,8 +9,8 @@ default = [ ]
 # parallel = [ "ark-std/parallel", "ministark/parallel", "ministark-gpu/parallel" ]
 
 [dependencies]
-ministark-gpu = { version = "0.1", path = "../../playground/ministark/gpu" }
-ministark = { path = "../../playground/ministark" }
+ministark-gpu = { version = "0.1", path = "../../ministark-mirror/gpu" }
+ministark = { path = "../../ministark-mirror" }
 binary = { path = "../binary", package = "sandstorm-binary" }
 builtins = { path = "../builtins", package = "sandstorm-builtins" }
 ark-poly = "0.4"

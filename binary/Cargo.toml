@@ -11,7 +11,7 @@ serde = { version = "1.0", features = [ "derive" ] }
 serde_json = { version = "1.0", features = [ "arbitrary_precision" ] }
 ruint = { version = "1.7", features = [ "serde", "num-bigint" ] }
 num-bigint = { version = "0.4" }
-ministark-gpu = { version = "0.1", path = "../../playground/ministark/gpu" }
+ministark-gpu = { version = "0.1", path = "../../ministark-mirror/gpu" }
 ark-serialize = "0.4"
 zip = "0.6"
 num-traits = "0.2"
