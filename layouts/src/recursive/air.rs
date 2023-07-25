@@ -1449,7 +1449,7 @@ pub enum Pedersen {
     Suffix,
     Slope,
     Bit251AndBit196AndBit192 = 7,
-    Bit251AndBit196 = 255,
+    Bit251AndBit196 = 1022,
 }
 
 // TODO Pedersen is split over multiple columns
@@ -1458,9 +1458,9 @@ impl ExecutionTraceColumn for Pedersen {
         match self {
             Self::PartialSumX => 1,
             Self::PartialSumY => 2, // TODO The partial Sums could be still the same - confirm this
-            Self::Suffix => 6,  // TODO where is suffix now?
-            Self::Slope | Self::Bit251AndBit196 => 4, // TODO find out where the slope is now
-            Self::Bit251AndBit196AndBit192 => 6, // Moved fom 8 to 6
+            Self::Suffix => 6,
+            Self::Slope => 4,
+            Self::Bit251AndBit196AndBit192 | Self::Bit251AndBit196 => 6,
         }
     }
 
