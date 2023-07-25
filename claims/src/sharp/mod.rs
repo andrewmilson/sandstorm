@@ -8,9 +8,12 @@ pub mod random;
 pub mod utils;
 pub mod verifier;
 
+use std::marker::PhantomData;
+
 use crate::base;
 use ark_ff::Field;
 use ministark::composer::DeepCompositionCoeffs;
+use ministark::hash::HashFn;
 use ministark::stark::Stark;
 use binary::CompiledProgram;
 use crate::sharp::hash::Keccak256HashFn;
@@ -27,6 +30,7 @@ use ministark::Air;
 use ministark_gpu::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481::ark::Fp;
 use digest::Digest;
 use sha3::Keccak256;
+use self::hash::MaskedKeccak256HashFn;
 use self::input::CairoAuxInput;
 use self::merkle::MerkleTreeVariant;
 
@@ -35,14 +39,14 @@ use self::merkle::MerkleTreeVariant;
 pub struct CairoClaim<
     A: SharpAirConfig<Fp = Fp, Fq = Fp>,
     T: CairoTrace<Fp = Fp, Fq = Fp>,
-    D: Digest,
->(base::CairoClaim<Fp, A, T, D>);
+    H: HashFn,
+>(base::CairoClaim<Fp, A, T, H>);
 
 impl<
         A: SharpAirConfig<Fp = Fp, Fq = Fp, PublicInputs = AirPublicInput<Fp>>,
         T: CairoTrace<Fp = Fp, Fq = Fp>,
-        D: Digest,
-    > CairoClaim<A, T, D>
+        H: HashFn,
+    > CairoClaim<A, T, H>
 {
     pub fn new(program: CompiledProgram<Fp>, air_public_input: AirPublicInput<Fp>) -> Self {
         Self(base::CairoClaim::new(program, air_public_input))
@@ -51,7 +55,7 @@ impl<
     fn public_coin_seed(&self, air: &Air<A>) -> Vec<u8> {
         let aux_input = CairoAuxInput(air.public_inputs());
         let mut seed = Vec::new();
-        for element in aux_input.public_input_elements::<D>() {
+        for element in aux_input.public_input_elements::<H>() {
             seed.extend_from_slice(&element.to_be_bytes::<32>())
         }
         seed
@@ -61,15 +65,14 @@ impl<
 impl<
         A: SharpAirConfig<Fp = Fp, Fq = Fp, PublicInputs = AirPublicInput<Fp>>,
         T: CairoTrace<Fp = Fp, Fq = Fp>,
-        D: Digest + Send + Sync + 'static,
-    > Stark for CairoClaim<A, T, D>
+    > Stark for CairoClaim<A, T>
 {
     type Fp = Fp;
     type Fq = Fp;
     type AirConfig = A;
     type Digest = SerdeOutput<Keccak256>;
     type HashFn = Keccak256HashFn;
-    type MerkleTree = MerkleTreeVariant<D>;
+    type MerkleTree = MerkleTreeVariant<MaskedKeccak256HashFn>;
     type PublicCoin = SolidityPublicCoin;
     type Witness = CairoWitness<Fp>;
     type Trace = T;

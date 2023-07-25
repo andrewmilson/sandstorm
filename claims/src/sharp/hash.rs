@@ -4,3 +4,7 @@ use ministark::hash::HashFn;
 pub struct Keccak256HashFn;
 
 impl HashFn for Keccak256HashFn {}
+
+pub struct MaskedKeccak256HashFn<const MASK: [u8; 32]>;
+
+impl<const MASK: [u8; 32]> HashFn for MaskedKeccak256HashFn<MASK> {}

@@ -6,6 +6,8 @@ use binary::CompiledProgram;
 use layouts::CairoTrace;
 use layouts::CairoWitness;
 use ministark::air::AirConfig;
+use ministark::hash::ElementHashFn;
+use ministark::hash::HashFn;
 use ministark::merkle::MatrixMerkleTreeImpl;
 use ministark::random::PublicCoinImpl;
 use ministark::stark::Stark;
@@ -13,14 +15,14 @@ use ministark_gpu::GpuFftField;
 use sha2::Digest;
 use std::marker::PhantomData;
 
-pub struct CairoClaim<Fp: PrimeField, A: AirConfig<Fp = Fp>, T: CairoTrace<Fp = Fp>, D: Digest> {
+pub struct CairoClaim<Fp: PrimeField, A: AirConfig<Fp = Fp>, T: CairoTrace<Fp = Fp>, H: HashFn> {
     program: CompiledProgram<Fp>,
     public_input: AirPublicInput<Fp>,
-    _phantom: PhantomData<(A, T, D)>,
+    _phantom: PhantomData<(A, T, H)>,
 }
 
-impl<Fp: GpuFftField + PrimeField, A: AirConfig<Fp = Fp>, T: CairoTrace<Fp = Fp>, D: Digest>
-    CairoClaim<Fp, A, T, D>
+impl<Fp: GpuFftField + PrimeField, A: AirConfig<Fp = Fp>, T: CairoTrace<Fp = Fp>, H: HashFn>
+    CairoClaim<Fp, A, T, H>
 {
     pub fn new(program: CompiledProgram<Fp>, public_input: AirPublicInput<Fp>) -> Self {
         Self {
@@ -35,16 +37,17 @@ impl<
         Fp: GpuFftField + PrimeField,
         A: AirConfig<Fp = Fp, PublicInputs = AirPublicInput<Fp>>,
         T: CairoTrace<Fp = Fp, Fq = A::Fq>,
-        D: Digest + Send + Sync + 'static,
-    > Stark for CairoClaim<Fp, A, T, D>
+        H: ElementHashFn<Fp> + ElementHashFn<A::Fq>,
+    > Stark for CairoClaim<Fp, A, T, H>
 {
     type Fp = A::Fp;
     type Fq = A::Fq;
     type AirConfig = A;
-    type Digest = D;
-    type PublicCoin = PublicCoinImpl<D, A::Fq>;
+    type Digest = H::Digest;
+    type HashFn = H;
+    type PublicCoin = PublicCoinImpl<A::Fq, H>;
     type Witness = CairoWitness<Fp>;
-    type MerkleTree = MatrixMerkleTreeImpl<D>;
+    type MerkleTree = MatrixMerkleTreeImpl<H>;
     type Trace = T;
 
     fn generate_trace(&self, witness: CairoWitness<Fp>) -> T {

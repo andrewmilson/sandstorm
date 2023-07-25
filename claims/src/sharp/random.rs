@@ -51,14 +51,14 @@ impl SolidityPublicCoin {
 }
 
 impl PublicCoin for SolidityPublicCoin {
-    type Digest = Keccak256;
+    type Digest = SerdeOutput<Keccak256>;
     type Field = Fp;
 
-    fn new(digest: Output<D>) -> Self {
+    fn new(digest: SerdeOutput<Keccak256>) -> Self {
         Self { digest, counter: 0 }
     }
 
-    fn reseed_with_hash(&mut self, val: &Output<D>) {
+    fn reseed_with_digest(&mut self, val: &SerdeOutput<Keccak256>) {
         self.reseed_with_bytes(val);
     }
 
@@ -113,13 +113,13 @@ impl PublicCoin for SolidityPublicCoin {
     }
 
     fn verify_proof_of_work(&self, proof_of_work_bits: u8, nonce: u64) -> bool {
-        let mut prefix_hasher = D::new();
+        let mut prefix_hasher = Keccak256::new();
         prefix_hasher.update(0x0123456789ABCDEDu64.to_be_bytes());
         prefix_hasher.update(&self.digest);
         prefix_hasher.update([proof_of_work_bits]);
         let prefix_hash = prefix_hasher.finalize();
 
-        let mut proof_of_work_hasher = D::new();
+        let mut proof_of_work_hasher = Keccak256::new();
         proof_of_work_hasher.update(prefix_hash);
         proof_of_work_hasher.update(nonce.to_be_bytes());
         let proof_of_work_hash = proof_of_work_hasher.finalize();
