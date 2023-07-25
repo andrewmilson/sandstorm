@@ -18,8 +18,8 @@ parallel = [ "dep:rayon", "ark-std/parallel", "ministark/parallel", "ministark-g
 layouts = { path = "./layouts", package = "sandstorm-layouts" }
 claims = { path = "./claims", package = "sandstorm-claims" }
 binary = { path = "./binary", package = "sandstorm-binary" }
-ministark-gpu = { version = "0.1", path = "../playground/ministark/gpu" }
-ministark = { path = "../playground/ministark" }
+ministark-gpu = { version = "0.1", path = "../ministark-mirror/gpu" }
+ministark = { path = "../ministark-mirror" }
 ark-poly = "0.4"
 ark-std = "0.4"
 ark-ff = "0.4"

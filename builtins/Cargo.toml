@@ -8,8 +8,8 @@ edition = "2021"
 [dependencies]
 ark-ff = "0.4"
 ark-ec = "0.4"
-ministark-gpu = { version = "0.1", path = "../../playground/ministark/gpu" }
-ministark = { path = "../../playground/ministark" }
+ministark-gpu = { version = "0.1", path = "../../ministark-mirror/gpu" }
+ministark = { path = "../../ministark-mirror" }
 ark-poly = "0.4"
 num-bigint = "0.4"
 ruint = { version = "1.7", features = [ "serde", "num-bigint" ] }

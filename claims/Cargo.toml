@@ -12,8 +12,8 @@ ark-ff = "0.4"
 ark-std = "0.4"
 layouts = { path = "../layouts", package = "sandstorm-layouts" }
 binary = { path = "../binary", package = "sandstorm-binary" }
-ministark-gpu = { version = "0.1", path = "../../playground/ministark/gpu" }
-ministark = { path = "../../playground/ministark" }
+ministark-gpu = { version = "0.1", path = "../../ministark-mirror/gpu" }
+ministark = { path = "../../ministark-mirror" }
 ruint = { version = "1.7", features = [ "serde", "num-bigint" ] }
 sha2 = "0.10"
 sha3 = "0.10"

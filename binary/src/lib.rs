@@ -71,11 +71,13 @@ pub enum Layout {
 
 impl Layout {
     const SHARP_CODE_STARKNET: u64 = 8319381555716711796;
+    const SHARP_CODE_RECURSIVE: u64 = 2110234636557836973669;
 
     // Returns the unique code used by SHARP associated to this layout
     pub const fn sharp_code(&self) -> u64 {
         match self {
             Self::Starknet => Self::SHARP_CODE_STARKNET,
+            Self::Recursive => Self::SHARP_CODE_RECURSIVE,
             _ => unimplemented!(),
         }
     }
@@ -83,6 +85,7 @@ impl Layout {
     pub const fn from_sharp_code(code: u64) -> Self {
         match code {
             Self::SHARP_CODE_STARKNET => Self::Starknet,
+            Self::SHARP_CODE_RECURSIVE => Self::Recursive,
             _ => unimplemented!(),
         }
     }

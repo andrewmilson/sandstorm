@@ -86,6 +86,7 @@ impl<'a> CairoAuxInput<'a> {
                 vals[OFFSET_N_PUBLIC_MEMORY_PAGES] = Some(uint!(1_U256));
                 vals.map(Option::unwrap).to_vec()
             }
+            Layout::Recursive => Vec::new(),
             _ => unimplemented!(),
         }
     }
