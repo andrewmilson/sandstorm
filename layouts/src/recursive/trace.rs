@@ -298,13 +298,13 @@ impl CairoTrace for ExecutionTrace {
         let mut pedersen_slopes_column = Vec::new_in(GpuAllocator);
         pedersen_slopes_column.resize(trace_len, Fp::zero());
 
-        // the trace for each hash spans 512 rows
-        let (pedersen_partial_xs_steps, _) = pedersen_partial_xs_column.as_chunks_mut::<512>();
-        let (pedersen_partial_ys_steps, _) = pedersen_partial_ys_column.as_chunks_mut::<512>();
-        let (pedersen_suffixes_steps, _) = pedersen_suffixes_column.as_chunks_mut::<512>();
-        let (pedersen_slopes_steps, _) = pedersen_slopes_column.as_chunks_mut::<512>();
-        let (pedersen_npc_steps, _) = npc_column.as_chunks_mut::<512>();
-        let (pedersen_aux_steps, _) = auxiliary_column.as_chunks_mut::<512>();
+        // the trace for each hash spans 2048 rows
+        let (pedersen_partial_xs_steps, _) = pedersen_partial_xs_column.as_chunks_mut::<2048>();
+        let (pedersen_partial_ys_steps, _) = pedersen_partial_ys_column.as_chunks_mut::<2048>();
+        let (pedersen_suffixes_steps, _) = pedersen_suffixes_column.as_chunks_mut::<2048>();
+        let (pedersen_slopes_steps, _) = pedersen_slopes_column.as_chunks_mut::<2048>();
+        let (pedersen_npc_steps, _) = npc_column.as_chunks_mut::<2048>();
+        let (pedersen_aux_steps, _) = auxiliary_column.as_chunks_mut::<2048>();
 
         // create dummy instances if there are cells that need to be filled
         let pedersen_instances = air_private_input.pedersen;
@@ -348,6 +348,7 @@ impl CairoTrace for ExecutionTrace {
                     }
 
                     // load fields for unique bit decomposition checks into the trace
+                    // TODO split_at_mut(256) is that correct?
                     let (a_slopes, b_slopes) = slopes.split_at_mut(256);
                     let (a_aux, b_aux) = aux.split_at_mut(256);
                     a_slopes[Pedersen::Bit251AndBit196 as usize] =

@@ -7,18 +7,16 @@ pub mod air;
 pub mod trace;
 
 pub use air::AirConfig;
-use builtins::{utils::curve::StarkwareCurve, pedersen};
 pub use ministark_gpu::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481::ark::Fp;
 pub use trace::ExecutionTrace;
-use ark_ec::models::short_weierstrass::SWCurveConfig;
 
 // TODO Are these correct?
 // must be a power-of-two
 pub const CYCLE_HEIGHT: usize = 16;
 pub const PUBLIC_MEMORY_STEP: usize = 8;
 pub const MEMORY_STEP: usize = 2;
-pub const RANGE_CHECK_STEP: usize = 4; // TODO is this log_units_per_step in python?
-pub const DILUTED_CHECK_STEP: usize = 8;
+pub const RANGE_CHECK_STEP: usize = 4;
+pub const DILUTED_CHECK_STEP: usize = 1; //TODO is that correct?
 
 /// How many cycles per pedersen hash
 pub const PEDERSEN_BUILTIN_RATIO: usize = 128;

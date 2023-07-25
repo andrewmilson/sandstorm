@@ -6,6 +6,7 @@ use super::PUBLIC_MEMORY_STEP;
 use super::RANGE_CHECK_BUILTIN_PARTS;
 use super::RANGE_CHECK_BUILTIN_RATIO;
 use super::RANGE_CHECK_STEP;
+use super::DILUTED_CHECK_STEP;
 use super::DILUTED_CHECK_N_BITS;
 use super::DILUTED_CHECK_SPACING;
 use crate::SharpAirConfig;
@@ -876,7 +877,7 @@ impl ministark::air::AirConfig for AirConfig {
 
         // Link Input1 into the memory pool.
         // Input1's address should be the address directly after input0's address
-        let pedersen_input1_value0 = (Npc::PedersenInput1Val.curr() - Pedersen::Suffix.offset(256))
+        let pedersen_input1_value0 = (Npc::PedersenInput1Val.curr() - Pedersen::Suffix.offset(1024))
             * &every_512_row_zerofier_inv;
         let pedersen_input1_addr = (Npc::PedersenInput1Addr.curr()
             - (Npc::PedersenInput0Addr.curr() + &one))
@@ -885,7 +886,7 @@ impl ministark::air::AirConfig for AirConfig {
         // Link pedersen output into the memory pool.
         // Output's address should be the address directly after input1's address.
         let pedersen_output_value0 = (Npc::PedersenOutputVal.curr()
-            - Pedersen::PartialSumX.offset(511))
+            - Pedersen::PartialSumX.offset(2045))
             * &every_512_row_zerofier_inv;
         let pedersen_output_addr = (Npc::PedersenOutputAddr.curr()
             - (Npc::PedersenInput1Addr.curr() + &one))
@@ -1544,7 +1545,7 @@ pub enum Pedersen {
     Suffix,
     Slope,
     Bit251AndBit196AndBit192 = 7,
-    Bit251AndBit196 = 1022,
+    Bit251AndBit196 = 8,    // TODO 1022
 }
 
 // TODO Pedersen is split over multiple columns
@@ -1572,7 +1573,7 @@ impl ExecutionTraceColumn for Pedersen {
 }
 
 // NPC? not sure what it means yet - next program counter?
-// Trace column 5
+// Trace column 3
 // Perhaps control flow is a better name for this column
 #[derive(Clone, Copy)]
 pub enum Npc {
@@ -1585,18 +1586,18 @@ pub enum Npc {
     MemOp0 = 5,
 
     // TODO Still old starknet layout
-    PedersenInput0Addr = 6,
-    PedersenInput0Val = 7,
+    PedersenInput0Addr = 10,
+    PedersenInput0Val = 11,
 
-    // 262 % 16 = 6
-    // 263 % 16 = 7
-    PedersenInput1Addr = 262,
-    PedersenInput1Val = 263,
+    // 1034 % 16 = 10
+    // 1035 % 16 = 11
+    PedersenInput1Addr = 1034,
+    PedersenInput1Val = 1035,
 
-    // 134 % 16 = 6
-    // 135 % 16 = 7
-    PedersenOutputAddr = 134,
-    PedersenOutputVal = 135,
+    // 522 % 16 = 10
+    // 523 % 16 = 11
+    PedersenOutputAddr = 522,
+    PedersenOutputVal = 523,
 
     // 74 % 16 = 10
     // 75 % 16 = 11
@@ -1722,7 +1723,7 @@ impl ExecutionTraceColumn for DilutedCheck {
 
     fn offset<T>(&self, offset: isize) -> Expr<AlgebraicItem<T>> {
         let column = self.index();
-        AlgebraicItem::Trace(column, 8 * offset + *self as isize).into()
+        AlgebraicItem::Trace(column, DILUTED_CHECK_STEP as isize * offset + *self as isize).into()
     }
 }
 
