@@ -1,4 +1,5 @@
 use super::BITWISE_RATIO;
+use super::PEDERSEN_BUILTIN_RATIO;
 use super::CYCLE_HEIGHT;
 use super::MEMORY_STEP;
 use super::PUBLIC_MEMORY_STEP;
@@ -10,7 +11,6 @@ use super::DILUTED_CHECK_SPACING;
 use crate::SharpAirConfig;
 use crate::utils;
 use crate::utils::compute_diluted_cumulative_value;
-use ark_ff::MontFp;
 use ark_poly::EvaluationDomain;
 use ark_poly::Radix2EvaluationDomain;
 use binary::AirPublicInput;
@@ -1446,7 +1446,7 @@ impl ExecutionTraceColumn for Bitwise {
 pub enum Pedersen {
     PartialSumX,
     PartialSumY,
-    Suffix = 0,
+    Suffix,
     Slope,
     Bit251AndBit196AndBit192 = 7,
     Bit251AndBit196 = 255,
@@ -1719,7 +1719,6 @@ impl ExecutionTraceColumn for Permutation {
 
     fn offset<T>(&self, offset: isize) -> Expr<AlgebraicItem<T>> {
         let (column, shift) = self.col_and_shift();
-        let column = self.index();
         let trace_offset = match self {
             Self::Memory => MEMORY_STEP as isize * offset + shift as isize,
             Self::RangeCheck => 4 * offset + shift as isize,

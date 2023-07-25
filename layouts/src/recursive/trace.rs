@@ -11,37 +11,26 @@ use ark_ff::Zero;
 use binary::BitwiseInstance;
 use binary::MemoryEntry;
 use binary::PedersenInstance;
-use binary::PoseidonInstance;
 use binary::RangeCheckInstance;
 use builtins::bitwise;
 use builtins::bitwise::dilute;
-use builtins::ec_op;
-use builtins::ecdsa;
 use builtins::pedersen;
 use ark_ff::One;
 use binary::AirPublicInput;
-use builtins::poseidon;
 use builtins::range_check;
 use num_bigint::BigUint;
 use ruint::aliases::U256;
 use crate::CairoWitness;
-use crate::starknet::air::Poseidon;
 use super::BITWISE_RATIO;
 use super::DILUTED_CHECK_N_BITS;
 use super::DILUTED_CHECK_SPACING;
 use super::DILUTED_CHECK_STEP;
-use super::ECDSA_BUILTIN_RATIO;
-use super::EC_OP_BUILTIN_RATIO;
-use super::EC_OP_SCALAR_HEIGHT;
-use super::POSEIDON_RATIO;
 use super::RANGE_CHECK_BUILTIN_PARTS;
 use super::RANGE_CHECK_BUILTIN_RATIO;
 use super::air::Bitwise;
 use super::air::DilutedCheck;
 use super::air::DilutedCheckAggregation;
 use super::air::DilutedCheckPermutation;
-use super::air::EcOp;
-use super::air::Ecdsa;
 use super::air::Pedersen;
 use super::air::RangeCheckBuiltin;
 use crate::utils::DilutedCheckPool;
@@ -80,9 +69,7 @@ pub struct ExecutionTrace {
     pub final_registers: RegisterState,
     pub initial_pedersen_address: u32,
     pub initial_rc_address: u32,
-    pub initial_ecdsa_address: u32,
     pub initial_bitwise_address: u32,
-    pub initial_ec_op_address: u32,
     pub program: CompiledProgram<Fp>,
     npc_column: GpuVec<Fp>,
     memory_column: GpuVec<Fp>,
@@ -424,102 +411,6 @@ impl CairoTrace for ExecutionTrace {
                 npc[Npc::RangeCheck128Val as usize] = Fp::from(BigUint::from(instance.value));
             });
 
-        // Generate trace for ECDSA builtin
-        // ================================
-        let ecdsa_memory_segment = air_public_input
-            .memory_segments
-            .ecdsa
-            .expect("layout requires an ECDSA memory segment");
-        let initial_ecdsa_address = ecdsa_memory_segment.begin_addr;
-
-        // Create dummy instances if there are cells that need to be filled
-        let ecdsa_instances = air_private_input.ecdsa;
-        let num_ecdsa_instances = ecdsa_instances.len() as u32;
-        let ecdsa_dummy_traces = (num_ecdsa_instances..).map(ecdsa::InstanceTrace::new_dummy);
-        let ecdsa_traces = ecdsa_instances
-            .into_iter()
-            .map(ecdsa::InstanceTrace::new)
-            .chain(ecdsa_dummy_traces);
-
-        const ECDSA_STEP_ROWS: usize = ECDSA_BUILTIN_RATIO * CYCLE_HEIGHT;
-        assert_eq!(ECDSA_BUILTIN_RATIO, EC_OP_BUILTIN_RATIO * 2);
-        let (ecdsa_npc_steps, _) = npc_column.as_chunks_mut::<ECDSA_STEP_ROWS>();
-        let (ecdsa_auxiliary_steps, _) = auxiliary_column.as_chunks_mut::<ECDSA_STEP_ROWS>();
-
-        ark_std::cfg_iter_mut!(ecdsa_npc_steps)
-            .zip(ecdsa_auxiliary_steps)
-            .zip(ecdsa_traces)
-            .for_each(|((npc, aux), ecdsa_trace)| {
-                let instance = ecdsa_trace.instance;
-                let message = Fp::from(BigUint::from(instance.message));
-                let pubkey = ecdsa_trace.pubkey;
-
-                // load the EC operation steps into the trace
-                // there are two EC ops per ECDSA instance
-                // 1st is for public key scalar multiplication `r * Q`
-                // 2nd is for `B` scalar multiplication `w * B` where `B = z * G + r * Q`
-                let (aux_steps, _) = aux.as_chunks_mut::<64>();
-                let (rq_aux_steps, wb_aux_steps) = aux_steps.split_at_mut(EC_OP_SCALAR_HEIGHT);
-                assert_eq!(EC_OP_SCALAR_HEIGHT, rq_aux_steps.len());
-                assert_eq!(EC_OP_SCALAR_HEIGHT, wb_aux_steps.len());
-
-                // #1 load in public key scalar multiplication `r * Q`
-                for ((aux_step, rq_step), pubkey_doubling_step) in
-                    zip(rq_aux_steps, ecdsa_trace.rq_steps).zip(ecdsa_trace.pubkey_doubling_steps)
-                {
-                    aux_step[Ecdsa::PubkeyDoublingX as usize] = pubkey_doubling_step.point.x;
-                    aux_step[Ecdsa::PubkeyDoublingY as usize] = pubkey_doubling_step.point.y;
-                    aux_step[Ecdsa::PubkeyDoublingSlope as usize] = pubkey_doubling_step.slope;
-                    aux_step[Ecdsa::PubkeyPartialSumX as usize] = rq_step.partial_sum.x;
-                    aux_step[Ecdsa::PubkeyPartialSumY as usize] = rq_step.partial_sum.y;
-                    aux_step[Ecdsa::PubkeyPartialSumSlope as usize] = rq_step.slope;
-                    aux_step[Ecdsa::PubkeyPartialSumXDiffInv as usize] = rq_step.x_diff_inv;
-                    aux_step[Ecdsa::RSuffix as usize] = rq_step.suffix;
-                }
-
-                // #2 load in `B` scalar multiplication `w * B` where `B = z * G + r * Q`
-                for ((aux_step, wb_step), b_doubling_step) in
-                    zip(wb_aux_steps, ecdsa_trace.wb_steps).zip(ecdsa_trace.b_doubling_steps)
-                {
-                    // TODO: need a better symbol for B and pubkey scalar mults since
-                    // PubkeyDoublingX is used for pubkey mult and B mult.
-                    aux_step[Ecdsa::PubkeyDoublingX as usize] = b_doubling_step.point.x;
-                    aux_step[Ecdsa::PubkeyDoublingY as usize] = b_doubling_step.point.y;
-                    aux_step[Ecdsa::PubkeyDoublingSlope as usize] = b_doubling_step.slope;
-                    aux_step[Ecdsa::PubkeyPartialSumX as usize] = wb_step.partial_sum.x;
-                    aux_step[Ecdsa::PubkeyPartialSumY as usize] = wb_step.partial_sum.y;
-                    aux_step[Ecdsa::PubkeyPartialSumSlope as usize] = wb_step.slope;
-                    aux_step[Ecdsa::PubkeyPartialSumXDiffInv as usize] = wb_step.x_diff_inv;
-                    aux_step[Ecdsa::RSuffix as usize] = wb_step.suffix;
-                }
-
-                // load the scalar multiplication `z * G` into the trace
-                // where `z` is the message hash and `G` is the curve generator point
-                let (zg_aux_steps, _) = aux.as_chunks_mut::<128>();
-                for (aux_step, zg_step) in zip(zg_aux_steps, ecdsa_trace.zg_steps) {
-                    aux_step[Ecdsa::GeneratorPartialSumX as usize] = zg_step.partial_sum.x;
-                    aux_step[Ecdsa::GeneratorPartialSumY as usize] = zg_step.partial_sum.y;
-                    aux_step[Ecdsa::GeneratorPartialSumSlope as usize] = zg_step.slope;
-                    aux_step[Ecdsa::GeneratorPartialSumXDiffInv as usize] = zg_step.x_diff_inv;
-                    aux_step[Ecdsa::MessageSuffix as usize] = zg_step.suffix;
-                }
-
-                aux[Ecdsa::BSlope as usize] = ecdsa_trace.b_slope;
-                aux[Ecdsa::BXDiffInv as usize] = ecdsa_trace.b_x_diff_inv;
-                aux[Ecdsa::WInv as usize] = ecdsa_trace.w_inv;
-                aux[Ecdsa::RInv as usize] = ecdsa_trace.r_inv;
-                aux[Ecdsa::RPointSlope as usize] = ecdsa_trace.r_point_slope;
-                aux[Ecdsa::RPointXDiffInv as usize] = ecdsa_trace.r_point_x_diff_inv;
-                aux[Ecdsa::MessageInv as usize] = ecdsa_trace.message_inv;
-                aux[Ecdsa::PubkeyXSquared as usize] = pubkey.x.square();
-
-                // add the instance to the memory pool
-                let (pubkey_addr, message_addr) = instance.mem_addr(initial_ecdsa_address);
-                npc[Npc::EcdsaPubkeyAddr as usize] = pubkey_addr.into();
-                npc[Npc::EcdsaPubkeyVal as usize] = pubkey.x;
-                npc[Npc::EcdsaMessageAddr as usize] = message_addr.into();
-                npc[Npc::EcdsaMessageVal as usize] = message;
-            });
 
         // Generate trace for bitwise builtin
         // ==================================
@@ -697,188 +588,6 @@ impl CairoTrace for ExecutionTrace {
         assert!(ordered_diluted_padding_vals.next().is_none());
         assert!(ordered_diluted_vals.next().is_none());
 
-        // Elliptic Curve operations builtin
-        // =================================
-        let ec_op_memory_segment = air_public_input
-            .memory_segments
-            .ec_op
-            .expect("layout requires a EC op memory segment");
-        let initial_ec_op_address = ec_op_memory_segment.begin_addr;
-
-        // Create dummy instances if there are cells that need to be filled
-        let ec_op_instances = air_private_input.ec_op;
-        let num_ec_op_instances = ec_op_instances.len() as u32;
-        let ec_op_dummy_traces = (num_ec_op_instances..).map(ec_op::InstanceTrace::new_dummy);
-        let ecdsa_traces = ec_op_instances
-            .into_iter()
-            .map(ec_op::InstanceTrace::new)
-            .chain(ec_op_dummy_traces);
-
-        const EC_OP_STEP_ROWS: usize = EC_OP_BUILTIN_RATIO * CYCLE_HEIGHT;
-        let (ec_op_npc_steps, _) = npc_column.as_chunks_mut::<EC_OP_STEP_ROWS>();
-        let (ec_op_auxiliary_steps, _) = auxiliary_column.as_chunks_mut::<EC_OP_STEP_ROWS>();
-
-        ark_std::cfg_iter_mut!(ec_op_npc_steps)
-            .zip(ec_op_auxiliary_steps)
-            .zip(ecdsa_traces)
-            .for_each(|((npc, aux), ec_op_trace)| {
-                const DOUBLING_STEP_ROWS: usize = EC_OP_STEP_ROWS / EC_OP_SCALAR_HEIGHT;
-                let (aux_steps, _) = aux.as_chunks_mut::<DOUBLING_STEP_ROWS>();
-
-                // #1 load in the scalar multiplication `m * Q`
-                for (i, ((aux_step, q_doubling_step), r_step)) in
-                    zip(aux_steps, ec_op_trace.q_doubling_steps)
-                        .zip(ec_op_trace.r_steps)
-                        .enumerate()
-                {
-                    aux_step[EcOp::QDoublingX as usize] = q_doubling_step.point.x;
-                    aux_step[EcOp::QDoublingY as usize] = q_doubling_step.point.y;
-                    aux_step[EcOp::QDoublingSlope as usize] = q_doubling_step.slope;
-                    aux_step[EcOp::RPartialSumX as usize] = r_step.partial_sum.x;
-                    aux_step[EcOp::RPartialSumY as usize] = r_step.partial_sum.y;
-                    aux_step[EcOp::MSuffix as usize] = r_step.suffix;
-                    // don't add if last (these fields might be used by other builtins)
-                    if i != EC_OP_SCALAR_HEIGHT - 1 {
-                        aux_step[EcOp::RPartialSumSlope as usize] = r_step.slope;
-                        aux_step[EcOp::RPartialSumXDiffInv as usize] = r_step.x_diff_inv;
-                    }
-                }
-
-                // load fields for unique bit decomposition checks into the trace
-                aux[EcOp::MBit251AndBit196 as usize] = ec_op_trace.m_bit251_and_bit196.into();
-                aux[EcOp::MBit251AndBit196AndBit192 as usize] =
-                    ec_op_trace.m_bit251_and_bit196_and_bit192.into();
-
-                // load EC op values into memory
-                let instance = ec_op_trace.instance;
-                let (p_x_addr, p_y_addr, q_x_addr, q_y_addr, m_addr, r_x_addr, r_y_addr) =
-                    instance.mem_addr(initial_ec_op_address);
-                npc[Npc::EcOpPXAddr as usize] = p_x_addr.into();
-                npc[Npc::EcOpPXVal as usize] = ec_op_trace.p.x;
-                npc[Npc::EcOpPYAddr as usize] = p_y_addr.into();
-                npc[Npc::EcOpPYVal as usize] = ec_op_trace.p.y;
-                npc[Npc::EcOpQXAddr as usize] = q_x_addr.into();
-                npc[Npc::EcOpQXVal as usize] = ec_op_trace.q.x;
-                npc[Npc::EcOpQYAddr as usize] = q_y_addr.into();
-                npc[Npc::EcOpQYVal as usize] = ec_op_trace.q.y;
-                npc[Npc::EcOpMAddr as usize] = m_addr.into();
-                npc[Npc::EcOpMVal as usize] = ec_op_trace.m;
-                npc[Npc::EcOpRXAddr as usize] = r_x_addr.into();
-                npc[Npc::EcOpRXVal as usize] = ec_op_trace.r.x;
-                npc[Npc::EcOpRYAddr as usize] = r_y_addr.into();
-                npc[Npc::EcOpRYVal as usize] = ec_op_trace.r.y;
-            });
-
-        // Poseidon builtin
-        // ================
-        let poseidon_memory_segment = air_public_input
-            .memory_segments
-            .poseidon
-            .expect("layout requires a poseidon memory segment");
-        let initial_poseidon_address = poseidon_memory_segment.begin_addr;
-
-        // Create dummy instances if there are cells that need to be filled
-        let poseidon_instances = air_private_input.poseidon;
-        let num_poseidon_instances = poseidon_instances.len() as u32;
-        let poseidon_dummy_instances = (num_poseidon_instances..).map(PoseidonInstance::new_empty);
-        let poseidon_traces = poseidon_instances
-            .into_iter()
-            .chain(poseidon_dummy_instances)
-            .map(poseidon::InstanceTrace::new);
-
-        const POSEIDON_STEP_ROWS: usize = POSEIDON_RATIO * CYCLE_HEIGHT;
-        let (poseidon_npc_steps, _) = npc_column.as_chunks_mut::<POSEIDON_STEP_ROWS>();
-        let (poseidon_rc_steps, _) = range_check_column.as_chunks_mut::<POSEIDON_STEP_ROWS>();
-        let (poseidon_auxiliary_steps, _) = auxiliary_column.as_chunks_mut::<POSEIDON_STEP_ROWS>();
-
-        ark_std::cfg_iter_mut!(poseidon_npc_steps)
-            .zip(poseidon_rc_steps)
-            .zip(poseidon_auxiliary_steps)
-            .zip(poseidon_traces)
-            .for_each(|(((npc, rc), aux), poseidon_trace)| {
-                // load the poseidon rounds into the trace
-                let (full_rounds, _) = aux.as_chunks_mut::<64>();
-
-                // load in full rounds
-                let full_round_states = [
-                    poseidon_trace.full_round_states_1st_half,
-                    poseidon_trace.full_round_states_2nd_half,
-                ]
-                .concat();
-                for (full_round, round_state) in zip(full_rounds.iter_mut(), full_round_states) {
-                    let (c0, state0_offset) = Poseidon::FullRoundsState0.col_and_shift();
-                    let (c1, state1_offset) = Poseidon::FullRoundsState1.col_and_shift();
-                    let (c2, state2_offset) = Poseidon::FullRoundsState2.col_and_shift();
-                    let (c3, state0_sq_offset) = Poseidon::FullRoundsState0Squared.col_and_shift();
-                    let (c4, state1_sq_offset) = Poseidon::FullRoundsState1Squared.col_and_shift();
-                    let (c5, state2_sq_offset) = Poseidon::FullRoundsState2Squared.col_and_shift();
-                    // ensure the columns are as expected
-                    assert_eq!((c0, c1, c2, c3, c4, c5), (8, 8, 8, 8, 8, 8));
-
-                    full_round[state0_offset as usize] = round_state.after_add_round_keys[0];
-                    full_round[state1_offset as usize] = round_state.after_add_round_keys[1];
-                    full_round[state2_offset as usize] = round_state.after_add_round_keys[2];
-
-                    full_round[state0_sq_offset as usize] =
-                        round_state.after_add_round_keys[0].square();
-                    full_round[state1_sq_offset as usize] =
-                        round_state.after_add_round_keys[1].square();
-                    full_round[state2_sq_offset as usize] =
-                        round_state.after_add_round_keys[2].square();
-                }
-
-                {
-                    // TODO: remove
-                    let partial_round_states = poseidon_trace.partial_round_states;
-
-                    let (c0, state0_offset) = Poseidon::PartialRoundsState0.col_and_shift();
-                    let (c1, state0_sq_offset) =
-                        Poseidon::PartialRoundsState0Squared.col_and_shift();
-                    assert_eq!((c0, c1), (7, 7));
-
-                    // load in the first 64 partial rounds
-                    let (partial_rounds0, _) = rc.as_chunks_mut::<8>();
-                    for (round, state) in zip(partial_rounds0, &partial_round_states) {
-                        round[state0_offset as usize] = state.after_add_round_key;
-                        round[state0_sq_offset as usize] = state.after_add_round_key.square();
-                    }
-
-                    let (c0, state1_offset) = Poseidon::PartialRoundsState1.col_and_shift();
-                    let (c1, state1_sq_offset) =
-                        Poseidon::PartialRoundsState1Squared.col_and_shift();
-                    assert_eq!((c0, c1), (8, 8));
-
-                    // load in the last 22 partial rounds
-                    let (partial_rounds1, _) = aux.as_chunks_mut::<16>();
-                    for (round, state) in zip(partial_rounds1, &partial_round_states[64 - 3..]) {
-                        round[state1_offset as usize] = state.after_add_round_key;
-                        round[state1_sq_offset as usize] = state.after_add_round_key.square();
-                    }
-                }
-
-                // load EC op values into memory
-                let instance = poseidon_trace.instance;
-                let (
-                    input0_addr,
-                    input1_addr,
-                    input2_addr,
-                    output0_addr,
-                    output1_addr,
-                    output2_addr,
-                ) = instance.mem_addr(initial_poseidon_address);
-                npc[Npc::PoseidonInput0Addr as usize] = input0_addr.into();
-                npc[Npc::PoseidonInput0Val as usize] = poseidon_trace.input0;
-                npc[Npc::PoseidonInput1Addr as usize] = input1_addr.into();
-                npc[Npc::PoseidonInput1Val as usize] = poseidon_trace.input1;
-                npc[Npc::PoseidonInput2Addr as usize] = input2_addr.into();
-                npc[Npc::PoseidonInput2Val as usize] = poseidon_trace.input2;
-                npc[Npc::PoseidonOutput0Addr as usize] = output0_addr.into();
-                npc[Npc::PoseidonOutput0Val as usize] = poseidon_trace.output0;
-                npc[Npc::PoseidonOutput1Addr as usize] = output1_addr.into();
-                npc[Npc::PoseidonOutput1Val as usize] = poseidon_trace.output1;
-                npc[Npc::PoseidonOutput2Addr as usize] = output2_addr.into();
-                npc[Npc::PoseidonOutput2Val as usize] = poseidon_trace.output2;
-            });
 
         // VM Memory
         // =========
@@ -961,9 +670,7 @@ impl CairoTrace for ExecutionTrace {
             base_trace,
             initial_pedersen_address,
             initial_rc_address,
-            initial_ecdsa_address,
             initial_bitwise_address,
-            initial_ec_op_address,
             program,
             _flags_column: flags_column,
             _auxiliary_column: auxiliary_column,
