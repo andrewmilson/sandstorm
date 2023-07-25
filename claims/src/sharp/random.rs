@@ -13,6 +13,7 @@ use sha3::digest::Output;
 use ark_ff::PrimeField;
 use ministark::random::leading_zeros;
 use sha3::Digest;
+use super::hash::Keccak256HashFn;
 use super::utils::to_montgomery;
 use super::utils::from_montgomery;
 
@@ -37,13 +38,13 @@ impl SolidityPublicCoin {
         let mut hasher = Keccak256::new();
         hasher.update((digest + uint!(1_U256)).to_be_bytes::<32>());
         hasher.update(bytes);
-        self.digest = hasher.finalize();
+        self.digest = SerdeOutput::new(hasher.finalize());
         self.counter = 0;
     }
 
     fn draw_bytes(&mut self) -> [u8; 32] {
         let mut hasher = Keccak256::new();
-        hasher.update(&self.digest);
+        hasher.update(&*self.digest);
         hasher.update(U256::from(self.counter).to_be_bytes::<32>());
         self.counter += 1;
         (*hasher.finalize()).try_into().unwrap()
@@ -52,6 +53,7 @@ impl SolidityPublicCoin {
 
 impl PublicCoin for SolidityPublicCoin {
     type Digest = SerdeOutput<Keccak256>;
+    type HashFn = Keccak256HashFn;
     type Field = Fp;
 
     fn new(digest: SerdeOutput<Keccak256>) -> Self {
@@ -59,7 +61,7 @@ impl PublicCoin for SolidityPublicCoin {
     }
 
     fn reseed_with_digest(&mut self, val: &SerdeOutput<Keccak256>) {
-        self.reseed_with_bytes(val);
+        self.reseed_with_bytes(&**val);
     }
 
     fn reseed_with_field_element(&mut self, val: &Fp) {
@@ -115,7 +117,7 @@ impl PublicCoin for SolidityPublicCoin {
     fn verify_proof_of_work(&self, proof_of_work_bits: u8, nonce: u64) -> bool {
         let mut prefix_hasher = Keccak256::new();
         prefix_hasher.update(0x0123456789ABCDEDu64.to_be_bytes());
-        prefix_hasher.update(&self.digest);
+        prefix_hasher.update(&*self.digest);
         prefix_hasher.update([proof_of_work_bits]);
         let prefix_hash = prefix_hasher.finalize();
 
@@ -135,6 +137,7 @@ mod tests {
     use ark_poly::Radix2EvaluationDomain;
     use ark_poly::EvaluationDomain;
     use ministark::random::PublicCoin;
+    use ministark::utils::SerdeOutput;
     use ministark_gpu::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481::ark::Fp;
     use sha2::digest::Output;
     use ark_ff::FftField;
@@ -142,8 +145,8 @@ mod tests {
 
     #[test]
     fn draw_matches_solidity_verifier() {
-        let pub_input_hash = Output::<Keccak256>::default();
-        let mut public_coin = SolidityPublicCoin::<Keccak256>::new(pub_input_hash);
+        let pub_input_hash = SerdeOutput::new(Output::<Keccak256>::default());
+        let mut public_coin = SolidityPublicCoin::new(pub_input_hash);
 
         assert_eq!(
             Fp!("914053382091189896561965228399096618375831658573140010954888220151670628653"),

@@ -1,8 +1,10 @@
 use binary::{AirPublicInput, Layout};
 use digest::Digest;
+use ministark::hash::HashFn;
 use ministark_gpu::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481::ark::Fp;
 use num_bigint::BigUint;
 use ruint::{aliases::U256, uint};
+use sha3::Keccak256;
 
 use crate::sharp::utils::hash_elements;
 
@@ -90,7 +92,7 @@ impl<'a> CairoAuxInput<'a> {
         }
     }
 
-    fn memory_page_values<D: Digest>(&self) -> Vec<U256> {
+    fn memory_page_values(&self) -> Vec<U256> {
         // The public memory consists of individual memory pages.
         // The first page is for main memory.
         // For each page:
@@ -111,7 +113,7 @@ impl<'a> CairoAuxInput<'a> {
                 .flat_map(|e| [e.address.into(), e.value])
                 .collect::<Vec<Fp>>();
 
-            let mut hasher = D::new();
+            let mut hasher = Keccak256::new();
             hash_elements(&mut hasher, &pairs);
             (*hasher.finalize()).try_into().unwrap()
         };
@@ -124,11 +126,11 @@ impl<'a> CairoAuxInput<'a> {
         main_page.map(Option::unwrap).to_vec()
     }
 
-    pub fn public_input_elements<D: Digest>(&self) -> Vec<U256> {
+    pub fn public_input_elements(&self) -> Vec<U256> {
         [
             self.base_values(),
             self.layout_specific_values(),
-            self.memory_page_values::<D>(),
+            self.memory_page_values(),
         ]
         .concat()
     }

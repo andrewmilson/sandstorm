@@ -52,6 +52,7 @@ pub struct HashedLeafConfig<H>(PhantomData<H>);
 
 impl<H: ElementHashFn<Fp>> MerkleTreeConfig for HashedLeafConfig<H> {
     type Digest = H::Digest;
+    type HashFn = H;
     type Leaf = H::Digest;
 
     fn hash_leaves(l0: &H::Digest, l1: &H::Digest) -> H::Digest {
@@ -64,12 +65,12 @@ impl<H: ElementHashFn<Fp>> MerkleTreeConfig for HashedLeafConfig<H> {
     // }
 }
 
-pub enum MerkleTreeVariantProof<H: HashFn> {
+pub enum MerkleTreeVariantProof<H: ElementHashFn<Fp>> {
     Hashed(MerkleProof<HashedLeafConfig<H>>),
     Unhashed(MerkleProof<UnhashedLeafConfig<H>>),
 }
 
-impl<H: HashFn> Clone for MerkleTreeVariantProof<H> {
+impl<H: ElementHashFn<Fp>> Clone for MerkleTreeVariantProof<H> {
     fn clone(&self) -> Self {
         match self {
             Self::Hashed(proof) => Self::Hashed(proof.clone()),
@@ -78,7 +79,7 @@ impl<H: HashFn> Clone for MerkleTreeVariantProof<H> {
     }
 }
 
-impl<H: HashFn> CanonicalSerialize for MerkleTreeVariantProof<H> {
+impl<H: ElementHashFn<Fp>> CanonicalSerialize for MerkleTreeVariantProof<H> {
     fn serialize_with_mode<W: ark_serialize::Write>(
         &self,
         mut writer: W,
@@ -104,13 +105,13 @@ impl<H: HashFn> CanonicalSerialize for MerkleTreeVariantProof<H> {
     }
 }
 
-impl<H: HashFn> Valid for MerkleTreeVariantProof<H> {
+impl<H: ElementHashFn<Fp>> Valid for MerkleTreeVariantProof<H> {
     fn check(&self) -> Result<(), ark_serialize::SerializationError> {
         Ok(())
     }
 }
 
-impl<H: HashFn> CanonicalDeserialize for MerkleTreeVariantProof<H> {
+impl<H: ElementHashFn<Fp>> CanonicalDeserialize for MerkleTreeVariantProof<H> {
     fn deserialize_with_mode<R: ark_serialize::Read>(
         mut reader: R,
         compress: ark_serialize::Compress,
@@ -125,12 +126,12 @@ impl<H: HashFn> CanonicalDeserialize for MerkleTreeVariantProof<H> {
     }
 }
 
-pub enum MerkleTreeVariant<H: HashFn> {
+pub enum MerkleTreeVariant<H: ElementHashFn<Fp>> {
     Hashed(MerkleTreeImpl<HashedLeafConfig<H>>),
     Unhashed(MerkleTreeImpl<UnhashedLeafConfig<H>>),
 }
 
-impl<D: Digest + Send + Sync + 'static> Clone for MerkleTreeVariant<D> {
+impl<H: ElementHashFn<Fp>> Clone for MerkleTreeVariant<H> {
     fn clone(&self) -> Self {
         match self {
             Self::Hashed(mt) => Self::Hashed(mt.clone()),
@@ -139,7 +140,7 @@ impl<D: Digest + Send + Sync + 'static> Clone for MerkleTreeVariant<D> {
     }
 }
 
-impl<H: HashFn> MerkleTree for MerkleTreeVariant<H> {
+impl<H: ElementHashFn<Fp>> MerkleTree for MerkleTreeVariant<H> {
     type Proof = MerkleTreeVariantProof<H>;
     type Root = H::Digest;
 
@@ -165,7 +166,7 @@ impl<H: HashFn> MerkleTree for MerkleTreeVariant<H> {
     }
 }
 
-impl<H: HashFn> MatrixMerkleTree<Fp> for MerkleTreeVariant<H> {
+impl<H: ElementHashFn<Fp>> MatrixMerkleTree<Fp> for MerkleTreeVariant<H> {
     fn from_matrix(matrix: &Matrix<Fp>) -> Self {
         match matrix.num_cols() {
             0 => unreachable!(),

@@ -31,8 +31,7 @@ use sha2::Digest;
 impl<
         A: SharpAirConfig<Fp = Fp, Fq = Fp, PublicInputs = AirPublicInput<Fp>>,
         T: CairoTrace<Fp = Fp, Fq = Fp>,
-        D: Digest + Send + Sync + 'static,
-    > CairoClaim<A, T, D>
+    > CairoClaim<A, T>
 {
     #[allow(clippy::too_many_lines, dead_code)]
     pub async fn prove_sharp(
