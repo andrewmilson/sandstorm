@@ -97,6 +97,13 @@ fn main() {
                     let claim = C::new(program, air_public_input);
                     execute_command(command, options, claim);
                 }
+                Layout::Recursive => {
+                    type A = layouts::recursive::AirConfig;
+                    type T = layouts::recursive::ExecutionTrace;
+                    type C = claims::sharp::CairoClaim<A, T, Keccak256>;
+                    let claim = C::new(program, air_public_input);
+                    execute_command(command, options, claim);
+                }
                 _ => unimplemented!(),
             }
         }
