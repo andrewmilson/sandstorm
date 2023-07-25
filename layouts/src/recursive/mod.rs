@@ -1,7 +1,8 @@
 //! Matches `bitwise` layout from StarkWare's open source verifier
 //! <https://github.com/starkware-libs/cairo-lang/blob/361fe32d5930db340ea78fe05aedfe706f6c9405/src/starkware/cairo/lang/instances.py#L157>
 
-//TODO This is still the starknet layout and has to be updated to the recursive parameters.
+//TODO This is still the starknet layout and has to be updated to the recursive
+// parameters.
 
 pub mod air;
 pub mod trace;
@@ -15,7 +16,7 @@ pub use trace::ExecutionTrace;
 pub const CYCLE_HEIGHT: usize = 16;
 pub const PUBLIC_MEMORY_STEP: usize = 8;
 pub const MEMORY_STEP: usize = 2;
-pub const RANGE_CHECK_STEP: usize = 4;
+pub const RANGE_CHECK_STEP: usize = 2;
 pub const DILUTED_CHECK_STEP: usize = 1; //TODO is that correct?
 
 /// How many cycles per pedersen hash

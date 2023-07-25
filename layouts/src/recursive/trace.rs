@@ -1,4 +1,5 @@
-// TODO This is still specific to the starknet layout and has to be updated to the recursive layout
+// TODO This is still specific to the starknet layout and has to be updated to
+// the recursive layout
 use super::air::Auxiliary;
 use super::air::Flag;
 use super::air::MemoryPermutation;
@@ -73,6 +74,8 @@ pub struct ExecutionTrace {
     pub program: CompiledProgram<Fp>,
     npc_column: GpuVec<Fp>,
     memory_column: GpuVec<Fp>,
+    diluted_check_ordered_column: GpuVec<Fp>,
+    diluted_check_unordered_column: GpuVec<Fp>,
     range_check_column: GpuVec<Fp>,
     base_trace: Matrix<Fp>,
     _register_states: RegisterStates,
@@ -279,13 +282,10 @@ impl CairoTrace for ExecutionTrace {
 
         // Diluted check
         // =============
-        // due to how the range-check/diluted-check column is initiated we need to clear
-        // all diluted check cells by setting them to `0`.
-        let (dilution_check_steps, _) = range_check_column.as_chunks_mut::<DILUTED_CHECK_STEP>();
-        ark_std::cfg_iter_mut!(dilution_check_steps).for_each(|dilution_check_step| {
-            dilution_check_step[DilutedCheck::Unordered as usize] = Fp::ZERO;
-            dilution_check_step[DilutedCheck::Ordered as usize] = Fp::ZERO;
-        });
+        let mut diluted_check_ordered_column = Vec::new_in(GpuAllocator);
+        range_check_column.resize(trace_len, Fp::ZERO);
+        let mut diluted_check_unordered_column = Vec::new_in(GpuAllocator);
+        range_check_column.resize(trace_len, Fp::ZERO);
 
         // Generate trace for pedersen hash
         // ================================
@@ -411,7 +411,6 @@ impl CairoTrace for ExecutionTrace {
                 npc[Npc::RangeCheck128Addr as usize] = addr.into();
                 npc[Npc::RangeCheck128Val as usize] = Fp::from(BigUint::from(instance.value));
             });
-
 
         // Generate trace for bitwise builtin
         // ==================================
@@ -577,18 +576,15 @@ impl CairoTrace for ExecutionTrace {
         }
 
         // add ordered diluted check values
-        let (diluted_check_steps, _) = range_check_column.as_chunks_mut::<DILUTED_CHECK_STEP>();
-        let padding_offset = diluted_check_steps.len() - ordered_diluted_vals.len();
-        for diluted_check_step in diluted_check_steps.iter_mut().skip(padding_offset) {
+        let padding_offset = diluted_check_ordered_column.len() - ordered_diluted_vals.len();
+        for diluted_val in &mut diluted_check_ordered_column[padding_offset..] {
             let val = ordered_diluted_vals.next().unwrap();
-            let diluted_val = dilute::<DILUTED_CHECK_SPACING>(U256::from(val));
-            diluted_check_step[DilutedCheck::Ordered as usize] = BigUint::from(diluted_val).into();
+            *diluted_val = BigUint::from(dilute::<DILUTED_CHECK_SPACING>(U256::from(val))).into();
         }
 
         // ensure dilution check values have been fully consumed
         assert!(ordered_diluted_padding_vals.next().is_none());
         assert!(ordered_diluted_vals.next().is_none());
-
 
         // VM Memory
         // =========
@@ -644,13 +640,15 @@ impl CairoTrace for ExecutionTrace {
 
         let base_trace = Matrix::new(vec![
             flags_column.to_vec_in(GpuAllocator),
+            diluted_check_unordered_column.to_vec_in(GpuAllocator),
+            diluted_check_ordered_column.to_vec_in(GpuAllocator),
+            npc_column.to_vec_in(GpuAllocator),
+            memory_column.to_vec_in(GpuAllocator),
+            range_check_column.to_vec_in(GpuAllocator),
             pedersen_partial_xs_column.to_vec_in(GpuAllocator),
             pedersen_partial_ys_column.to_vec_in(GpuAllocator),
             pedersen_suffixes_column.to_vec_in(GpuAllocator),
             pedersen_slopes_column.to_vec_in(GpuAllocator),
-            npc_column.to_vec_in(GpuAllocator),
-            memory_column.to_vec_in(GpuAllocator),
-            range_check_column.to_vec_in(GpuAllocator),
             auxiliary_column.to_vec_in(GpuAllocator),
         ]);
 
@@ -665,6 +663,8 @@ impl CairoTrace for ExecutionTrace {
             range_check_max,
             initial_registers,
             final_registers,
+            diluted_check_ordered_column,
+            diluted_check_unordered_column,
             npc_column,
             memory_column,
             range_check_column,
@@ -732,14 +732,16 @@ impl Trace for ExecutionTrace {
         // generate diluted check permutation product
         // ==========================================
         let z = challenges[DilutedCheckPermutation::Z];
-        let diluted_check_chunks = self.range_check_column.array_chunks::<DILUTED_CHECK_STEP>();
         let mut dc_perm_numerators = Vec::new();
         let mut dc_perm_denominators = Vec::new();
         let mut numerator_acc = Fp::one();
         let mut denominator_acc = Fp::one();
-        for chunk in diluted_check_chunks {
-            numerator_acc *= z - chunk[DilutedCheck::Unordered as usize];
-            denominator_acc *= z - chunk[DilutedCheck::Ordered as usize];
+        for (unordered, ordered) in zip(
+            &self.diluted_check_unordered_column,
+            &self.diluted_check_ordered_column,
+        ) {
+            numerator_acc *= z - unordered;
+            denominator_acc *= z - ordered;
             dc_perm_numerators.push(numerator_acc);
             dc_perm_denominators.push(denominator_acc);
         }
@@ -747,17 +749,27 @@ impl Trace for ExecutionTrace {
         batch_inversion(&mut dc_perm_denominators);
         let dc_perm_denominators_inv = dc_perm_denominators;
 
-        let mut permutation_column = Vec::new_in(GpuAllocator);
-        permutation_column.resize(self.base_columns().num_rows(), Fp::zero());
+        let trace_len = self.base_columns().num_rows();
+
+        let mut diluted_check_permutation_column = Vec::new_in(GpuAllocator);
+        diluted_check_permutation_column.resize(trace_len, Fp::ZERO);
+
+        let mut diluted_check_aggregate_column = Vec::new_in(GpuAllocator);
+        diluted_check_aggregate_column.resize(trace_len, Fp::ZERO);
+
+        let mut mem_and_rc_permutation_column = Vec::new_in(GpuAllocator);
+        mem_and_rc_permutation_column.resize(trace_len, Fp::ZERO);
 
         // insert intermediate memory permutation results
         for (i, (n, d_inv)) in zip(mem_perm_numerators, mem_perm_denominators_inv).enumerate() {
-            permutation_column[i * MEMORY_STEP + Permutation::Memory as usize] = n * d_inv;
+            let offset = i * MEMORY_STEP + Permutation::Memory.col_and_shift().1 as usize;
+            mem_and_rc_permutation_column[offset] = n * d_inv;
         }
 
         // insert intermediate range check results
         for (i, (n, d_inv)) in zip(rc_perm_numerators, rc_perm_denominators_inv).enumerate() {
-            permutation_column[i * RANGE_CHECK_STEP + Permutation::RangeCheck as usize] = n * d_inv;
+            let offset = i * RANGE_CHECK_STEP + Permutation::RangeCheck.col_and_shift().1 as usize;
+            mem_and_rc_permutation_column[offset] = n * d_inv;
         }
 
         assert!(
@@ -767,30 +779,30 @@ impl Trace for ExecutionTrace {
 
         // insert intermediate diluted check results
         for (i, (n, d_inv)) in zip(dc_perm_numerators, dc_perm_denominators_inv).enumerate() {
-            permutation_column[i * DILUTED_CHECK_STEP + Permutation::DilutedCheck as usize] =
-                n * d_inv;
+            diluted_check_permutation_column[i] = n * d_inv;
         }
 
         // generate aggregation of diluted checks
         // ======================================
         let z = challenges[DilutedCheckAggregation::Z];
         let alpha = challenges[DilutedCheckAggregation::A];
-        let (diluted_check_chunks, _) = self.range_check_column.as_chunks::<DILUTED_CHECK_STEP>();
 
         // insert initial value
         let initial = Fp::one();
-        permutation_column[DilutedCheck::Aggregate as usize] = initial;
+        diluted_check_aggregate_column[0] = initial;
 
         // insert intermediate aggregation results
         let mut acc = initial;
-        for (i, [prev_step, curr_step]) in zip(1.., diluted_check_chunks.array_windows()) {
-            let prev = prev_step[DilutedCheck::Ordered as usize];
-            let curr = curr_step[DilutedCheck::Ordered as usize];
+        for (i, [prev, curr]) in zip(1.., self.diluted_check_ordered_column.array_windows()) {
             let u = curr - prev;
             acc = acc * (Fp::ONE + z * u) + alpha * u.square();
-            permutation_column[i * DILUTED_CHECK_STEP + DilutedCheck::Aggregate as usize] = acc;
+            diluted_check_aggregate_column[i] = acc;
         }
 
-        Some(Matrix::new(vec![permutation_column]))
+        Some(Matrix::new(vec![
+            diluted_check_aggregate_column,
+            diluted_check_permutation_column,
+            mem_and_rc_permutation_column,
+        ]))
     }
 }
