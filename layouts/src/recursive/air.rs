@@ -540,6 +540,7 @@ impl ministark::air::AirConfig for AirConfig {
         // Dilutions have two parameters (1) the number of bits they operate on and
         // (2) the spread of each bit. For example the the dilution of binary
         // digit 1111 to 0001000100010001 operates on 4 bits with a spread of 4.
+        // TODO Zerofier adjust
         let diluted_check_permutation_init0 = ((DilutedCheckPermutation::Z.challenge()
             - DilutedCheck::Ordered.curr())
             * Permutation::DilutedCheck.curr()
@@ -579,6 +580,7 @@ impl ministark::air::AirConfig for AirConfig {
         // Note that if there is no difference between the current and next ordered
         // diluted values then `diluted_diff == 0` and the previous aggregate value is
         // copied over
+        // TODO Zerofier
         let diluted_diff = DilutedCheck::Ordered.next() - DilutedCheck::Ordered.curr();
         let diluted_check_step = (DilutedCheck::Aggregate.next()
             - (DilutedCheck::Aggregate.curr()
@@ -899,6 +901,7 @@ impl ministark::air::AirConfig for AirConfig {
             &zerofier_256th_last_row * &every_256_row_zerofier_inv;
 
         // Hook up range check with the memory pool
+        // TODO Zerofier every 128_row_zerofier? 
         let rc_builtin_value =
             (rc_builtin_value7_0 - Npc::RangeCheck128Val.curr()) * &every_256_row_zerofier_inv;
         let rc_builtin_addr_step = (Npc::RangeCheck128Addr.next()
@@ -1350,7 +1353,7 @@ impl ExecutionTraceColumn for RangeCheckBuiltin {
 pub enum Bitwise {
     // TODO: better names or just don't use this
     // for 1st chunk 64 bits
-    Bits16Chunk0Offset0 = 1,
+    Bits16Chunk0Offset0 = 0,
     Bits16Chunk0Offset1 = 17,
     Bits16Chunk0Offset2 = 33,
     Bits16Chunk0Offset3 = 49,
@@ -1443,9 +1446,9 @@ impl ExecutionTraceColumn for Bitwise {
 pub enum Pedersen {
     PartialSumX,
     PartialSumY,
-    Suffix,
+    Suffix = 0,
     Slope,
-    Bit251AndBit196AndBit192 = 71,
+    Bit251AndBit196AndBit192 = 7,
     Bit251AndBit196 = 255,
 }
 
@@ -1454,8 +1457,8 @@ impl ExecutionTraceColumn for Pedersen {
     fn index(&self) -> usize {
         match self {
             Self::PartialSumX => 1,
-            Self::PartialSumY => 2, // TODO The partial sums could be still the same - confirm this
-            Self::Suffix => 3,  // TODO where is suffix now?
+            Self::PartialSumY => 2, // TODO The partial Sums could be still the same - confirm this
+            Self::Suffix => 6,  // TODO where is suffix now?
             Self::Slope | Self::Bit251AndBit196 => 4, // TODO find out where the slope is now
             Self::Bit251AndBit196AndBit192 => 6, // Moved fom 8 to 6
         }
@@ -1485,7 +1488,8 @@ pub enum Npc {
     PubMemVal = 3,
     MemOp0Addr = 4,
     MemOp0 = 5,
-
+    
+    // TODO Still old starknet layout
     PedersenInput0Addr = 6,
     PedersenInput0Val = 7,
 
@@ -1499,20 +1503,20 @@ pub enum Npc {
     PedersenOutputAddr = 134,
     PedersenOutputVal = 135,
 
-    // 70 % 16 = 6
-    // 71 % 16 = 7
-    RangeCheck128Addr = 70,
-    RangeCheck128Val = 71,
+    // 74 % 16 = 10
+    // 75 % 16 = 11
+    RangeCheck128Addr = 74,
+    RangeCheck128Val = 75,
 
-    // 198 % 16 = 6
-    // 199 % 16 = 7
-    BitwisePoolAddr = 198,
-    BitwisePoolVal = 199,
+    // 26 % 16 = 10
+    // 27 % 16 = 11
+    BitwisePoolAddr = 26,
+    BitwisePoolVal = 27,
 
-    // 902 % 16 = 6
-    // 903 % 16 = 7
-    BitwiseXOrYAddr = 902,
-    BitwiseXOrYVal = 903,
+    // 42 % 16 = 10
+    // 43 % 16 = 11
+    BitwiseXOrYAddr = 42,
+    BitwiseXOrYVal = 43,
 
     MemDstAddr = 8,
     MemDst = 9,
@@ -1596,17 +1600,28 @@ impl ExecutionTraceColumn for Mem {
 
 #[derive(Clone, Copy)]
 pub enum DilutedCheck {
-    Unordered = 1,
-    Ordered = 5,
-    Aggregate = 3,
+    Unordered,
+    Ordered,
+    Aggregate,
 }
 
-// TODO columns need to be updated
+impl DilutedCheck {
+    /// Output is of the form (col_idx, row_shift)
+    pub const fn col_and_shift(&self) -> (usize, isize) {
+        match self {
+            Self::Unordered => (1, 0),
+            Self::Ordered => (2, 0),
+            Self::Aggregate => (7, 0),
+        }
+    }
+}
+
 impl ExecutionTraceColumn for DilutedCheck {
     fn index(&self) -> usize {
         match self {
-            Self::Unordered | Self::Ordered => 7,
-            Self::Aggregate => 9,
+            Self::Unordered => 8,
+            Self::Ordered => 2,
+            Self::Aggregate => 7,
         }
     }
 
@@ -1616,12 +1631,11 @@ impl ExecutionTraceColumn for DilutedCheck {
     }
 }
 
-// Trace column 7
+// Trace column 5
 #[derive(Clone, Copy)]
 pub enum RangeCheck {
     OffDst = 0,
     Ordered = 2, // Stores ordered values for the range check
-    // TODO 2
     OffOp1 = 4,
     // Ordered = 6 - trace step is 4
     OffOp0 = 8,
@@ -1653,12 +1667,12 @@ impl ExecutionTraceColumn for RangeCheck {
 // Auxiliary column 8
 #[derive(Clone, Copy)]
 pub enum Auxiliary {
-    Ap = 0, // Allocation pointer (ap)
-    Tmp0 = 2,
-    Op0MulOp1 = 4, // =op0*op1
-    Fp = 8,        // Frame pointer (fp)
-    Tmp1 = 10,
-    Res = 12,
+    Ap = 1, // Allocation pointer (ap)
+    Tmp0 = 3,
+    Op0MulOp1 = 5, // =op0*op1
+    Fp = 9,        // Frame pointer (fp)
+    Tmp1 = 11,
+    Res = 13,
 }
 
 impl ExecutionTraceColumn for Auxiliary {
@@ -1678,26 +1692,38 @@ impl ExecutionTraceColumn for Auxiliary {
     }
 }
 
-// Trace column 6 - permutations
+// Trace column 9 and 8 - permutations
 #[derive(Clone, Copy)]
 pub enum Permutation {
-    // TODO = 0,
-    Memory = 0,
-    RangeCheck = 1,
-    DilutedCheck = 7,
+    Memory,
+    RangeCheck,
+    DilutedCheck,
+}
+
+impl Permutation {
+    /// Output is of the form (col_idx, row_shift)
+    pub const fn col_and_shift(&self) -> (usize, isize) {
+        match self {
+            Self::Memory => (9, 0),
+            Self::DilutedCheck => (8, 0),
+            Self::RangeCheck => (9, 1),
+        }
+    }
 }
 
 impl ExecutionTraceColumn for Permutation {
     fn index(&self) -> usize {
-        9
+        let (col_idx, _) = self.col_and_shift();
+        col_idx
     }
 
     fn offset<T>(&self, offset: isize) -> Expr<AlgebraicItem<T>> {
+        let (column, shift) = self.col_and_shift();
         let column = self.index();
         let trace_offset = match self {
-            Self::Memory => MEMORY_STEP as isize * offset + *self as isize,
-            Self::RangeCheck => 4 * offset + *self as isize,
-            Self::DilutedCheck => 8 * offset + *self as isize,
+            Self::Memory => MEMORY_STEP as isize * offset + shift as isize,
+            Self::RangeCheck => 4 * offset + shift as isize,
+            Self::DilutedCheck => 8 * offset + shift as isize,  // TODO this is probably 2 * offset
         };
         AlgebraicItem::Trace(column, trace_offset).into()
     }

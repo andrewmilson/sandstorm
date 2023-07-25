@@ -21,6 +21,7 @@ use ministark::Trace;
 
 pub mod plain;
 pub mod starknet;
+pub mod recursive;
 pub mod utils;
 
 pub trait SharpAirConfig: AirConfig {
