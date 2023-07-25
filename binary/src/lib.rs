@@ -504,10 +504,14 @@ pub struct AirPrivateInput {
     pub trace_path: PathBuf,
     pub memory_path: PathBuf,
     pub pedersen: Vec<PedersenInstance>,
-    pub ecdsa: Vec<EcdsaInstance>,
     pub range_check: Vec<RangeCheckInstance>,
+    #[serde(default)]
+    pub ecdsa: Vec<EcdsaInstance>,
+    #[serde(default)]
     pub bitwise: Vec<BitwiseInstance>,
+    #[serde(default)]
     pub ec_op: Vec<EcOpInstance>,
+    #[serde(default)]
     pub poseidon: Vec<PoseidonInstance>,
 }
 
