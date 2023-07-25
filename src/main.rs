@@ -9,6 +9,7 @@ use binary::Layout;
 use binary::Memory;
 use binary::RegisterStates;
 use layouts::CairoWitness;
+use ministark::hash::Sha256HashFn;
 use ministark::stark::Stark;
 use ministark::Proof;
 use ministark::ProofOptions;
@@ -86,15 +87,13 @@ fn main() {
                 Layout::Plain => {
                     type A = layouts::plain::AirConfig<Fp, Fp>;
                     type T = layouts::plain::ExecutionTrace<Fp, Fp>;
-                    type C = claims::base::CairoClaim<Fp, A, T, Sha256>;
+                    type C = claims::base::CairoClaim<Fp, A, T, Sha256HashFn>;
                     let claim = C::new(program, air_public_input);
                     execute_command(command, options, claim);
                 }
                 Layout::Starknet => {
-                    type A = layouts::starknet::AirConfig;
-                    type T = layouts::starknet::ExecutionTrace;
-                    type C = claims::sharp::CairoClaim<A, T, Keccak256>;
-                    let claim = C::new(program, air_public_input);
+                    use claims::sharp::StarknetSolidityClaim;
+                    let claim = StarknetSolidityClaim::new(program, air_public_input);
                     execute_command(command, options, claim);
                 }
                 _ => unimplemented!(),
@@ -111,7 +110,7 @@ fn main() {
                 Layout::Plain => {
                     type A = layouts::plain::AirConfig<Fp, Fq3>;
                     type T = layouts::plain::ExecutionTrace<Fp, Fq3>;
-                    type C = claims::base::CairoClaim<Fp, A, T, Sha256>;
+                    type C = claims::base::CairoClaim<Fp, A, T, Sha256HashFn>;
                     let claim = C::new(program, air_public_input);
                     execute_command(command, options, claim);
                 }

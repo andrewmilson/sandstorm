@@ -178,10 +178,10 @@ impl<H: ElementHashFn<Fp>> MatrixMerkleTree<Fp> for MerkleTreeVariant<H> {
             _ => {
                 let mut row_hashes = hash_rows::<H>(matrix);
                 for hash in &mut row_hashes {
-                    mask_bytes(hash, &HASH_MASK);
+                    // mask_bytes(hash, &HASH_MASK);
                 }
-                let leaves = row_hashes.into_iter().map(SerdeOutput::new).collect();
-                Self::Hashed(MerkleTreeImpl::new(leaves).unwrap())
+                // let leaves = row_hashes.into_iter().map(SerdeOutput::new).collect();
+                Self::Hashed(MerkleTreeImpl::new(row_hashes).unwrap())
             }
         }
     }
@@ -207,8 +207,8 @@ impl<H: ElementHashFn<Fp>> MatrixMerkleTree<Fp> for MerkleTreeVariant<H> {
             }
             (row, MerkleTreeVariantProof::Hashed(proof)) => {
                 let mut row_hash = hash_row::<H>(row);
-                mask_bytes(&mut row_hash, &HASH_MASK);
-                if **proof.leaf() == row_hash {
+                // mask_bytes(&mut row_hash, &HASH_MASK);
+                if proof.leaf() == &row_hash {
                     MerkleTreeImpl::<HashedLeafConfig<H>>::verify(root, proof, row_idx)
                 } else {
                     Err(Error::InvalidProof)
@@ -262,6 +262,7 @@ fn hash_rows<H: ElementHashFn<Fp>>(matrix: &Matrix<Fp>) -> Vec<H::Digest> {
 mod tests {
     use super::MerkleTree;
     use super::MerkleTreeVariant;
+    use crate::sharp::hash::Keccak256HashFn;
     use ark_ff::MontFp as Fp;
     use ministark::merkle::Error;
     use ministark::merkle::MatrixMerkleTree;
@@ -273,7 +274,7 @@ mod tests {
     fn verify_unhashed_leaves() -> Result<(), Error> {
         let leaves = [Fp!("1"), Fp!("2"), Fp!("3"), Fp!("4")];
         let single_column_matrix = Matrix::new(vec![leaves.to_vec_in(GpuAllocator)]);
-        let tree = MerkleTreeVariant::<Keccak256>::from_matrix(&single_column_matrix);
+        let tree = MerkleTreeVariant::<Keccak256HashFn>::from_matrix(&single_column_matrix);
         let commitment = tree.root();
         let i = 3;
 
@@ -290,7 +291,7 @@ mod tests {
             leaves.to_vec_in(GpuAllocator),
             leaves.to_vec_in(GpuAllocator),
         ]);
-        let tree = MerkleTreeVariant::<Keccak256>::from_matrix(&multi_column_matrix);
+        let tree = MerkleTreeVariant::<Keccak256HashFn>::from_matrix(&multi_column_matrix);
         let commitment = tree.root();
         let i = 3;
 

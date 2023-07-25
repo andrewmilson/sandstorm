@@ -1,6 +1,5 @@
 use binary::{AirPublicInput, Layout};
 use digest::Digest;
-use ministark::hash::HashFn;
 use ministark_gpu::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481::ark::Fp;
 use num_bigint::BigUint;
 use ruint::{aliases::U256, uint};

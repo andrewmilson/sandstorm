@@ -7,13 +7,9 @@ pub mod merkle;
 pub mod random;
 pub mod utils;
 pub mod verifier;
-
-use std::marker::PhantomData;
-
 use crate::base;
 use ark_ff::Field;
 use ministark::composer::DeepCompositionCoeffs;
-use ministark::hash::ElementHashFn;
 use ministark::hash::HashFn;
 use ministark::stark::Stark;
 use binary::CompiledProgram;
@@ -29,11 +25,21 @@ use ministark::verifier::VerificationError;
 use ministark::random::PublicCoin;
 use ministark::Air;
 use ministark_gpu::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481::ark::Fp;
-use digest::Digest;
 use sha3::Keccak256;
 use self::hash::MaskedKeccak256HashFn;
 use self::input::CairoAuxInput;
 use self::merkle::MerkleTreeVariant;
+use layouts::starknet;
+
+// List of the hash functions used by StarkWare's verifiers
+pub type SolidityVerifierMaskedHashFn = MaskedKeccak256HashFn<20>;
+
+// List of the targets for SHARP
+pub type StarknetSolidityClaim = CairoClaim<starknet::AirConfig, starknet::ExecutionTrace>;
+
+// List of proofs
+pub type StarknetSolidityProof =
+    Proof<Fp, Fp, SerdeOutput<Keccak256>, MerkleTreeVariant<SolidityVerifierMaskedHashFn>>;
 
 /// Wrapper around a base Cairo claim that has a custom implementation of proof
 /// generation and validation to match StarkWare's prover and verifier (SHARP)
@@ -53,7 +59,7 @@ impl<
     fn public_coin_seed(&self, air: &Air<A>) -> Vec<u8> {
         let aux_input = CairoAuxInput(air.public_inputs());
         let mut seed = Vec::new();
-        for element in aux_input.public_input_elements::<Keccak256HashFn>() {
+        for element in aux_input.public_input_elements() {
             seed.extend_from_slice(&element.to_be_bytes::<32>())
         }
         seed
@@ -70,7 +76,7 @@ impl<
     type AirConfig = A;
     type Digest = SerdeOutput<Keccak256>;
     type HashFn = Keccak256HashFn;
-    type MerkleTree = MerkleTreeVariant<Keccak256HashFn>;
+    type MerkleTree = MerkleTreeVariant<SolidityVerifierMaskedHashFn>;
     type PublicCoin = SolidityPublicCoin;
     type Witness = CairoWitness<Fp>;
     type Trace = T;
@@ -101,7 +107,7 @@ impl<
 
     fn gen_public_coin(&self, air: &Air<A>) -> SolidityPublicCoin {
         println!("Generating public coin from SHARP verifier!");
-        SolidityPublicCoin::new(Keccak256HashFn::digest(self.public_coin_seed(air)))
+        SolidityPublicCoin::new(Keccak256HashFn::hash(self.public_coin_seed(air)))
     }
 
     // async fn prove(
