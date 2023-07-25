@@ -3,10 +3,12 @@ use std::fmt::Debug;
 use std::iter;
 
 use ministark::random::PublicCoin;
+use ministark::utils::SerdeOutput;
 use ministark_gpu::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481::ark::Fp;
 use num_bigint::BigUint;
 use ruint::aliases::U256;
 use ruint::uint;
+use sha3::Keccak256;
 use sha3::digest::Output;
 use ark_ff::PrimeField;
 use ministark::random::leading_zeros;
@@ -15,12 +17,12 @@ use super::utils::to_montgomery;
 use super::utils::from_montgomery;
 
 /// Public coin based off of StarkWare's solidity verifier
-pub struct PublicCoinImpl<D: Digest> {
-    digest: Output<D>,
+pub struct SolidityPublicCoin {
+    digest: SerdeOutput<Keccak256>,
     counter: usize,
 }
 
-impl<D: Digest> Debug for PublicCoinImpl<D> {
+impl Debug for SolidityPublicCoin {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("PublicCoinImpl")
             .field("digest", &self.digest)
@@ -29,10 +31,10 @@ impl<D: Digest> Debug for PublicCoinImpl<D> {
     }
 }
 
-impl<D: Digest> PublicCoinImpl<D> {
+impl SolidityPublicCoin {
     fn reseed_with_bytes(&mut self, bytes: impl AsRef<[u8]>) {
         let digest = U256::try_from_be_slice(&self.digest).unwrap();
-        let mut hasher = D::new();
+        let mut hasher = Keccak256::new();
         hasher.update((digest + uint!(1_U256)).to_be_bytes::<32>());
         hasher.update(bytes);
         self.digest = hasher.finalize();
@@ -40,7 +42,7 @@ impl<D: Digest> PublicCoinImpl<D> {
     }
 
     fn draw_bytes(&mut self) -> [u8; 32] {
-        let mut hasher = D::new();
+        let mut hasher = Keccak256::new();
         hasher.update(&self.digest);
         hasher.update(U256::from(self.counter).to_be_bytes::<32>());
         self.counter += 1;
@@ -48,8 +50,8 @@ impl<D: Digest> PublicCoinImpl<D> {
     }
 }
 
-impl<D: Digest> PublicCoin for PublicCoinImpl<D> {
-    type Digest = D;
+impl PublicCoin for SolidityPublicCoin {
+    type Digest = Keccak256;
     type Field = Fp;
 
     fn new(digest: Output<D>) -> Self {
@@ -128,7 +130,7 @@ impl<D: Digest> PublicCoin for PublicCoinImpl<D> {
 
 #[cfg(test)]
 mod tests {
-    use super::PublicCoinImpl;
+    use super::SolidityPublicCoin;
     use ark_ff::MontFp as Fp;
     use ark_poly::Radix2EvaluationDomain;
     use ark_poly::EvaluationDomain;
@@ -141,7 +143,7 @@ mod tests {
     #[test]
     fn draw_matches_solidity_verifier() {
         let pub_input_hash = Output::<Keccak256>::default();
-        let mut public_coin = PublicCoinImpl::<Keccak256>::new(pub_input_hash);
+        let mut public_coin = SolidityPublicCoin::<Keccak256>::new(pub_input_hash);
 
         assert_eq!(
             Fp!("914053382091189896561965228399096618375831658573140010954888220151670628653"),

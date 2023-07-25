@@ -1,5 +1,6 @@
 //! Claim prover and verifier compatible with Starkware's SHARed Prover (SHARP)
 
+pub mod hash;
 pub mod input;
 pub mod merkle;
 pub mod prover;
@@ -12,7 +13,9 @@ use ark_ff::Field;
 use ministark::composer::DeepCompositionCoeffs;
 use ministark::stark::Stark;
 use binary::CompiledProgram;
-use random::PublicCoinImpl;
+use crate::sharp::hash::Keccak256HashFn;
+use ministark::utils::SerdeOutput;
+use random::SolidityPublicCoin;
 use binary::AirPublicInput;
 use layouts::CairoTrace;
 use layouts::CairoWitness;
@@ -23,6 +26,7 @@ use ministark::random::PublicCoin;
 use ministark::Air;
 use ministark_gpu::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481::ark::Fp;
 use digest::Digest;
+use sha3::Keccak256;
 use self::input::CairoAuxInput;
 use self::merkle::MerkleTreeVariant;
 
@@ -63,9 +67,10 @@ impl<
     type Fp = Fp;
     type Fq = Fp;
     type AirConfig = A;
-    type Digest = D;
+    type Digest = SerdeOutput<Keccak256>;
+    type HashFn = Keccak256HashFn;
     type MerkleTree = MerkleTreeVariant<D>;
-    type PublicCoin = random::PublicCoinImpl<D>;
+    type PublicCoin = SolidityPublicCoin;
     type Witness = CairoWitness<Fp>;
     type Trace = T;
 
@@ -93,9 +98,9 @@ impl<
         }
     }
 
-    fn gen_public_coin(&self, air: &Air<A>) -> PublicCoinImpl<D> {
+    fn gen_public_coin(&self, air: &Air<A>) -> SolidityPublicCoin<D> {
         println!("Generating public coin from SHARP verifier!");
-        PublicCoinImpl::new(D::digest(self.public_coin_seed(air)))
+        SolidityPublicCoin::new(D::digest(self.public_coin_seed(air)))
     }
 
     // async fn prove(
@@ -107,7 +112,10 @@ impl<
     // > { self.prove_sharp(options, witness).await
     // }
 
-    fn verify(&self, proof: Proof<Fp, Fp, D, Self::MerkleTree>) -> Result<(), VerificationError> {
+    fn verify(
+        &self,
+        proof: Proof<Fp, Fp, Self::Digest, Self::MerkleTree>,
+    ) -> Result<(), VerificationError> {
         self.verify_sharp(proof)?;
         Ok(())
     }
