@@ -2404,13 +2404,14 @@ impl ministark::air::AirConfig for AirConfig {
         let initial_ec_op_address = ec_op_segment.begin_addr.into();
         let initial_poseidon_address = poseidon_segment.begin_addr.into();
 
-        let memory_quotient = utils::compute_public_memory_quotient(
-            challenges[MemoryPermutation::Z],
-            challenges[MemoryPermutation::A],
-            trace_len,
-            &execution_info.public_memory,
-            execution_info.public_memory_padding(),
-        );
+        let memory_quotient =
+            utils::compute_public_memory_quotient::<PUBLIC_MEMORY_STEP, Self::Fp, Self::Fq>(
+                challenges[MemoryPermutation::Z],
+                challenges[MemoryPermutation::A],
+                trace_len,
+                &execution_info.public_memory,
+                execution_info.public_memory_padding(),
+            );
 
         let diluted_cumulative_val = compute_diluted_cumulative_value::<
             Fp,

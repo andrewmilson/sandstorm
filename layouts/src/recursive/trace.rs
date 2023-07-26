@@ -208,10 +208,8 @@ impl CairoTrace for ExecutionTrace {
                     npc_cycle[Npc::MemDst as usize] = dst;
                     npc_cycle[Npc::MemOp1Addr as usize] = op1_addr.into();
                     npc_cycle[Npc::MemOp1 as usize] = op1;
-                    for offset in (0..CYCLE_HEIGHT).step_by(PUBLIC_MEMORY_STEP) {
-                        npc_cycle[offset + Npc::PubMemAddr as usize] = Fp::zero();
-                        npc_cycle[offset + Npc::PubMemVal as usize] = Fp::zero();
-                    }
+                    npc_cycle[Npc::PubMemAddr as usize] = Fp::zero();
+                    npc_cycle[Npc::PubMemVal as usize] = Fp::zero();
 
                     // MEMORY
                     // handled after this loop
@@ -642,8 +640,12 @@ impl CairoTrace for ExecutionTrace {
                 value: value_felt,
             })
             .collect();
-        let ordered_memory_accesses =
-            get_ordered_memory_accesses(trace_len, &memory_accesses, &public_memory, padding_entry);
+        let ordered_memory_accesses = get_ordered_memory_accesses::<PUBLIC_MEMORY_STEP, Fp>(
+            trace_len,
+            &memory_accesses,
+            &public_memory,
+            padding_entry,
+        );
         let memory_column = ordered_memory_accesses
             .into_iter()
             .flat_map(|e| [e.address.into(), e.value])

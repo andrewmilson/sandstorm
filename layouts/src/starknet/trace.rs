@@ -924,8 +924,12 @@ impl CairoTrace for ExecutionTrace {
                 value: value_felt,
             })
             .collect();
-        let ordered_memory_accesses =
-            get_ordered_memory_accesses(trace_len, &memory_accesses, &public_memory, padding_entry);
+        let ordered_memory_accesses = get_ordered_memory_accesses::<PUBLIC_MEMORY_STEP, Fp>(
+            trace_len,
+            &memory_accesses,
+            &public_memory,
+            padding_entry,
+        );
         let memory_column = ordered_memory_accesses
             .into_iter()
             .flat_map(|e| [e.address.into(), e.value])

@@ -1,4 +1,3 @@
-use crate::starknet::PUBLIC_MEMORY_STEP;
 use ark_ff::PrimeField;
 use binary::MemoryEntry;
 use ministark::StarkExtensionOf;
@@ -10,7 +9,11 @@ use ruint::uint;
 
 /// Computes the value of the public memory quotient:
 /// Adapted from https://github.com/starkware-libs/starkex-contracts
-pub fn compute_public_memory_quotient<Fp: GpuFftField + PrimeField, Fq: StarkExtensionOf<Fp>>(
+pub fn compute_public_memory_quotient<
+    const PUBLIC_MEMORY_STEP: usize,
+    Fp: GpuFftField + PrimeField,
+    Fq: StarkExtensionOf<Fp>,
+>(
     z: Fq,
     alpha: Fq,
     trace_len: usize,
@@ -108,7 +111,7 @@ pub fn compute_diluted_cumulative_value<
 /// Accesses must be of the form (address, value)
 /// Output is of the form (address, value)
 // TODO: make sure supports input, output and builtins
-pub fn get_ordered_memory_accesses<F: PrimeField>(
+pub fn get_ordered_memory_accesses<const PUBLIC_MEMORY_STEP: usize, F: PrimeField>(
     trace_len: usize,
     accesses: &[MemoryEntry<F>],
     public_memory: &[MemoryEntry<F>],

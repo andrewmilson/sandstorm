@@ -495,8 +495,8 @@ impl ministark::air::AirConfig for AirConfig {
         // terminates with more-or-less the permutation of just the public input. The
         // verifier can relatively cheaply calculate this terminal. The constraint for
         // this terminal is `memory_multi_column_perm_perm_last`.
-        let public_memory_addr_zero = Npc::PubMemAddr.curr() * &every_eighth_row_zerofier_inv;
-        let public_memory_value_zero = Npc::PubMemVal.curr() * &every_eighth_row_zerofier_inv;
+        let public_memory_addr_zero = Npc::PubMemAddr.curr() * &all_cycles_zerofier_inv;
+        let public_memory_value_zero = Npc::PubMemVal.curr() * &all_cycles_zerofier_inv;
 
         // examples for trace length n=16
         // =====================================
@@ -928,11 +928,11 @@ impl ministark::air::AirConfig for AirConfig {
         // x^(n/256) - 1               = (x-ω^0)(x-ω^256)(x-ω^512)(x-ω^768)
         // (x-ω^768)/(x^(n/256) - 1)   = 1/((x-ω^0)(x-ω^256)(x-ω^512))
         // vanishes on every 256th row except the 3rd of every 4
-        let bitwise_transition_zerofier_inv = (X.pow(n / 1024)
+        let bitwise_transition_zerofier_inv = (X.pow(n / 128)
             - Constant(FieldVariant::Fp(g.pow([(3 * n / 4) as u64]))))
             * &every_256_row_zerofier_inv;
 
-        let all_bitwise_zerofier = X.pow(n / 1024) - &one;
+        let all_bitwise_zerofier = X.pow(n / 128) - &one;
         let all_bitwise_zerofier_inv = &one / &all_bitwise_zerofier;
 
         // Checks memory address for four bitwise inputs
@@ -946,7 +946,7 @@ impl ministark::air::AirConfig for AirConfig {
             * &all_bitwise_zerofier_inv;
 
         let last_bitwise_zerofier =
-            X - Constant(FieldVariant::Fp(g.pow([1024 * (n / 1024 - 1) as u64])));
+            X - Constant(FieldVariant::Fp(g.pow([128 * (n / 128 - 1) as u64])));
         let all_bitwise_except_last_zerofier_inv =
             &last_bitwise_zerofier * &all_bitwise_zerofier_inv;
 
@@ -1177,48 +1177,48 @@ impl ministark::air::AirConfig for AirConfig {
             cpu_decode_opcode_rc_input,
             cpu_decode_flag_op1_base_op0_bit,
             cpu_decode_flag_res_op1_bit,
-            // cpu_decode_flag_pc_update_regular_bit,
-            // cpu_decode_fp_update_regular_bit,
-            // cpu_operands_mem_dst_addr,
-            // cpu_operands_mem_op0_addr,
-            // cpu_operands_mem_op1_addr,
-            // cpu_operands_ops_mul,
-            // cpu_operands_res,
-            // cpu_update_registers_update_pc_tmp0,
-            // cpu_update_registers_update_pc_tmp1,
-            // cpu_update_registers_update_pc_pc_cond_negative,
-            // cpu_update_registers_update_pc_pc_cond_positive,
-            // cpu_update_registers_update_ap_ap_update,
-            // cpu_update_registers_update_fp_fp_update,
-            // cpu_opcodes_call_push_fp,
-            // cpu_opcodes_call_push_pc,
-            // cpu_opcodes_call_off0,
-            // cpu_opcodes_call_off1,
-            // cpu_opcodes_call_flags,
-            // cpu_opcodes_ret_off0,
-            // cpu_opcodes_ret_off2,
-            // cpu_opcodes_ret_flags,
-            // cpu_opcodes_assert_eq_assert_eq,
-            // initial_ap,
-            // initial_fp,
-            // initial_pc,
-            // final_ap,
-            // final_fp,
-            // final_pc,
+            cpu_decode_flag_pc_update_regular_bit,
+            cpu_decode_fp_update_regular_bit,
+            cpu_operands_mem_dst_addr,
+            cpu_operands_mem_op0_addr,
+            cpu_operands_mem_op1_addr,
+            cpu_operands_ops_mul,
+            cpu_operands_res,
+            cpu_update_registers_update_pc_tmp0,
+            cpu_update_registers_update_pc_tmp1,
+            cpu_update_registers_update_pc_pc_cond_negative,
+            cpu_update_registers_update_pc_pc_cond_positive,
+            cpu_update_registers_update_ap_ap_update,
+            cpu_update_registers_update_fp_fp_update,
+            cpu_opcodes_call_push_fp,
+            cpu_opcodes_call_push_pc,
+            cpu_opcodes_call_off0,
+            cpu_opcodes_call_off1,
+            cpu_opcodes_call_flags,
+            cpu_opcodes_ret_off0,
+            cpu_opcodes_ret_off2,
+            cpu_opcodes_ret_flags,
+            cpu_opcodes_assert_eq_assert_eq,
+            initial_ap,
+            initial_fp,
+            initial_pc,
+            final_ap,
+            final_fp,
+            final_pc,
             memory_multi_column_perm_perm_init0,
-            // memory_multi_column_perm_perm_step0,
-            // memory_multi_column_perm_perm_last,
-            // memory_diff_is_bit,
-            // memory_is_func,
-            // memory_initial_addr,
-            // public_memory_addr_zero,
-            // public_memory_value_zero,
+            memory_multi_column_perm_perm_step0,
+            memory_multi_column_perm_perm_last,
+            memory_diff_is_bit,
+            memory_is_func,
+            memory_initial_addr,
+            public_memory_addr_zero,
+            public_memory_value_zero,
             rc16_perm_init0,
-            // rc16_perm_step0,
-            // rc16_perm_last,
-            // rc16_diff_is_bit,
-            // rc16_minimum,
-            // rc16_maximum,
+            rc16_perm_step0,
+            rc16_perm_last,
+            rc16_diff_is_bit,
+            rc16_minimum,
+            rc16_maximum,
             diluted_check_permutation_init0,
             // diluted_check_permutation_step0,
             // diluted_check_permutation_last,
@@ -1305,13 +1305,14 @@ impl ministark::air::AirConfig for AirConfig {
         let initial_rc_address = rc_segment.begin_addr.into();
         let initial_bitwise_address = bitwise_segment.begin_addr.into();
 
-        let memory_quotient = utils::compute_public_memory_quotient(
-            challenges[MemoryPermutation::Z],
-            challenges[MemoryPermutation::A],
-            trace_len,
-            &execution_info.public_memory,
-            execution_info.public_memory_padding(),
-        );
+        let memory_quotient =
+            utils::compute_public_memory_quotient::<PUBLIC_MEMORY_STEP, Self::Fp, Self::Fq>(
+                challenges[MemoryPermutation::Z],
+                challenges[MemoryPermutation::A],
+                trace_len,
+                &execution_info.public_memory,
+                execution_info.public_memory_padding(),
+            );
 
         let diluted_cumulative_val = compute_diluted_cumulative_value::<
             Fp,
