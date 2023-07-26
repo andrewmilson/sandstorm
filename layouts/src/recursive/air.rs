@@ -557,6 +557,12 @@ impl ministark::air::AirConfig for AirConfig {
         let every_8_rows_except_last_zerofier_inv =
             &zerofier_8th_last_row * &every_8_row_zerofier_inv;
 
+        let zerofier_every_last_row = X - Constant(FieldVariant::Fp(g.pow([(n / CYCLE_HEIGHT - 1) as u64])));
+        let zerofier_every_row = X.pow(n) - &one;
+        let every_row_zerofier_inv = &one / &zerofier_every_row;
+        let zerofier_every_row_except_every_last_row = &zerofier_every_row * &zerofier_every_last_row;
+        let every_row_except_every_last_row_zerofier_inv = &one / &zerofier_every_row_except_every_last_row;
+        let every_last_row_zerofier_inv = &one / &zerofier_every_last_row;
         // we have an out-of-order and in-order list of diluted values for this layout
         // (starknet). We want to check each list is a permutation of one another
         let diluted_check_permutation_step0 = ((DilutedCheckPermutation::Z.challenge()
@@ -564,10 +570,10 @@ impl ministark::air::AirConfig for AirConfig {
             * Permutation::DilutedCheck.next()
             - (DilutedCheckPermutation::Z.challenge() - DilutedCheck::Unordered.next())
                 * Permutation::DilutedCheck.curr())
-            * &every_8_rows_except_last_zerofier_inv;
+            * &every_row_except_every_last_row_zerofier_inv;
         let diluted_check_permutation_last = (Permutation::DilutedCheck.curr()
             - DilutedCheckProduct.hint())
-            * &zerofier_8th_last_row_inv;
+           * &every_last_row_zerofier_inv;
 
         // Initial aggregate value should be =1
         let diluted_check_init = (DilutedCheck::Aggregate.curr() - &one) * &first_row_zerofier_inv;
@@ -626,21 +632,21 @@ impl ministark::air::AirConfig for AirConfig {
         let shift3 = Constant(FieldVariant::Fp(Fp::from(BigUint::from(2u32).pow(3u32))));
         let pedersen_hash0_ec_subset_sum_bit_unpacking_zeroes_between_ones192 =
             (Pedersen::Bit251AndBit196.curr()
-                * (Pedersen::Suffix.offset(193) - Pedersen::Suffix.offset(196) * shift3))
+                * (Pedersen::Suffix.offset(772) - Pedersen::Suffix.offset(784) * shift3))
                 * &every_256_row_zerofier_inv;
         let pedersen_hash0_ec_subset_sum_bit_unpacking_cumulative_bit196 =
             (Pedersen::Bit251AndBit196.curr()
-                - (Pedersen::Suffix.offset(251)
-                    - (Pedersen::Suffix.offset(252) + Pedersen::Suffix.offset(252)))
-                    * (Pedersen::Suffix.offset(196)
-                        - (Pedersen::Suffix.offset(197) + Pedersen::Suffix.offset(197))))
+                - (Pedersen::Suffix.offset(1004)
+                    - (Pedersen::Suffix.offset(1008) + Pedersen::Suffix.offset(1008)))
+                    * (Pedersen::Suffix.offset(784)
+                        - (Pedersen::Suffix.offset(788) + Pedersen::Suffix.offset(788))))
                 * &every_256_row_zerofier_inv;
         // TODO: docs
         let shift54 = Constant(FieldVariant::Fp(Fp::from(BigUint::from(2u32).pow(54u32))));
         let pedersen_hash0_ec_subset_sum_bit_unpacking_zeroes_between_ones196 = ((Pedersen::Suffix
-            .offset(251)
-            - (Pedersen::Suffix.offset(252) + Pedersen::Suffix.offset(252)))
-            * (Pedersen::Suffix.offset(197) - Pedersen::Suffix.offset(251) * shift54))
+            .offset(1004)
+            - (Pedersen::Suffix.offset(1008) + Pedersen::Suffix.offset(1008)))
+            * (Pedersen::Suffix.offset(788) - Pedersen::Suffix.offset(1004) * shift54))
             * &every_256_row_zerofier_inv;
 
         // example for trace length n=512
@@ -839,11 +845,11 @@ impl ministark::air::AirConfig for AirConfig {
         // We make sure the initial value of each group is loaded correctly:
         // - 1st group we check P0 (the shift point) is the first partial sum
         // - 2nd group we check e0 (processed `a`) is the first partial sum
-        let pedersen_hash0_copy_point_x = (Pedersen::PartialSumX.offset(256)
-            - Pedersen::PartialSumX.offset(255))
+        let pedersen_hash0_copy_point_x = (Pedersen::PartialSumX.offset(1024)
+            - Pedersen::PartialSumX.offset(1020))
             * &every_512_row_zerofier_inv;
-        let pedersen_hash0_copy_point_y = (Pedersen::PartialSumY.offset(256)
-            - Pedersen::PartialSumY.offset(255))
+        let pedersen_hash0_copy_point_y = (Pedersen::PartialSumY.offset(1024)
+            - Pedersen::PartialSumY.offset(1020))
             * &every_512_row_zerofier_inv;
         // TODO: introducing a new zerofier that's equivalent to the
         // previous one? double check every_512_row_zerofier
@@ -1176,7 +1182,7 @@ impl ministark::air::AirConfig for AirConfig {
             cpu_decode_opcode_rc_zero,
             cpu_decode_opcode_rc_input,
             cpu_decode_flag_op1_base_op0_bit,
-            cpu_decode_flag_res_op1_bit,
+            cpu_decode_flag_res_op1_bit,        // enable above here
             cpu_decode_flag_pc_update_regular_bit,
             cpu_decode_fp_update_regular_bit,
             cpu_operands_mem_dst_addr,
@@ -1205,66 +1211,67 @@ impl ministark::air::AirConfig for AirConfig {
             final_ap,
             final_fp,
             final_pc,
-            memory_multi_column_perm_perm_init0,
+            memory_multi_column_perm_perm_init0,    // enable
             memory_multi_column_perm_perm_step0,
-            memory_multi_column_perm_perm_last,
+            // memory_multi_column_perm_perm_last,  // TODO something wrong with this
             memory_diff_is_bit,
             memory_is_func,
             memory_initial_addr,
-            public_memory_addr_zero,
+            public_memory_addr_zero,                // TODO No Zerofier? PublicMemoryFraction
+                                                    // for recrusive layout = 8 and starknet = 4
             public_memory_value_zero,
-            rc16_perm_init0,
+            rc16_perm_init0,                        //enable
             rc16_perm_step0,
             rc16_perm_last,
             rc16_diff_is_bit,
             rc16_minimum,
             rc16_maximum,
-            diluted_check_permutation_init0,
-            // diluted_check_permutation_step0,
-            // diluted_check_permutation_last,
-            // diluted_check_init,
-            // diluted_check_first_element,
-            diluted_check_step,
-            // diluted_check_last,
-            // pedersen_hash0_ec_subset_sub_bit_unpacking_last_one_is_zero,
-            // pedersen_hash0_ec_subset_sub_bit_unpacking_zeros_between_ones,
-            // pedersen_hash0_ec_subset_sum_bit_unpacking_cumulative_bit192,
-            // pedersen_hash0_ec_subset_sum_bit_unpacking_zeroes_between_ones192,
-            // pedersen_hash0_ec_subset_sum_bit_unpacking_cumulative_bit196,
-            // pedersen_hash0_ec_subset_sum_bit_unpacking_zeroes_between_ones196,
-            // pedersen_hash0_ec_subset_sum_booleanity_test,
-            // pedersen_hash0_ec_subset_sum_bit_extraction_end,
-            // pedersen_hash0_ec_subset_sum_zeros_tail,
-            // pedersen_hash0_ec_subset_sum_add_points_slope,
-            // pedersen_hash0_ec_subset_sum_add_points_x,
-            // pedersen_hash0_ec_subset_sum_add_points_y,
-            // pedersen_hash0_ec_subset_sum_copy_point_x,
-            // pedersen_hash0_ec_subset_sum_copy_point_y,
-            // pedersen_hash0_copy_point_x,
-            // pedersen_hash0_copy_point_y,
-            // pedersen_hash0_init_x,
-            // pedersen_hash0_init_y,
-            // pedersen_input0_value0,
-            // pedersen_input0_addr,
-            // pedersen_init_addr,
-            // pedersen_input1_value0,
-            // pedersen_input1_addr,
-            // pedersen_output_value0,
-            // pedersen_output_addr,
-            // rc_builtin_value,
-            // rc_builtin_addr_step,
-            // rc_builtin_init_addr,
-            // bitwise_init_var_pool_addr,
-            // bitwise_step_var_pool_addr,
-            // bitwise_x_or_y_addr,
-            // bitwise_next_var_pool_addr,
-            // bitwise_partition,
-            // bitwise_or_is_and_plus_xor,
-            // bitwise_addition_is_xor_with_and,
-            // bitwise_unique_unpacking192,
-            // bitwise_unique_unpacking193,
-            // bitwise_unique_unpacking194,
-            // bitwise_unique_unpacking195,
+            diluted_check_permutation_init0,        //enable
+            diluted_check_permutation_step0,
+            diluted_check_permutation_last,      // TODO permutations are messed up
+          // diluted_check_init,
+          //  diluted_check_first_element,
+            diluted_check_step,                     //enable
+           // diluted_check_last,
+           // pedersen_hash0_ec_subset_sub_bit_unpacking_last_one_is_zero,
+           // pedersen_hash0_ec_subset_sub_bit_unpacking_zeros_between_ones,
+           // pedersen_hash0_ec_subset_sum_bit_unpacking_cumulative_bit192,
+           // pedersen_hash0_ec_subset_sum_bit_unpacking_zeroes_between_ones192,
+           // pedersen_hash0_ec_subset_sum_bit_unpacking_cumulative_bit196,
+           // pedersen_hash0_ec_subset_sum_bit_unpacking_zeroes_between_ones196,
+           // pedersen_hash0_ec_subset_sum_booleanity_test,
+           // pedersen_hash0_ec_subset_sum_bit_extraction_end,
+           // pedersen_hash0_ec_subset_sum_zeros_tail,
+           // pedersen_hash0_ec_subset_sum_add_points_slope,
+           // pedersen_hash0_ec_subset_sum_add_points_x,
+           // pedersen_hash0_ec_subset_sum_add_points_y,
+           // pedersen_hash0_ec_subset_sum_copy_point_x,
+           // pedersen_hash0_ec_subset_sum_copy_point_y,
+           // pedersen_hash0_copy_point_x,
+           // pedersen_hash0_copy_point_y,
+           // pedersen_hash0_init_x,
+           // pedersen_hash0_init_y,
+           // pedersen_input0_value0,
+           // pedersen_input0_addr,
+           // pedersen_init_addr,
+           // pedersen_input1_value0,
+           // pedersen_input1_addr,
+           // pedersen_output_value0,
+           // pedersen_output_addr,
+           // rc_builtin_value,
+           // rc_builtin_addr_step,
+           // rc_builtin_init_addr,
+           // bitwise_init_var_pool_addr,
+           // bitwise_step_var_pool_addr,
+           // bitwise_x_or_y_addr,
+           // bitwise_next_var_pool_addr,
+           // bitwise_partition,
+           // bitwise_or_is_and_plus_xor,
+            bitwise_addition_is_xor_with_and,       //enable
+           // bitwise_unique_unpacking192,
+           // bitwise_unique_unpacking193,
+           // bitwise_unique_unpacking194,
+           // bitwise_unique_unpacking195,
         ]
         .into_iter()
         .map(Constraint::new)
@@ -1508,7 +1515,7 @@ impl ExecutionTraceColumn for Bitwise {
             | Self::Bits16Chunk3Offset0ResShifted
             | Self::Bits16Chunk3Offset1ResShifted
             | Self::Bits16Chunk3Offset2ResShifted
-            | Self::Bits16Chunk3Offset3ResShifted => 5,
+            | Self::Bits16Chunk3Offset3ResShifted => 1,
         }
     }
 
@@ -1530,11 +1537,11 @@ impl ExecutionTraceColumn for Bitwise {
             | Self::Bits16Chunk3Offset0
             | Self::Bits16Chunk3Offset1
             | Self::Bits16Chunk3Offset2
-            | Self::Bits16Chunk3Offset3 => 256,
+            | Self::Bits16Chunk3Offset3 => 32,
             Self::Bits16Chunk3Offset0ResShifted
             | Self::Bits16Chunk3Offset1ResShifted
             | Self::Bits16Chunk3Offset2ResShifted
-            | Self::Bits16Chunk3Offset3ResShifted => 1024,
+            | Self::Bits16Chunk3Offset3ResShifted => 128,
         };
         AlgebraicItem::Trace(column, offset * step + *self as isize).into()
     }
@@ -1542,22 +1549,19 @@ impl ExecutionTraceColumn for Bitwise {
 
 #[derive(Clone, Copy)]
 pub enum Pedersen {
-    PartialSumX,
-    PartialSumY,
-    Suffix,
-    Slope,
+    PartialSumX = 1,
+    PartialSumY = 3,
+    Suffix = 0,
+    Slope = 2,
     Bit251AndBit196AndBit192 = 7,
-    Bit251AndBit196 = 8, // TODO 1022
+    Bit251AndBit196 = 1022,
 }
 
-// TODO Pedersen is split over multiple columns
 impl ExecutionTraceColumn for Pedersen {
     fn index(&self) -> usize {
         match self {
-            Self::PartialSumX => 1,
-            Self::PartialSumY => 2, // TODO The partial Sums could be still the same - confirm this
-            Self::Suffix => 6,
-            Self::Slope => 4,
+            Self::PartialSumX | Self::PartialSumY => 5,
+            Self::Suffix | Self:: Slope => 6,
             Self::Bit251AndBit196AndBit192 | Self::Bit251AndBit196 => 6,
         }
     }
@@ -1565,7 +1569,12 @@ impl ExecutionTraceColumn for Pedersen {
     fn offset<T>(&self, offset: isize) -> Expr<AlgebraicItem<T>> {
         let column = self.index();
         let trace_offset = match self {
-            Self::PartialSumX | Self::PartialSumY | Self::Suffix | Self::Slope => offset,
+            Self::Suffix | Self::Slope => {
+                offset + *self as isize
+            },
+            Self::PartialSumX | Self::PartialSumY  => {
+                4 * offset + *self as isize
+            }
             Self::Bit251AndBit196AndBit192 | Self::Bit251AndBit196 => {
                 (PEDERSEN_BUILTIN_RATIO * CYCLE_HEIGHT) as isize * offset + *self as isize
             }
@@ -1587,7 +1596,6 @@ pub enum Npc {
     MemOp0Addr = 4,
     MemOp0 = 5,
 
-    // TODO Still old starknet layout
     PedersenInput0Addr = 10,
     PedersenInput0Val = 11,
 
@@ -1815,7 +1823,7 @@ impl ExecutionTraceColumn for Permutation {
         let trace_offset = match self {
             Self::Memory => MEMORY_STEP as isize * offset + shift as isize,
             Self::RangeCheck => 4 * offset + shift as isize,
-            Self::DilutedCheck => 8 * offset + shift as isize, // TODO this is probably 2 * offset
+            Self::DilutedCheck => offset + shift as isize, // TODO this is probably 2 * offset
         };
         AlgebraicItem::Trace(column, trace_offset).into()
     }
