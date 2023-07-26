@@ -1235,7 +1235,7 @@ impl ministark::air::AirConfig for AirConfig {
             // pedersen_hash0_ec_subset_sum_booleanity_test,
             // pedersen_hash0_ec_subset_sum_bit_extraction_end,
             // pedersen_hash0_ec_subset_sum_zeros_tail,
-            pedersen_hash0_ec_subset_sum_add_points_slope,
+            // pedersen_hash0_ec_subset_sum_add_points_slope,
             // pedersen_hash0_ec_subset_sum_add_points_x,
             // pedersen_hash0_ec_subset_sum_add_points_y,
             // pedersen_hash0_ec_subset_sum_copy_point_x,
@@ -1554,8 +1554,9 @@ impl ExecutionTraceColumn for Pedersen {
     fn index(&self) -> usize {
         match self {
             Self::PartialSumX | Self::PartialSumY => 5,
-            Self::Suffix | Self::Slope => 6,
-            Self::Bit251AndBit196AndBit192 | Self::Bit251AndBit196 => 6,
+            Self::Suffix | Self::Slope | Self::Bit251AndBit196AndBit192 | Self::Bit251AndBit196 => {
+                6
+            }
         }
     }
 

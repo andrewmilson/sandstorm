@@ -113,6 +113,8 @@ impl<
             z,
         );
 
+        println!("Mask size: {}", trace_ood_eval_map.len());
+
         for eval in &composition_trace_ood_evals {
             public_coin.reseed_with_field_element(eval);
         }
