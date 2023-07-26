@@ -486,8 +486,6 @@ impl ministark::air::AirConfig for AirConfig {
         // boundary condition stating the first memory address == 1
         let memory_initial_addr = (Mem::Address.curr() - &one) * &first_row_zerofier_inv;
         // applies every 8 rows
-        let every_eighth_row_zerofier = X.pow(n / 8) - &one;
-        let every_eighth_row_zerofier_inv = &one / &every_eighth_row_zerofier;
         // Read cairo whitepaper section 9.8 as to why the public memory cells are 0.
         // The high level is that the way public memory works is that the prover is
         // forced (with these constraints) to exclude the public memory from one of
@@ -541,7 +539,6 @@ impl ministark::air::AirConfig for AirConfig {
         // Dilutions have two parameters (1) the number of bits they operate on and
         // (2) the spread of each bit. For example the the dilution of binary
         // digit 1111 to 0001000100010001 operates on 4 bits with a spread of 4.
-        // TODO Zerofier adjust
         let diluted_check_permutation_init0 = ((DilutedCheckPermutation::Z.challenge()
             - DilutedCheck::Ordered.curr())
             * Permutation::DilutedCheck.curr()
@@ -549,14 +546,7 @@ impl ministark::air::AirConfig for AirConfig {
             - DilutedCheckPermutation::Z.challenge())
             * &first_row_zerofier_inv;
 
-        // Diluted checks operate every 8 rows (twice per cycle)
-        let zerofier_8th_last_row = X - Constant(FieldVariant::Fp(g.pow([8 * (n as u64 / 8 - 1)])));
-        let zerofier_8th_last_row_inv = &one / &zerofier_8th_last_row;
-        let every_8_row_zerofier = X.pow(n / 8) - &one;
-        let every_8_row_zerofier_inv = &one / &every_8_row_zerofier;
-        let every_8_rows_except_last_zerofier_inv =
-            &zerofier_8th_last_row * &every_8_row_zerofier_inv;
-
+        // Diluted checks operate every row (16 times per cycle)
         let last_row_zerofier = X - Constant(FieldVariant::Fp(g.pow([n as u64 - 1])));
         let last_row_zerofier_inv = &one / &last_row_zerofier;
         let every_row_except_last_zerofier_inv = &last_row_zerofier * &one / &every_row_zerofier;
@@ -584,19 +574,18 @@ impl ministark::air::AirConfig for AirConfig {
         // Note that if there is no difference between the current and next ordered
         // diluted values then `diluted_diff == 0` and the previous aggregate value is
         // copied over
-        // TODO Zerofier
         let diluted_diff = DilutedCheck::Ordered.next() - DilutedCheck::Ordered.curr();
         let diluted_check_step = (DilutedCheck::Aggregate.next()
             - (DilutedCheck::Aggregate.curr()
                 * (&one + DilutedCheckAggregation::Z.challenge() * &diluted_diff)
-                + DilutedCheckAggregation::A.challenge() * &diluted_diff * diluted_diff));
-        // * &every_8_rows_except_last_zerofier_inv;
+                + DilutedCheckAggregation::A.challenge() * &diluted_diff * diluted_diff))
+            * &every_row_except_last_zerofier_inv;
 
         // Check the last cumulative value.
         // NOTE: This can be calculated efficiently by the verifier.
         let diluted_check_last = (DilutedCheck::Aggregate.curr()
             - DilutedCheckCumulativeValue.hint())
-            * &zerofier_8th_last_row_inv;
+            * &last_row_zerofier_inv;
 
         // Pedersen builtin
         // ================
@@ -1225,10 +1214,10 @@ impl ministark::air::AirConfig for AirConfig {
             diluted_check_permutation_init0,
             diluted_check_permutation_step0,
             diluted_check_permutation_last,
-            // diluted_check_init,
-            // diluted_check_first_element,
+            diluted_check_init,
+            diluted_check_first_element,
             diluted_check_step,
-            // diluted_check_last,
+            diluted_check_last,
             // pedersen_hash0_ec_subset_sub_bit_unpacking_last_one_is_zero,
             // pedersen_hash0_ec_subset_sub_bit_unpacking_zeros_between_ones,
             // pedersen_hash0_ec_subset_sum_bit_unpacking_cumulative_bit192,
