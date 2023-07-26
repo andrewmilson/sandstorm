@@ -40,8 +40,8 @@ use strum_macros::EnumIter;
 pub struct AirConfig;
 
 impl ministark::air::AirConfig for AirConfig {
-    const NUM_BASE_COLUMNS: usize = 9;
-    const NUM_EXTENSION_COLUMNS: usize = 1;
+    const NUM_BASE_COLUMNS: usize = 7;
+    const NUM_EXTENSION_COLUMNS: usize = 3;
     type Fp = Fp;
     type Fq = Fp;
     type PublicInputs = AirPublicInput<Fp>;
@@ -516,8 +516,8 @@ impl ministark::air::AirConfig for AirConfig {
         let rc16_perm_init0 = ((RangeCheckPermutation::Z.challenge() - RangeCheck::Ordered.curr())
             * Permutation::RangeCheck.curr()
             + RangeCheck::OffDst.curr()
-            - RangeCheckPermutation::Z.challenge())
-            * &first_row_zerofier_inv;
+            - RangeCheckPermutation::Z.challenge());
+        // * &first_row_zerofier_inv;
         let rc16_perm_step0 = ((RangeCheckPermutation::Z.challenge() - RangeCheck::Ordered.next())
             * Permutation::RangeCheck.next()
             - (RangeCheckPermutation::Z.challenge() - RangeCheck::OffOp1.curr())
@@ -546,8 +546,8 @@ impl ministark::air::AirConfig for AirConfig {
             - DilutedCheck::Ordered.curr())
             * Permutation::DilutedCheck.curr()
             + DilutedCheck::Unordered.curr()
-            - DilutedCheckPermutation::Z.challenge())
-            * &first_row_zerofier_inv;
+            - DilutedCheckPermutation::Z.challenge());
+        // * &first_row_zerofier_inv;
 
         // Diluted checks operate every 8 rows (twice per cycle)
         let zerofier_8th_last_row = X - Constant(FieldVariant::Fp(g.pow([8 * (n as u64 / 8 - 1)])));
@@ -586,8 +586,8 @@ impl ministark::air::AirConfig for AirConfig {
         let diluted_check_step = (DilutedCheck::Aggregate.next()
             - (DilutedCheck::Aggregate.curr()
                 * (&one + DilutedCheckAggregation::Z.challenge() * &diluted_diff)
-                + DilutedCheckAggregation::A.challenge() * &diluted_diff * diluted_diff))
-            * &every_8_rows_except_last_zerofier_inv;
+                + DilutedCheckAggregation::A.challenge() * &diluted_diff * diluted_diff));
+        // * &every_8_rows_except_last_zerofier_inv;
 
         // Check the last cumulative value.
         // NOTE: This can be calculated efficiently by the verifier.
@@ -877,7 +877,8 @@ impl ministark::air::AirConfig for AirConfig {
 
         // Link Input1 into the memory pool.
         // Input1's address should be the address directly after input0's address
-        let pedersen_input1_value0 = (Npc::PedersenInput1Val.curr() - Pedersen::Suffix.offset(1024))
+        let pedersen_input1_value0 = (Npc::PedersenInput1Val.curr()
+            - Pedersen::Suffix.offset(1024))
             * &every_512_row_zerofier_inv;
         let pedersen_input1_addr = (Npc::PedersenInput1Addr.curr()
             - (Npc::PedersenInput0Addr.curr() + &one))
@@ -1171,11 +1172,11 @@ impl ministark::air::AirConfig for AirConfig {
 
         // NOTE: for composition OODs only seem to involve one random per constraint
         vec![
-            // cpu_decode_opcode_rc_b,
-            // cpu_decode_opcode_rc_zero,
-            // cpu_decode_opcode_rc_input,
-            // cpu_decode_flag_op1_base_op0_bit,
-            // cpu_decode_flag_res_op1_bit,
+            cpu_decode_opcode_rc_b,
+            cpu_decode_opcode_rc_zero,
+            cpu_decode_opcode_rc_input,
+            cpu_decode_flag_op1_base_op0_bit,
+            cpu_decode_flag_res_op1_bit,
             // cpu_decode_flag_pc_update_regular_bit,
             // cpu_decode_fp_update_regular_bit,
             // cpu_operands_mem_dst_addr,
@@ -1204,7 +1205,7 @@ impl ministark::air::AirConfig for AirConfig {
             // final_ap,
             // final_fp,
             // final_pc,
-            // memory_multi_column_perm_perm_init0,
+            memory_multi_column_perm_perm_init0,
             // memory_multi_column_perm_perm_step0,
             // memory_multi_column_perm_perm_last,
             // memory_diff_is_bit,
@@ -1212,18 +1213,18 @@ impl ministark::air::AirConfig for AirConfig {
             // memory_initial_addr,
             // public_memory_addr_zero,
             // public_memory_value_zero,
-            // rc16_perm_init0,
+            rc16_perm_init0,
             // rc16_perm_step0,
             // rc16_perm_last,
             // rc16_diff_is_bit,
             // rc16_minimum,
             // rc16_maximum,
-            // diluted_check_permutation_init0,
+            diluted_check_permutation_init0,
             // diluted_check_permutation_step0,
             // diluted_check_permutation_last,
             // diluted_check_init,
             // diluted_check_first_element,
-            // diluted_check_step,
+            diluted_check_step,
             // diluted_check_last,
             // pedersen_hash0_ec_subset_sub_bit_unpacking_last_one_is_zero,
             // pedersen_hash0_ec_subset_sub_bit_unpacking_zeros_between_ones,
@@ -1545,7 +1546,7 @@ pub enum Pedersen {
     Suffix,
     Slope,
     Bit251AndBit196AndBit192 = 7,
-    Bit251AndBit196 = 8,    // TODO 1022
+    Bit251AndBit196 = 8, // TODO 1022
 }
 
 // TODO Pedersen is split over multiple columns
@@ -1723,7 +1724,11 @@ impl ExecutionTraceColumn for DilutedCheck {
 
     fn offset<T>(&self, offset: isize) -> Expr<AlgebraicItem<T>> {
         let column = self.index();
-        AlgebraicItem::Trace(column, DILUTED_CHECK_STEP as isize * offset + *self as isize).into()
+        AlgebraicItem::Trace(
+            column,
+            DILUTED_CHECK_STEP as isize * offset + *self as isize,
+        )
+        .into()
     }
 }
 

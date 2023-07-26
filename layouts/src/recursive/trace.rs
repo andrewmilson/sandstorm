@@ -283,37 +283,42 @@ impl CairoTrace for ExecutionTrace {
         // Diluted check
         // =============
         let mut diluted_check_ordered_column = Vec::new_in(GpuAllocator);
-        range_check_column.resize(trace_len, Fp::ZERO);
+        diluted_check_ordered_column.resize(trace_len, Fp::ZERO);
         let mut diluted_check_unordered_column = Vec::new_in(GpuAllocator);
-        range_check_column.resize(trace_len, Fp::ZERO);
+        diluted_check_unordered_column.resize(trace_len, Fp::ZERO);
 
-        // Generate trace for pedersen hash
-        // ================================
-        let mut pedersen_partial_xs_column = Vec::new_in(GpuAllocator);
-        pedersen_partial_xs_column.resize(trace_len, Fp::zero());
-        let mut pedersen_partial_ys_column = Vec::new_in(GpuAllocator);
-        pedersen_partial_ys_column.resize(trace_len, Fp::zero());
-        let mut pedersen_suffixes_column = Vec::new_in(GpuAllocator);
-        pedersen_suffixes_column.resize(trace_len, Fp::zero());
-        let mut pedersen_slopes_column = Vec::new_in(GpuAllocator);
-        pedersen_slopes_column.resize(trace_len, Fp::zero());
+        // // Generate trace for pedersen hash
+        // // ================================
+        // let mut pedersen_partial_xs_column = Vec::new_in(GpuAllocator);
+        // pedersen_partial_xs_column.resize(trace_len, Fp::zero());
+        // let mut pedersen_partial_ys_column = Vec::new_in(GpuAllocator);
+        // pedersen_partial_ys_column.resize(trace_len, Fp::zero());
+        // let mut pedersen_suffixes_column = Vec::new_in(GpuAllocator);
+        // pedersen_suffixes_column.resize(trace_len, Fp::zero());
+        // let mut pedersen_slopes_column = Vec::new_in(GpuAllocator);
+        // pedersen_slopes_column.resize(trace_len, Fp::zero());
 
-        // the trace for each hash spans 2048 rows
-        let (pedersen_partial_xs_steps, _) = pedersen_partial_xs_column.as_chunks_mut::<2048>();
-        let (pedersen_partial_ys_steps, _) = pedersen_partial_ys_column.as_chunks_mut::<2048>();
-        let (pedersen_suffixes_steps, _) = pedersen_suffixes_column.as_chunks_mut::<2048>();
-        let (pedersen_slopes_steps, _) = pedersen_slopes_column.as_chunks_mut::<2048>();
-        let (pedersen_npc_steps, _) = npc_column.as_chunks_mut::<2048>();
-        let (pedersen_aux_steps, _) = auxiliary_column.as_chunks_mut::<2048>();
+        // // the trace for each hash spans 2048 rows
+        // let (pedersen_partial_xs_steps, _) =
+        // pedersen_partial_xs_column.as_chunks_mut::<2048>();
+        // let (pedersen_partial_ys_steps, _) =
+        // pedersen_partial_ys_column.as_chunks_mut::<2048>();
+        // let (pedersen_suffixes_steps, _) =
+        // pedersen_suffixes_column.as_chunks_mut::<2048>();
+        // let (pedersen_slopes_steps, _) =
+        // pedersen_slopes_column.as_chunks_mut::<2048>();
+        // let (pedersen_npc_steps, _) = npc_column.as_chunks_mut::<2048>();
+        // let (pedersen_aux_steps, _) = auxiliary_column.as_chunks_mut::<2048>();
 
-        // create dummy instances if there are cells that need to be filled
-        let pedersen_instances = air_private_input.pedersen;
-        let num_pedersen_instances = pedersen_instances.len() as u32;
-        let empty_pedersen_instances = (num_pedersen_instances..).map(PedersenInstance::new_empty);
-        let pedersen_traces = pedersen_instances
-            .into_iter()
-            .chain(empty_pedersen_instances)
-            .map(pedersen::InstanceTrace::new);
+        // // create dummy instances if there are cells that need to be filled
+        // let pedersen_instances = air_private_input.pedersen;
+        // let num_pedersen_instances = pedersen_instances.len() as u32;
+        // let empty_pedersen_instances =
+        // (num_pedersen_instances..).map(PedersenInstance::new_empty);
+        // let pedersen_traces = pedersen_instances
+        //     .into_iter()
+        //     .chain(empty_pedersen_instances)
+        //     .map(pedersen::InstanceTrace::new);
 
         let pedersen_memory_segment = air_public_input
             .memory_segments
@@ -321,62 +326,65 @@ impl CairoTrace for ExecutionTrace {
             .expect("layout requires a pedersen memory segment");
         let initial_pedersen_address = pedersen_memory_segment.begin_addr;
 
-        // load individual hash traces into the global execution trace
-        ark_std::cfg_iter_mut!(pedersen_partial_xs_steps)
-            .zip(pedersen_partial_ys_steps)
-            .zip(pedersen_suffixes_steps)
-            .zip(pedersen_slopes_steps)
-            .zip(pedersen_npc_steps)
-            .zip(pedersen_aux_steps)
-            .zip(pedersen_traces)
-            .for_each(
-                |((((((partial_xs, partial_ys), suffixes), slopes), npc), aux), pedersen_trace)| {
-                    let a_steps = pedersen_trace.a_steps;
-                    let b_steps = pedersen_trace.b_steps;
-                    let partial_steps = [a_steps, b_steps].concat();
+        // // load individual hash traces into the global execution trace
+        // ark_std::cfg_iter_mut!(pedersen_partial_xs_steps)
+        //     .zip(pedersen_partial_ys_steps)
+        //     .zip(pedersen_suffixes_steps)
+        //     .zip(pedersen_slopes_steps)
+        //     .zip(pedersen_npc_steps)
+        //     .zip(pedersen_aux_steps)
+        //     .zip(pedersen_traces)
+        //     .for_each(
+        //         |((((((partial_xs, partial_ys), suffixes), slopes), npc), aux), pedersen_trace)| {
+        //             let a_steps = pedersen_trace.a_steps;
+        //             let b_steps = pedersen_trace.b_steps;
+        //             let partial_steps = [a_steps, b_steps].concat();
 
-                    for ((((suffix, partial_x), partial_y), slope), step) in
-                        zip(suffixes.iter_mut(), partial_xs.iter_mut())
-                            .zip(partial_ys.iter_mut())
-                            .zip(slopes.iter_mut())
-                            .zip(partial_steps)
-                    {
-                        *suffix = step.suffix;
-                        *partial_x = step.point.x;
-                        *partial_y = step.point.y;
-                        *slope = step.slope;
-                    }
+        //             for ((((suffix, partial_x), partial_y), slope), step) in
+        //                 zip(suffixes.iter_mut(), partial_xs.iter_mut())
+        //                     .zip(partial_ys.iter_mut())
+        //                     .zip(slopes.iter_mut())
+        //                     .zip(partial_steps)
+        //             {
+        //                 *suffix = step.suffix;
+        //                 *partial_x = step.point.x;
+        //                 *partial_y = step.point.y;
+        //                 *slope = step.slope;
+        //             }
 
-                    // load fields for unique bit decomposition checks into the trace
-                    // TODO split_at_mut(256) is that correct?
-                    let (a_slopes, b_slopes) = slopes.split_at_mut(256);
-                    let (a_aux, b_aux) = aux.split_at_mut(256);
-                    a_slopes[Pedersen::Bit251AndBit196 as usize] =
-                        pedersen_trace.a_bit251_and_bit196.into();
-                    b_slopes[Pedersen::Bit251AndBit196 as usize] =
-                        pedersen_trace.b_bit251_and_bit196.into();
-                    a_aux[Pedersen::Bit251AndBit196AndBit192 as usize] =
-                        pedersen_trace.a_bit251_and_bit196_and_bit192.into();
-                    b_aux[Pedersen::Bit251AndBit196AndBit192 as usize] =
-                        pedersen_trace.b_bit251_and_bit196_and_bit192.into();
+        //             // load fields for unique bit decomposition checks into the trace
+        //             // TODO split_at_mut(256) is that correct?
+        //             let (a_slopes, b_slopes) = slopes.split_at_mut(256);
+        //             let (a_aux, b_aux) = aux.split_at_mut(256);
+        //             a_slopes[Pedersen::Bit251AndBit196 as usize] =
+        //                 pedersen_trace.a_bit251_and_bit196.into();
+        //             b_slopes[Pedersen::Bit251AndBit196 as usize] =
+        //                 pedersen_trace.b_bit251_and_bit196.into();
+        //             a_aux[Pedersen::Bit251AndBit196AndBit192 as usize] =
+        //                 pedersen_trace.a_bit251_and_bit196_and_bit192.into();
+        //             b_aux[Pedersen::Bit251AndBit196AndBit192 as usize] =
+        //                 pedersen_trace.b_bit251_and_bit196_and_bit192.into();
 
-                    // add the hash to the memory pool
-                    let instance = pedersen_trace.instance;
-                    let (a_addr, b_addr, output_addr) = instance.mem_addr(initial_pedersen_address);
-                    npc[Npc::PedersenInput0Addr as usize] = a_addr.into();
-                    npc[Npc::PedersenInput0Val as usize] = Fp::from(BigUint::from(instance.a));
-                    npc[Npc::PedersenInput1Addr as usize] = b_addr.into();
-                    npc[Npc::PedersenInput1Val as usize] = Fp::from(BigUint::from(instance.b));
-                    npc[Npc::PedersenOutputAddr as usize] = output_addr.into();
-                    npc[Npc::PedersenOutputVal as usize] = pedersen_trace.output;
-                },
-            );
+        //             // add the hash to the memory pool
+        //             let instance = pedersen_trace.instance;
+        //             let (a_addr, b_addr, output_addr) =
+        // instance.mem_addr(initial_pedersen_address);
+        // npc[Npc::PedersenInput0Addr as usize] = a_addr.into();
+        // npc[Npc::PedersenInput0Val as usize] = Fp::from(BigUint::from(instance.a));
+        //             npc[Npc::PedersenInput1Addr as usize] = b_addr.into();
+        //             npc[Npc::PedersenInput1Val as usize] =
+        // Fp::from(BigUint::from(instance.b));
+        // npc[Npc::PedersenOutputAddr as usize] = output_addr.into();
+        //             npc[Npc::PedersenOutputVal as usize] = pedersen_trace.output;
+        //         },
+        //     );
 
-        // Generate trace for range check builtin
-        // ======================================
-        const RC_STEP_ROWS: usize = RANGE_CHECK_BUILTIN_RATIO * CYCLE_HEIGHT;
-        let (rc_range_check_steps, _) = range_check_column.as_chunks_mut::<RC_STEP_ROWS>();
-        let (rc_npc_steps, _) = npc_column.as_chunks_mut::<RC_STEP_ROWS>();
+        // // Generate trace for range check builtin
+        // // ======================================
+        // const RC_STEP_ROWS: usize = RANGE_CHECK_BUILTIN_RATIO * CYCLE_HEIGHT;
+        // let (rc_range_check_steps, _) =
+        // range_check_column.as_chunks_mut::<RC_STEP_ROWS>();
+        // let (rc_npc_steps, _) = npc_column.as_chunks_mut::<RC_STEP_ROWS>();
 
         let rc_memory_segment = air_public_input
             .memory_segments
@@ -384,33 +392,37 @@ impl CairoTrace for ExecutionTrace {
             .expect("layout requires a range check memory segment");
         let initial_rc_address = rc_memory_segment.begin_addr;
 
-        ark_std::cfg_iter_mut!(rc_range_check_steps)
-            .zip(rc_npc_steps)
-            .zip(rc128_traces.into_iter().chain(rc128_dummy_traces))
-            .for_each(|((rc, npc), rc_trace)| {
-                // add the 128-bit range check to the 16-bit range check pool
-                let parts = rc_trace.parts;
-                const RC_PART_ROWS: usize = RC_STEP_ROWS / RANGE_CHECK_BUILTIN_PARTS;
-                rc[RangeCheckBuiltin::Rc16Component as usize] = parts[0].into();
-                rc[RangeCheckBuiltin::Rc16Component as usize + RC_PART_ROWS] = parts[1].into();
-                rc[RangeCheckBuiltin::Rc16Component as usize + RC_PART_ROWS * 2] = parts[2].into();
-                rc[RangeCheckBuiltin::Rc16Component as usize + RC_PART_ROWS * 3] = parts[3].into();
-                rc[RangeCheckBuiltin::Rc16Component as usize + RC_PART_ROWS * 4] = parts[4].into();
-                rc[RangeCheckBuiltin::Rc16Component as usize + RC_PART_ROWS * 5] = parts[5].into();
-                rc[RangeCheckBuiltin::Rc16Component as usize + RC_PART_ROWS * 6] = parts[6].into();
-                rc[RangeCheckBuiltin::Rc16Component as usize + RC_PART_ROWS * 7] = parts[7].into();
+        // ark_std::cfg_iter_mut!(rc_range_check_steps)
+        //     .zip(rc_npc_steps)
+        //     .zip(rc128_traces.into_iter().chain(rc128_dummy_traces))
+        //     .for_each(|((rc, npc), rc_trace)| {
+        //         // add the 128-bit range check to the 16-bit range check pool
+        //         let parts = rc_trace.parts;
+        //         const RC_PART_ROWS: usize = RC_STEP_ROWS / RANGE_CHECK_BUILTIN_PARTS;
+        //         rc[RangeCheckBuiltin::Rc16Component as usize] = parts[0].into();
+        //         rc[RangeCheckBuiltin::Rc16Component as usize + RC_PART_ROWS] =
+        // parts[1].into();         rc[RangeCheckBuiltin::Rc16Component as usize
+        // + RC_PART_ROWS * 2] = parts[2].into(); rc[RangeCheckBuiltin::Rc16Component as
+        //   usize + RC_PART_ROWS * 3] =
+        // parts[3].into();         rc[RangeCheckBuiltin::Rc16Component as usize
+        // + RC_PART_ROWS * 4] = parts[4].into(); rc[RangeCheckBuiltin::Rc16Component as
+        //   usize + RC_PART_ROWS * 5] =
+        // parts[5].into();         rc[RangeCheckBuiltin::Rc16Component as usize
+        // + RC_PART_ROWS * 6] = parts[6].into(); rc[RangeCheckBuiltin::Rc16Component as
+        //   usize + RC_PART_ROWS * 7] =
+        // parts[7].into();
 
-                // TODO: could turn above into loop
-                // for (dst, val) in zip(range_check.chunks_mut(RC_PART_ROWS), rc_trace.parts) {
-                //     dst[RangeCheckBuiltin::Rc16Component as usize] = val.into();
-                // }
+        //         // TODO: could turn above into loop
+        //         // for (dst, val) in zip(range_check.chunks_mut(RC_PART_ROWS),
+        // rc_trace.parts) {         //     dst[RangeCheckBuiltin::Rc16Component
+        // as usize] = val.into();         // }
 
-                // add the range check to the memory pool
-                let instance = rc_trace.instance;
-                let addr = instance.mem_addr(initial_rc_address);
-                npc[Npc::RangeCheck128Addr as usize] = addr.into();
-                npc[Npc::RangeCheck128Val as usize] = Fp::from(BigUint::from(instance.value));
-            });
+        //         // add the range check to the memory pool
+        //         let instance = rc_trace.instance;
+        //         let addr = instance.mem_addr(initial_rc_address);
+        //         npc[Npc::RangeCheck128Addr as usize] = addr.into();
+        //         npc[Npc::RangeCheck128Val as usize] =
+        // Fp::from(BigUint::from(instance.value));     });
 
         // Generate trace for bitwise builtin
         // ==================================
@@ -422,169 +434,190 @@ impl CairoTrace for ExecutionTrace {
             .expect("layout requires a bitwise memory segment");
         let initial_bitwise_address = bitwise_memory_segment.begin_addr;
 
-        // create dummy instances if there are cells that need to be filled
-        let bitwise_instances = air_private_input.bitwise;
-        let num_bitwise_instances = bitwise_instances.len() as u32;
-        let bitwise_dummy_instances = (num_bitwise_instances..).map(BitwiseInstance::new_empty);
-        let bitwise_traces = bitwise_instances
-            .into_iter()
-            .chain(bitwise_dummy_instances)
-            .map(bitwise::InstanceTrace::<DILUTED_CHECK_SPACING>::new);
+        // // create dummy instances if there are cells that need to be filled
+        // let bitwise_instances = air_private_input.bitwise;
+        // let num_bitwise_instances = bitwise_instances.len() as u32;
+        // let bitwise_dummy_instances =
+        // (num_bitwise_instances..).map(BitwiseInstance::new_empty);
+        // let bitwise_traces = bitwise_instances
+        //     .into_iter()
+        //     .chain(bitwise_dummy_instances)
+        //     .map(bitwise::InstanceTrace::<DILUTED_CHECK_SPACING>::new);
 
-        let (bitwise_npc_steps, _) = npc_column.as_chunks_mut::<1024>();
-        let (bitwise_dilution_steps, _) = range_check_column.as_chunks_mut::<1024>();
+        // let (bitwise_npc_steps, _) = npc_column.as_chunks_mut::<1024>();
+        // let (bitwise_dilution_steps, _) = range_check_column.as_chunks_mut::<1024>();
 
-        // TODO: how does fold work with par_iter? Does it kill parallelism?
-        // might be better to map multiple pools and then fold into one if so.
-        let diluted_check_pool = ark_std::cfg_iter_mut!(bitwise_npc_steps)
-            .zip(bitwise_dilution_steps)
-            .zip(bitwise_traces)
-            .fold(
-                DilutedCheckPool::<DILUTED_CHECK_N_BITS, DILUTED_CHECK_SPACING>::new(),
-                |mut diluted_pool, ((npc, dilution), bitwise_trace)| {
-                    let instance = bitwise_trace.instance;
+        // // TODO: how does fold work with par_iter? Does it kill parallelism?
+        // // might be better to map multiple pools and then fold into one if so.
+        // let diluted_check_pool = ark_std::cfg_iter_mut!(bitwise_npc_steps)
+        //     .zip(bitwise_dilution_steps)
+        //     .zip(bitwise_traces)
+        //     .fold(
+        //         DilutedCheckPool::<DILUTED_CHECK_N_BITS,
+        // DILUTED_CHECK_SPACING>::new(),         |mut diluted_pool, ((npc, dilution),
+        // bitwise_trace)| {             let instance = bitwise_trace.instance;
 
-                    {
-                        // add shifts to ensure a unique unpacking
-                        let x_and_y_v0 = bitwise_trace.x_and_y_partition.high.high[0];
-                        let x_and_y_v1 = bitwise_trace.x_and_y_partition.high.high[1];
-                        let x_and_y_v2 = bitwise_trace.x_and_y_partition.high.high[2];
-                        let x_and_y_v3 = bitwise_trace.x_and_y_partition.high.high[3];
-                        let v0 = x_and_y_v0 + bitwise_trace.x_xor_y_partition.high.high[0];
-                        let v1 = x_and_y_v1 + bitwise_trace.x_xor_y_partition.high.high[1];
-                        let v2 = x_and_y_v2 + bitwise_trace.x_xor_y_partition.high.high[2];
-                        let v3 = x_and_y_v3 + bitwise_trace.x_xor_y_partition.high.high[3];
-                        // only fails if the AIR will error
-                        assert_eq!(v0, (v0 << 4) >> 4);
-                        assert_eq!(v1, (v1 << 4) >> 4);
-                        assert_eq!(v2, (v2 << 4) >> 4);
-                        assert_eq!(v3, (v3 << 8) >> 8);
-                        let s0 = v0 << 4;
-                        let s1 = v1 << 4;
-                        let s2 = v2 << 4;
-                        let s3 = v3 << 8;
-                        diluted_pool.push_diluted(U256::from(s0));
-                        diluted_pool.push_diluted(U256::from(s1));
-                        diluted_pool.push_diluted(U256::from(s2));
-                        diluted_pool.push_diluted(U256::from(s3));
-                        dilution[Bitwise::Bits16Chunk3Offset0ResShifted as usize] = s0.into();
-                        dilution[Bitwise::Bits16Chunk3Offset1ResShifted as usize] = s1.into();
-                        dilution[Bitwise::Bits16Chunk3Offset2ResShifted as usize] = s2.into();
-                        dilution[Bitwise::Bits16Chunk3Offset3ResShifted as usize] = s3.into();
-                    }
+        //             {
+        //                 // add shifts to ensure a unique unpacking
+        //                 let x_and_y_v0 =
+        // bitwise_trace.x_and_y_partition.high.high[0];                 let
+        // x_and_y_v1 = bitwise_trace.x_and_y_partition.high.high[1];
+        //                 let x_and_y_v2 =
+        // bitwise_trace.x_and_y_partition.high.high[2];                 let
+        // x_and_y_v3 = bitwise_trace.x_and_y_partition.high.high[3];
+        //                 let v0 = x_and_y_v0 +
+        // bitwise_trace.x_xor_y_partition.high.high[0];                 let v1
+        // = x_and_y_v1 + bitwise_trace.x_xor_y_partition.high.high[1];
+        //                 let v2 = x_and_y_v2 +
+        // bitwise_trace.x_xor_y_partition.high.high[2];                 let v3
+        // = x_and_y_v3 + bitwise_trace.x_xor_y_partition.high.high[3];
+        //                 // only fails if the AIR will error
+        //                 assert_eq!(v0, (v0 << 4) >> 4);
+        //                 assert_eq!(v1, (v1 << 4) >> 4);
+        //                 assert_eq!(v2, (v2 << 4) >> 4);
+        //                 assert_eq!(v3, (v3 << 8) >> 8);
+        //                 let s0 = v0 << 4;
+        //                 let s1 = v1 << 4;
+        //                 let s2 = v2 << 4;
+        //                 let s3 = v3 << 8;
+        //                 diluted_pool.push_diluted(U256::from(s0));
+        //                 diluted_pool.push_diluted(U256::from(s1));
+        //                 diluted_pool.push_diluted(U256::from(s2));
+        //                 diluted_pool.push_diluted(U256::from(s3));
+        //                 dilution[Bitwise::Bits16Chunk3Offset0ResShifted as usize] =
+        // s0.into();
+        // dilution[Bitwise::Bits16Chunk3Offset1ResShifted as usize] = s1.into();
+        //                 dilution[Bitwise::Bits16Chunk3Offset2ResShifted as usize] =
+        // s2.into();
+        // dilution[Bitwise::Bits16Chunk3Offset3ResShifted as usize] = s3.into();
+        //             }
 
-                    // NOTE: the order of these partitions matters
-                    let partitions = [
-                        bitwise_trace.x_partition,
-                        bitwise_trace.y_partition,
-                        bitwise_trace.x_and_y_partition,
-                        bitwise_trace.x_xor_y_partition,
-                    ];
+        //             // NOTE: the order of these partitions matters
+        //             let partitions = [
+        //                 bitwise_trace.x_partition,
+        //                 bitwise_trace.y_partition,
+        //                 bitwise_trace.x_and_y_partition,
+        //                 bitwise_trace.x_xor_y_partition,
+        //             ];
 
-                    // load diluted partitions into the execution trace
-                    let (dilution_steps, _) = dilution.as_chunks_mut::<256>();
-                    for (dilution_step, partition) in zip(dilution_steps, partitions) {
-                        let chunk0 = partition.low.low;
-                        dilution_step[Bitwise::Bits16Chunk0Offset0 as usize] = chunk0[0].into();
-                        dilution_step[Bitwise::Bits16Chunk0Offset1 as usize] = chunk0[1].into();
-                        dilution_step[Bitwise::Bits16Chunk0Offset2 as usize] = chunk0[2].into();
-                        dilution_step[Bitwise::Bits16Chunk0Offset3 as usize] = chunk0[3].into();
+        //             // load diluted partitions into the execution trace
+        //             let (dilution_steps, _) = dilution.as_chunks_mut::<256>();
+        //             for (dilution_step, partition) in zip(dilution_steps, partitions)
+        // {                 let chunk0 = partition.low.low;
+        //                 dilution_step[Bitwise::Bits16Chunk0Offset0 as usize] =
+        // chunk0[0].into();
+        // dilution_step[Bitwise::Bits16Chunk0Offset1 as usize] = chunk0[1].into();
+        //                 dilution_step[Bitwise::Bits16Chunk0Offset2 as usize] =
+        // chunk0[2].into();
+        // dilution_step[Bitwise::Bits16Chunk0Offset3 as usize] = chunk0[3].into();
 
-                        let chunk1 = partition.low.high;
-                        dilution_step[Bitwise::Bits16Chunk1Offset0 as usize] = chunk1[0].into();
-                        dilution_step[Bitwise::Bits16Chunk1Offset1 as usize] = chunk1[1].into();
-                        dilution_step[Bitwise::Bits16Chunk1Offset2 as usize] = chunk1[2].into();
-                        dilution_step[Bitwise::Bits16Chunk1Offset3 as usize] = chunk1[3].into();
+        //                 let chunk1 = partition.low.high;
+        //                 dilution_step[Bitwise::Bits16Chunk1Offset0 as usize] =
+        // chunk1[0].into();
+        // dilution_step[Bitwise::Bits16Chunk1Offset1 as usize] = chunk1[1].into();
+        //                 dilution_step[Bitwise::Bits16Chunk1Offset2 as usize] =
+        // chunk1[2].into();
+        // dilution_step[Bitwise::Bits16Chunk1Offset3 as usize] = chunk1[3].into();
 
-                        let chunk2 = partition.high.low;
-                        dilution_step[Bitwise::Bits16Chunk2Offset0 as usize] = chunk2[0].into();
-                        dilution_step[Bitwise::Bits16Chunk2Offset1 as usize] = chunk2[1].into();
-                        dilution_step[Bitwise::Bits16Chunk2Offset2 as usize] = chunk2[2].into();
-                        dilution_step[Bitwise::Bits16Chunk2Offset3 as usize] = chunk2[3].into();
+        //                 let chunk2 = partition.high.low;
+        //                 dilution_step[Bitwise::Bits16Chunk2Offset0 as usize] =
+        // chunk2[0].into();
+        // dilution_step[Bitwise::Bits16Chunk2Offset1 as usize] = chunk2[1].into();
+        //                 dilution_step[Bitwise::Bits16Chunk2Offset2 as usize] =
+        // chunk2[2].into();
+        // dilution_step[Bitwise::Bits16Chunk2Offset3 as usize] = chunk2[3].into();
 
-                        let chunk3 = partition.high.high;
-                        dilution_step[Bitwise::Bits16Chunk3Offset0 as usize] = chunk3[0].into();
-                        dilution_step[Bitwise::Bits16Chunk3Offset1 as usize] = chunk3[1].into();
-                        dilution_step[Bitwise::Bits16Chunk3Offset2 as usize] = chunk3[2].into();
-                        dilution_step[Bitwise::Bits16Chunk3Offset3 as usize] = chunk3[3].into();
+        //                 let chunk3 = partition.high.high;
+        //                 dilution_step[Bitwise::Bits16Chunk3Offset0 as usize] =
+        // chunk3[0].into();
+        // dilution_step[Bitwise::Bits16Chunk3Offset1 as usize] = chunk3[1].into();
+        //                 dilution_step[Bitwise::Bits16Chunk3Offset2 as usize] =
+        // chunk3[2].into();
+        // dilution_step[Bitwise::Bits16Chunk3Offset3 as usize] = chunk3[3].into();
 
-                        for v in [*chunk0, *chunk1, *chunk2, *chunk3].concat() {
-                            diluted_pool.push_diluted(U256::from(v))
-                        }
-                    }
+        //                 for v in [*chunk0, *chunk1, *chunk2, *chunk3].concat() {
+        //                     diluted_pool.push_diluted(U256::from(v))
+        //                 }
+        //             }
 
-                    // load bitwise values into memory
-                    let addr_step = BITWISE_RATIO * CYCLE_HEIGHT / 4;
-                    let input_x_offset = Npc::BitwisePoolAddr as usize;
-                    let input_y_offset = input_x_offset + addr_step;
-                    let x_and_y_offset = input_y_offset + addr_step;
-                    let x_xor_y_offset = x_and_y_offset + addr_step;
-                    let x_or_y_offset = Npc::BitwiseXOrYAddr as usize;
-                    let (input_x_addr, input_y_addr, x_and_y_addr, x_xor_y_addr, x_or_y_addr) =
-                        instance.mem_addr(initial_bitwise_address);
-                    npc[input_x_offset] = input_x_addr.into();
-                    npc[input_x_offset + 1] = bitwise_trace.x;
-                    npc[input_y_offset] = input_y_addr.into();
-                    npc[input_y_offset + 1] = bitwise_trace.y;
-                    npc[x_and_y_offset] = x_and_y_addr.into();
-                    npc[x_and_y_offset + 1] = bitwise_trace.x_and_y;
-                    npc[x_xor_y_offset] = x_xor_y_addr.into();
-                    npc[x_xor_y_offset + 1] = bitwise_trace.x_xor_y;
-                    npc[x_or_y_offset] = x_or_y_addr.into();
-                    npc[x_or_y_offset + 1] = bitwise_trace.x_or_y;
+        //             // load bitwise values into memory
+        //             let addr_step = BITWISE_RATIO * CYCLE_HEIGHT / 4;
+        //             let input_x_offset = Npc::BitwisePoolAddr as usize;
+        //             let input_y_offset = input_x_offset + addr_step;
+        //             let x_and_y_offset = input_y_offset + addr_step;
+        //             let x_xor_y_offset = x_and_y_offset + addr_step;
+        //             let x_or_y_offset = Npc::BitwiseXOrYAddr as usize;
+        //             let (input_x_addr, input_y_addr, x_and_y_addr, x_xor_y_addr,
+        // x_or_y_addr) =
+        // instance.mem_addr(initial_bitwise_address);
+        // npc[input_x_offset] = input_x_addr.into();
+        // npc[input_x_offset + 1] = bitwise_trace.x;
+        // npc[input_y_offset] = input_y_addr.into();
+        // npc[input_y_offset + 1] = bitwise_trace.y;
+        // npc[x_and_y_offset] = x_and_y_addr.into();
+        // npc[x_and_y_offset + 1] = bitwise_trace.x_and_y;
+        // npc[x_xor_y_offset] = x_xor_y_addr.into();
+        // npc[x_xor_y_offset + 1] = bitwise_trace.x_xor_y;
+        // npc[x_or_y_offset] = x_or_y_addr.into();
+        // npc[x_or_y_offset + 1] = bitwise_trace.x_or_y;
 
-                    // return the diluted pool
-                    diluted_pool
-                },
-            );
+        //             // return the diluted pool
+        //             diluted_pool
+        //         },
+        //     );
 
-        // make sure all diluted check values are encountered for
-        const DILUTED_MIN: u128 = 0;
-        const DILUTED_MAX: u128 = (1 << DILUTED_CHECK_N_BITS) - 1;
-        let (ordered_diluted_vals, ordered_diluted_padding_vals) =
-            diluted_check_pool.get_ordered_values_with_padding(DILUTED_MIN, DILUTED_MAX);
-        let mut ordered_diluted_vals = ordered_diluted_vals.into_iter();
-        let mut ordered_diluted_padding_vals = ordered_diluted_padding_vals.into_iter();
+        // // make sure all diluted check values are encountered for
+        // const DILUTED_MIN: u128 = 0;
+        // const DILUTED_MAX: u128 = (1 << DILUTED_CHECK_N_BITS) - 1;
+        // let (ordered_diluted_vals, ordered_diluted_padding_vals) =
+        //     diluted_check_pool.get_ordered_values_with_padding(DILUTED_MIN,
+        // DILUTED_MAX); let mut ordered_diluted_vals =
+        // ordered_diluted_vals.into_iter();
+        // let mut ordered_diluted_padding_vals =
+        // ordered_diluted_padding_vals.into_iter();
 
-        // add diluted padding values
-        // TODO: this is a strange way to do it. fix
-        let (bitwise_dilution_chunks, _) = range_check_column.as_chunks_mut::<1024>();
-        'outer: for bitwise_dilution_chunk in bitwise_dilution_chunks {
-            for (i, dilution_step) in bitwise_dilution_chunk
-                .array_chunks_mut::<DILUTED_CHECK_STEP>()
-                .enumerate()
-                .skip(1)
-                .step_by(2)
-            {
-                let offset = i * DILUTED_CHECK_STEP + DilutedCheck::Unordered as usize;
-                // NOTE: doing it this hacky way to ensure no conflict with the bitwise builtin
-                // CONTEXT: each cycle spans 16 steps, there are two stacked dilutions per cycle
-                if offset != Bitwise::Bits16Chunk3Offset0ResShifted as usize
-                    && offset != Bitwise::Bits16Chunk3Offset1ResShifted as usize
-                    && offset != Bitwise::Bits16Chunk3Offset2ResShifted as usize
-                    && offset != Bitwise::Bits16Chunk3Offset3ResShifted as usize
-                {
-                    let padding_val = match ordered_diluted_padding_vals.next() {
-                        Some(v) => dilute::<DILUTED_CHECK_SPACING>(U256::from(v)),
-                        None => break 'outer,
-                    };
+        // // add diluted padding values
+        // // TODO: this is a strange way to do it. fix
+        // let (bitwise_dilution_chunks, _) =
+        // range_check_column.as_chunks_mut::<1024>(); 'outer: for
+        // bitwise_dilution_chunk in bitwise_dilution_chunks {     for (i,
+        // dilution_step) in bitwise_dilution_chunk
+        //         .array_chunks_mut::<DILUTED_CHECK_STEP>()
+        //         .enumerate()
+        //         .skip(1)
+        //         .step_by(2)
+        //     {
+        //         let offset = i * DILUTED_CHECK_STEP + DilutedCheck::Unordered as
+        // usize;         // NOTE: doing it this hacky way to ensure no conflict
+        // with the bitwise builtin         // CONTEXT: each cycle spans 16
+        // steps, there are two stacked dilutions per cycle         if offset !=
+        // Bitwise::Bits16Chunk3Offset0ResShifted as usize             && offset
+        // != Bitwise::Bits16Chunk3Offset1ResShifted as usize             &&
+        // offset != Bitwise::Bits16Chunk3Offset2ResShifted as usize
+        // && offset != Bitwise::Bits16Chunk3Offset3ResShifted as usize
+        //         {
+        //             let padding_val = match ordered_diluted_padding_vals.next() {
+        //                 Some(v) => dilute::<DILUTED_CHECK_SPACING>(U256::from(v)),
+        //                 None => break 'outer,
+        //             };
 
-                    dilution_step[DilutedCheck::Unordered as usize] =
-                        BigUint::from(padding_val).into();
-                }
-            }
-        }
+        //             dilution_step[DilutedCheck::Unordered as usize] =
+        //                 BigUint::from(padding_val).into();
+        //         }
+        //     }
+        // }
 
-        // add ordered diluted check values
-        let padding_offset = diluted_check_ordered_column.len() - ordered_diluted_vals.len();
-        for diluted_val in &mut diluted_check_ordered_column[padding_offset..] {
-            let val = ordered_diluted_vals.next().unwrap();
-            *diluted_val = BigUint::from(dilute::<DILUTED_CHECK_SPACING>(U256::from(val))).into();
-        }
+        // // add ordered diluted check values
+        // let padding_offset = diluted_check_ordered_column.len() -
+        // ordered_diluted_vals.len(); for diluted_val in &mut
+        // diluted_check_ordered_column[padding_offset..] {     let val =
+        // ordered_diluted_vals.next().unwrap();     *diluted_val =
+        // BigUint::from(dilute::<DILUTED_CHECK_SPACING>(U256::from(val))).into();
+        // }
 
-        // ensure dilution check values have been fully consumed
-        assert!(ordered_diluted_padding_vals.next().is_none());
-        assert!(ordered_diluted_vals.next().is_none());
+        // // ensure dilution check values have been fully consumed
+        // assert!(ordered_diluted_padding_vals.next().is_none());
+        // assert!(ordered_diluted_vals.next().is_none());
 
         // VM Memory
         // =========
@@ -645,10 +678,6 @@ impl CairoTrace for ExecutionTrace {
             npc_column.to_vec_in(GpuAllocator),
             memory_column.to_vec_in(GpuAllocator),
             range_check_column.to_vec_in(GpuAllocator),
-            pedersen_partial_xs_column.to_vec_in(GpuAllocator),
-            pedersen_partial_ys_column.to_vec_in(GpuAllocator),
-            pedersen_suffixes_column.to_vec_in(GpuAllocator),
-            pedersen_slopes_column.to_vec_in(GpuAllocator),
             auxiliary_column.to_vec_in(GpuAllocator),
         ]);
 

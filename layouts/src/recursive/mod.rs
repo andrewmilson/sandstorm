@@ -16,7 +16,7 @@ pub use trace::ExecutionTrace;
 pub const CYCLE_HEIGHT: usize = 16;
 pub const PUBLIC_MEMORY_STEP: usize = 8;
 pub const MEMORY_STEP: usize = 2;
-pub const RANGE_CHECK_STEP: usize = 2;
+pub const RANGE_CHECK_STEP: usize = 4;
 pub const DILUTED_CHECK_STEP: usize = 1; //TODO is that correct?
 
 /// How many cycles per pedersen hash
