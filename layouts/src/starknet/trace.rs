@@ -539,8 +539,9 @@ impl CairoTrace for ExecutionTrace {
             .chain(bitwise_dummy_instances)
             .map(bitwise::InstanceTrace::<DILUTED_CHECK_SPACING>::new);
 
-        let (bitwise_npc_steps, _) = npc_column.as_chunks_mut::<1024>();
-        let (bitwise_dilution_steps, _) = range_check_column.as_chunks_mut::<1024>();
+        const BITWISE_STEP_ROWS: usize = BITWISE_RATIO * CYCLE_HEIGHT;
+        let (bitwise_npc_steps, _) = npc_column.as_chunks_mut::<BITWISE_STEP_ROWS>();
+        let (bitwise_dilution_steps, _) = range_check_column.as_chunks_mut::<BITWISE_STEP_ROWS>();
 
         // TODO: how does fold work with par_iter? Does it kill parallelism?
         // might be better to map multiple pools and then fold into one if so.

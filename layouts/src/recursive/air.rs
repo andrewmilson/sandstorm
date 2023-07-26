@@ -516,8 +516,8 @@ impl ministark::air::AirConfig for AirConfig {
         let rc16_perm_init0 = ((RangeCheckPermutation::Z.challenge() - RangeCheck::Ordered.curr())
             * Permutation::RangeCheck.curr()
             + RangeCheck::OffDst.curr()
-            - RangeCheckPermutation::Z.challenge());
-        // * &first_row_zerofier_inv;
+            - RangeCheckPermutation::Z.challenge())
+            * &first_row_zerofier_inv;
         let rc16_perm_step0 = ((RangeCheckPermutation::Z.challenge() - RangeCheck::Ordered.next())
             * Permutation::RangeCheck.next()
             - (RangeCheckPermutation::Z.challenge() - RangeCheck::OffOp1.curr())
@@ -546,8 +546,8 @@ impl ministark::air::AirConfig for AirConfig {
             - DilutedCheck::Ordered.curr())
             * Permutation::DilutedCheck.curr()
             + DilutedCheck::Unordered.curr()
-            - DilutedCheckPermutation::Z.challenge());
-        // * &first_row_zerofier_inv;
+            - DilutedCheckPermutation::Z.challenge())
+            * &first_row_zerofier_inv;
 
         // Diluted checks operate every 8 rows (twice per cycle)
         let zerofier_8th_last_row = X - Constant(FieldVariant::Fp(g.pow([8 * (n as u64 / 8 - 1)])));
@@ -1451,38 +1451,38 @@ pub enum Bitwise {
     // TODO: better names or just don't use this
     // for 1st chunk 64 bits
     Bits16Chunk0Offset0 = 0,
-    Bits16Chunk0Offset1 = 17,
-    Bits16Chunk0Offset2 = 33,
-    Bits16Chunk0Offset3 = 49,
+    Bits16Chunk0Offset1 = 2,
+    Bits16Chunk0Offset2 = 4,
+    Bits16Chunk0Offset3 = 6,
     // for 2nd chunk of 64 bits
-    Bits16Chunk1Offset0 = 65,
-    Bits16Chunk1Offset1 = 81,
-    Bits16Chunk1Offset2 = 97,
-    Bits16Chunk1Offset3 = 113,
+    Bits16Chunk1Offset0 = 8,
+    Bits16Chunk1Offset1 = 10,
+    Bits16Chunk1Offset2 = 12,
+    Bits16Chunk1Offset3 = 14,
     // for 3rd chunk of 64 bits
-    Bits16Chunk2Offset0 = 129,
-    Bits16Chunk2Offset1 = 145,
-    Bits16Chunk2Offset2 = 161,
-    Bits16Chunk2Offset3 = 177,
+    Bits16Chunk2Offset0 = 16,
+    Bits16Chunk2Offset1 = 18,
+    Bits16Chunk2Offset2 = 20,
+    Bits16Chunk2Offset3 = 22,
     // for 4th chunk of 64 bits
-    Bits16Chunk3Offset0 = 193,
-    Bits16Chunk3Offset1 = 209,
-    Bits16Chunk3Offset2 = 225,
-    Bits16Chunk3Offset3 = 241,
+    Bits16Chunk3Offset0 = 24,
+    Bits16Chunk3Offset1 = 26,
+    Bits16Chunk3Offset2 = 28,
+    Bits16Chunk3Offset3 = 30,
     // these fields hold shifted values to ensure
     // that there has been a unique unpacking
     // NOTE: 8/8 = 1
     // NOTE: 0 = 2^5 * 0
-    Bits16Chunk3Offset0ResShifted = 9,
+    Bits16Chunk3Offset0ResShifted = 1,
     // NOTE: 520/8 = 65
     // NOTE: 64 = 2^5 * 2
-    Bits16Chunk3Offset1ResShifted = 521,
+    Bits16Chunk3Offset1ResShifted = 65,
     // NOTE: 264/8 = 33
     // NOTE: 64 = 2^5 * 1
-    Bits16Chunk3Offset2ResShifted = 265,
+    Bits16Chunk3Offset2ResShifted = 33,
     // NOTE: 776/8 = 97
     // NOTE: 64 = 2^5 * 3
-    Bits16Chunk3Offset3ResShifted = 777,
+    Bits16Chunk3Offset3ResShifted = 97,
 }
 
 impl ExecutionTraceColumn for Bitwise {
@@ -1715,20 +1715,12 @@ impl DilutedCheck {
 
 impl ExecutionTraceColumn for DilutedCheck {
     fn index(&self) -> usize {
-        match self {
-            Self::Unordered => 8,
-            Self::Ordered => 2,
-            Self::Aggregate => 7,
-        }
+        self.col_and_shift().0
     }
 
     fn offset<T>(&self, offset: isize) -> Expr<AlgebraicItem<T>> {
-        let column = self.index();
-        AlgebraicItem::Trace(
-            column,
-            DILUTED_CHECK_STEP as isize * offset + *self as isize,
-        )
-        .into()
+        let (col, shift) = self.col_and_shift();
+        AlgebraicItem::Trace(col, DILUTED_CHECK_STEP as isize * offset + shift).into()
     }
 }
 

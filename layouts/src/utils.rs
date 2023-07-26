@@ -295,7 +295,7 @@ impl<const N_BITS: usize, const SPACING: usize> DilutedCheckPool<N_BITS, SPACING
         let mut ordered_vals = self.0.clone();
         ordered_vals.sort();
 
-        // range check values need to be continuos therefore any gaps
+        // diluted check values need to be continuos therefore any gaps
         // e.g. [..., 3, 4, 7, 8, ...] need to be filled with [5, 6] as padding.
         let mut padding_vals = Vec::new();
 

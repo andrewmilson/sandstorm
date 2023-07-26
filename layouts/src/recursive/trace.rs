@@ -434,190 +434,169 @@ impl CairoTrace for ExecutionTrace {
             .expect("layout requires a bitwise memory segment");
         let initial_bitwise_address = bitwise_memory_segment.begin_addr;
 
-        // // create dummy instances if there are cells that need to be filled
-        // let bitwise_instances = air_private_input.bitwise;
-        // let num_bitwise_instances = bitwise_instances.len() as u32;
-        // let bitwise_dummy_instances =
-        // (num_bitwise_instances..).map(BitwiseInstance::new_empty);
-        // let bitwise_traces = bitwise_instances
-        //     .into_iter()
-        //     .chain(bitwise_dummy_instances)
-        //     .map(bitwise::InstanceTrace::<DILUTED_CHECK_SPACING>::new);
+        // create dummy instances if there are cells that need to be filled
+        let bitwise_instances = air_private_input.bitwise;
+        let num_bitwise_instances = bitwise_instances.len() as u32;
+        let bitwise_dummy_instances = (num_bitwise_instances..).map(BitwiseInstance::new_empty);
+        let bitwise_traces = bitwise_instances
+            .into_iter()
+            .chain(bitwise_dummy_instances)
+            .map(bitwise::InstanceTrace::<DILUTED_CHECK_SPACING>::new);
 
-        // let (bitwise_npc_steps, _) = npc_column.as_chunks_mut::<1024>();
-        // let (bitwise_dilution_steps, _) = range_check_column.as_chunks_mut::<1024>();
+        const BITWISE_STEP_ROWS: usize = BITWISE_RATIO * CYCLE_HEIGHT;
+        let (bitwise_npc_steps, _) = npc_column.as_chunks_mut::<BITWISE_STEP_ROWS>();
+        let (bitwise_dilution_steps, _) =
+            diluted_check_unordered_column.as_chunks_mut::<BITWISE_STEP_ROWS>();
 
-        // // TODO: how does fold work with par_iter? Does it kill parallelism?
-        // // might be better to map multiple pools and then fold into one if so.
-        // let diluted_check_pool = ark_std::cfg_iter_mut!(bitwise_npc_steps)
-        //     .zip(bitwise_dilution_steps)
-        //     .zip(bitwise_traces)
-        //     .fold(
-        //         DilutedCheckPool::<DILUTED_CHECK_N_BITS,
-        // DILUTED_CHECK_SPACING>::new(),         |mut diluted_pool, ((npc, dilution),
-        // bitwise_trace)| {             let instance = bitwise_trace.instance;
+        // TODO: how does fold work with par_iter? Does it kill parallelism?
+        // might be better to map multiple pools and then fold into one if so.
+        let diluted_check_pool = ark_std::cfg_iter_mut!(bitwise_npc_steps)
+            .zip(bitwise_dilution_steps)
+            .zip(bitwise_traces)
+            .fold(
+                DilutedCheckPool::<DILUTED_CHECK_N_BITS, DILUTED_CHECK_SPACING>::new(),
+                |mut diluted_pool, ((npc, dilution), bitwise_trace)| {
+                    let instance = bitwise_trace.instance;
 
-        //             {
-        //                 // add shifts to ensure a unique unpacking
-        //                 let x_and_y_v0 =
-        // bitwise_trace.x_and_y_partition.high.high[0];                 let
-        // x_and_y_v1 = bitwise_trace.x_and_y_partition.high.high[1];
-        //                 let x_and_y_v2 =
-        // bitwise_trace.x_and_y_partition.high.high[2];                 let
-        // x_and_y_v3 = bitwise_trace.x_and_y_partition.high.high[3];
-        //                 let v0 = x_and_y_v0 +
-        // bitwise_trace.x_xor_y_partition.high.high[0];                 let v1
-        // = x_and_y_v1 + bitwise_trace.x_xor_y_partition.high.high[1];
-        //                 let v2 = x_and_y_v2 +
-        // bitwise_trace.x_xor_y_partition.high.high[2];                 let v3
-        // = x_and_y_v3 + bitwise_trace.x_xor_y_partition.high.high[3];
-        //                 // only fails if the AIR will error
-        //                 assert_eq!(v0, (v0 << 4) >> 4);
-        //                 assert_eq!(v1, (v1 << 4) >> 4);
-        //                 assert_eq!(v2, (v2 << 4) >> 4);
-        //                 assert_eq!(v3, (v3 << 8) >> 8);
-        //                 let s0 = v0 << 4;
-        //                 let s1 = v1 << 4;
-        //                 let s2 = v2 << 4;
-        //                 let s3 = v3 << 8;
-        //                 diluted_pool.push_diluted(U256::from(s0));
-        //                 diluted_pool.push_diluted(U256::from(s1));
-        //                 diluted_pool.push_diluted(U256::from(s2));
-        //                 diluted_pool.push_diluted(U256::from(s3));
-        //                 dilution[Bitwise::Bits16Chunk3Offset0ResShifted as usize] =
-        // s0.into();
-        // dilution[Bitwise::Bits16Chunk3Offset1ResShifted as usize] = s1.into();
-        //                 dilution[Bitwise::Bits16Chunk3Offset2ResShifted as usize] =
-        // s2.into();
-        // dilution[Bitwise::Bits16Chunk3Offset3ResShifted as usize] = s3.into();
-        //             }
+                    {
+                        // add shifts to ensure a unique unpacking
+                        let x_and_y_v0 = bitwise_trace.x_and_y_partition.high.high[0];
+                        let x_and_y_v1 = bitwise_trace.x_and_y_partition.high.high[1];
+                        let x_and_y_v2 = bitwise_trace.x_and_y_partition.high.high[2];
+                        let x_and_y_v3 = bitwise_trace.x_and_y_partition.high.high[3];
+                        let v0 = x_and_y_v0 + bitwise_trace.x_xor_y_partition.high.high[0];
+                        let v1 = x_and_y_v1 + bitwise_trace.x_xor_y_partition.high.high[1];
+                        let v2 = x_and_y_v2 + bitwise_trace.x_xor_y_partition.high.high[2];
+                        let v3 = x_and_y_v3 + bitwise_trace.x_xor_y_partition.high.high[3];
+                        // only fails if the AIR will error
+                        assert_eq!(v0, (v0 << 4) >> 4);
+                        assert_eq!(v1, (v1 << 4) >> 4);
+                        assert_eq!(v2, (v2 << 4) >> 4);
+                        assert_eq!(v3, (v3 << 8) >> 8);
+                        let s0 = v0 << 4;
+                        let s1 = v1 << 4;
+                        let s2 = v2 << 4;
+                        let s3 = v3 << 8;
+                        diluted_pool.push_diluted(U256::from(s0));
+                        diluted_pool.push_diluted(U256::from(s1));
+                        diluted_pool.push_diluted(U256::from(s2));
+                        diluted_pool.push_diluted(U256::from(s3));
+                        dilution[Bitwise::Bits16Chunk3Offset0ResShifted as usize] = s0.into();
+                        dilution[Bitwise::Bits16Chunk3Offset1ResShifted as usize] = s1.into();
+                        dilution[Bitwise::Bits16Chunk3Offset2ResShifted as usize] = s2.into();
+                        dilution[Bitwise::Bits16Chunk3Offset3ResShifted as usize] = s3.into();
+                    }
 
-        //             // NOTE: the order of these partitions matters
-        //             let partitions = [
-        //                 bitwise_trace.x_partition,
-        //                 bitwise_trace.y_partition,
-        //                 bitwise_trace.x_and_y_partition,
-        //                 bitwise_trace.x_xor_y_partition,
-        //             ];
+                    // NOTE: the order of these partitions matters
+                    let partitions = [
+                        bitwise_trace.x_partition,
+                        bitwise_trace.y_partition,
+                        bitwise_trace.x_and_y_partition,
+                        bitwise_trace.x_xor_y_partition,
+                    ];
 
-        //             // load diluted partitions into the execution trace
-        //             let (dilution_steps, _) = dilution.as_chunks_mut::<256>();
-        //             for (dilution_step, partition) in zip(dilution_steps, partitions)
-        // {                 let chunk0 = partition.low.low;
-        //                 dilution_step[Bitwise::Bits16Chunk0Offset0 as usize] =
-        // chunk0[0].into();
-        // dilution_step[Bitwise::Bits16Chunk0Offset1 as usize] = chunk0[1].into();
-        //                 dilution_step[Bitwise::Bits16Chunk0Offset2 as usize] =
-        // chunk0[2].into();
-        // dilution_step[Bitwise::Bits16Chunk0Offset3 as usize] = chunk0[3].into();
+                    // load diluted partitions into the execution trace
+                    let (dilution_steps, _) = dilution.as_chunks_mut::<32>();
+                    for (dilution_step, partition) in zip(dilution_steps, partitions) {
+                        let chunk0 = partition.low.low;
+                        dilution_step[Bitwise::Bits16Chunk0Offset0 as usize] = chunk0[0].into();
+                        dilution_step[Bitwise::Bits16Chunk0Offset1 as usize] = chunk0[1].into();
+                        dilution_step[Bitwise::Bits16Chunk0Offset2 as usize] = chunk0[2].into();
+                        dilution_step[Bitwise::Bits16Chunk0Offset3 as usize] = chunk0[3].into();
 
-        //                 let chunk1 = partition.low.high;
-        //                 dilution_step[Bitwise::Bits16Chunk1Offset0 as usize] =
-        // chunk1[0].into();
-        // dilution_step[Bitwise::Bits16Chunk1Offset1 as usize] = chunk1[1].into();
-        //                 dilution_step[Bitwise::Bits16Chunk1Offset2 as usize] =
-        // chunk1[2].into();
-        // dilution_step[Bitwise::Bits16Chunk1Offset3 as usize] = chunk1[3].into();
+                        let chunk1 = partition.low.high;
+                        dilution_step[Bitwise::Bits16Chunk1Offset0 as usize] = chunk1[0].into();
+                        dilution_step[Bitwise::Bits16Chunk1Offset1 as usize] = chunk1[1].into();
+                        dilution_step[Bitwise::Bits16Chunk1Offset2 as usize] = chunk1[2].into();
+                        dilution_step[Bitwise::Bits16Chunk1Offset3 as usize] = chunk1[3].into();
 
-        //                 let chunk2 = partition.high.low;
-        //                 dilution_step[Bitwise::Bits16Chunk2Offset0 as usize] =
-        // chunk2[0].into();
-        // dilution_step[Bitwise::Bits16Chunk2Offset1 as usize] = chunk2[1].into();
-        //                 dilution_step[Bitwise::Bits16Chunk2Offset2 as usize] =
-        // chunk2[2].into();
-        // dilution_step[Bitwise::Bits16Chunk2Offset3 as usize] = chunk2[3].into();
+                        let chunk2 = partition.high.low;
+                        dilution_step[Bitwise::Bits16Chunk2Offset0 as usize] = chunk2[0].into();
+                        dilution_step[Bitwise::Bits16Chunk2Offset1 as usize] = chunk2[1].into();
+                        dilution_step[Bitwise::Bits16Chunk2Offset2 as usize] = chunk2[2].into();
+                        dilution_step[Bitwise::Bits16Chunk2Offset3 as usize] = chunk2[3].into();
 
-        //                 let chunk3 = partition.high.high;
-        //                 dilution_step[Bitwise::Bits16Chunk3Offset0 as usize] =
-        // chunk3[0].into();
-        // dilution_step[Bitwise::Bits16Chunk3Offset1 as usize] = chunk3[1].into();
-        //                 dilution_step[Bitwise::Bits16Chunk3Offset2 as usize] =
-        // chunk3[2].into();
-        // dilution_step[Bitwise::Bits16Chunk3Offset3 as usize] = chunk3[3].into();
+                        let chunk3 = partition.high.high;
+                        dilution_step[Bitwise::Bits16Chunk3Offset0 as usize] = chunk3[0].into();
+                        dilution_step[Bitwise::Bits16Chunk3Offset1 as usize] = chunk3[1].into();
+                        dilution_step[Bitwise::Bits16Chunk3Offset2 as usize] = chunk3[2].into();
+                        dilution_step[Bitwise::Bits16Chunk3Offset3 as usize] = chunk3[3].into();
 
-        //                 for v in [*chunk0, *chunk1, *chunk2, *chunk3].concat() {
-        //                     diluted_pool.push_diluted(U256::from(v))
-        //                 }
-        //             }
+                        for v in [*chunk0, *chunk1, *chunk2, *chunk3].concat() {
+                            diluted_pool.push_diluted(U256::from(v))
+                        }
+                    }
 
-        //             // load bitwise values into memory
-        //             let addr_step = BITWISE_RATIO * CYCLE_HEIGHT / 4;
-        //             let input_x_offset = Npc::BitwisePoolAddr as usize;
-        //             let input_y_offset = input_x_offset + addr_step;
-        //             let x_and_y_offset = input_y_offset + addr_step;
-        //             let x_xor_y_offset = x_and_y_offset + addr_step;
-        //             let x_or_y_offset = Npc::BitwiseXOrYAddr as usize;
-        //             let (input_x_addr, input_y_addr, x_and_y_addr, x_xor_y_addr,
-        // x_or_y_addr) =
-        // instance.mem_addr(initial_bitwise_address);
-        // npc[input_x_offset] = input_x_addr.into();
-        // npc[input_x_offset + 1] = bitwise_trace.x;
-        // npc[input_y_offset] = input_y_addr.into();
-        // npc[input_y_offset + 1] = bitwise_trace.y;
-        // npc[x_and_y_offset] = x_and_y_addr.into();
-        // npc[x_and_y_offset + 1] = bitwise_trace.x_and_y;
-        // npc[x_xor_y_offset] = x_xor_y_addr.into();
-        // npc[x_xor_y_offset + 1] = bitwise_trace.x_xor_y;
-        // npc[x_or_y_offset] = x_or_y_addr.into();
-        // npc[x_or_y_offset + 1] = bitwise_trace.x_or_y;
+                    // load bitwise values into memory
+                    let addr_step = BITWISE_RATIO * CYCLE_HEIGHT / 4;
+                    let input_x_offset = Npc::BitwisePoolAddr as usize;
+                    let input_y_offset = input_x_offset + addr_step;
+                    let x_and_y_offset = input_y_offset + addr_step;
+                    let x_xor_y_offset = x_and_y_offset + addr_step;
+                    let x_or_y_offset = Npc::BitwiseXOrYAddr as usize;
+                    let (input_x_addr, input_y_addr, x_and_y_addr, x_xor_y_addr, x_or_y_addr) =
+                        instance.mem_addr(initial_bitwise_address);
+                    npc[input_x_offset] = input_x_addr.into();
+                    npc[input_x_offset + 1] = bitwise_trace.x;
+                    npc[input_y_offset] = input_y_addr.into();
+                    npc[input_y_offset + 1] = bitwise_trace.y;
+                    npc[x_and_y_offset] = x_and_y_addr.into();
+                    npc[x_and_y_offset + 1] = bitwise_trace.x_and_y;
+                    npc[x_xor_y_offset] = x_xor_y_addr.into();
+                    npc[x_xor_y_offset + 1] = bitwise_trace.x_xor_y;
+                    npc[x_or_y_offset] = x_or_y_addr.into();
+                    npc[x_or_y_offset + 1] = bitwise_trace.x_or_y;
 
-        //             // return the diluted pool
-        //             diluted_pool
-        //         },
-        //     );
+                    // return the diluted pool
+                    diluted_pool
+                },
+            );
 
-        // // make sure all diluted check values are encountered for
-        // const DILUTED_MIN: u128 = 0;
-        // const DILUTED_MAX: u128 = (1 << DILUTED_CHECK_N_BITS) - 1;
-        // let (ordered_diluted_vals, ordered_diluted_padding_vals) =
-        //     diluted_check_pool.get_ordered_values_with_padding(DILUTED_MIN,
-        // DILUTED_MAX); let mut ordered_diluted_vals =
-        // ordered_diluted_vals.into_iter();
-        // let mut ordered_diluted_padding_vals =
-        // ordered_diluted_padding_vals.into_iter();
+        // make sure all diluted check values are encountered for
+        const DILUTED_MIN: u128 = 0;
+        const DILUTED_MAX: u128 = (1 << DILUTED_CHECK_N_BITS) - 1;
+        let (ordered_diluted_vals, ordered_diluted_padding_vals) =
+            diluted_check_pool.get_ordered_values_with_padding(DILUTED_MIN, DILUTED_MAX);
+        let mut ordered_diluted_vals = ordered_diluted_vals.into_iter();
+        let mut ordered_diluted_padding_vals = ordered_diluted_padding_vals.into_iter();
 
-        // // add diluted padding values
-        // // TODO: this is a strange way to do it. fix
-        // let (bitwise_dilution_chunks, _) =
-        // range_check_column.as_chunks_mut::<1024>(); 'outer: for
-        // bitwise_dilution_chunk in bitwise_dilution_chunks {     for (i,
-        // dilution_step) in bitwise_dilution_chunk
-        //         .array_chunks_mut::<DILUTED_CHECK_STEP>()
-        //         .enumerate()
-        //         .skip(1)
-        //         .step_by(2)
-        //     {
-        //         let offset = i * DILUTED_CHECK_STEP + DilutedCheck::Unordered as
-        // usize;         // NOTE: doing it this hacky way to ensure no conflict
-        // with the bitwise builtin         // CONTEXT: each cycle spans 16
-        // steps, there are two stacked dilutions per cycle         if offset !=
-        // Bitwise::Bits16Chunk3Offset0ResShifted as usize             && offset
-        // != Bitwise::Bits16Chunk3Offset1ResShifted as usize             &&
-        // offset != Bitwise::Bits16Chunk3Offset2ResShifted as usize
-        // && offset != Bitwise::Bits16Chunk3Offset3ResShifted as usize
-        //         {
-        //             let padding_val = match ordered_diluted_padding_vals.next() {
-        //                 Some(v) => dilute::<DILUTED_CHECK_SPACING>(U256::from(v)),
-        //                 None => break 'outer,
-        //             };
+        // add diluted padding values
+        // TODO: this is a strange way to do it. fix
+        let (bitwise_dilution_chunks, _) =
+            diluted_check_unordered_column.as_chunks_mut::<BITWISE_STEP_ROWS>();
+        'outer: for bitwise_dilution_chunk in bitwise_dilution_chunks {
+            for (offset, unordered_dilution_step) in bitwise_dilution_chunk
+                .iter_mut()
+                .enumerate()
+                .skip(1)
+                .step_by(2)
+            {
+                // NOTE: doing it this hacky way to ensure no conflict with the bitwise builtin
+                // CONTEXT: each cycle spans 16 steps, there are 16 stacked dilutions per cycle
+                if offset != Bitwise::Bits16Chunk3Offset0ResShifted as usize
+                    && offset != Bitwise::Bits16Chunk3Offset1ResShifted as usize
+                    && offset != Bitwise::Bits16Chunk3Offset2ResShifted as usize
+                    && offset != Bitwise::Bits16Chunk3Offset3ResShifted as usize
+                {
+                    let padding_val = match ordered_diluted_padding_vals.next() {
+                        Some(v) => dilute::<DILUTED_CHECK_SPACING>(U256::from(v)),
+                        None => break 'outer,
+                    };
+                    *unordered_dilution_step = BigUint::from(padding_val).into();
+                }
+            }
+        }
 
-        //             dilution_step[DilutedCheck::Unordered as usize] =
-        //                 BigUint::from(padding_val).into();
-        //         }
-        //     }
-        // }
+        // add ordered diluted check values
+        let padding_offset = diluted_check_ordered_column.len() - ordered_diluted_vals.len();
+        for diluted_val in &mut diluted_check_ordered_column[padding_offset..] {
+            let val = ordered_diluted_vals.next().unwrap();
+            *diluted_val = BigUint::from(dilute::<DILUTED_CHECK_SPACING>(U256::from(val))).into();
+        }
 
-        // // add ordered diluted check values
-        // let padding_offset = diluted_check_ordered_column.len() -
-        // ordered_diluted_vals.len(); for diluted_val in &mut
-        // diluted_check_ordered_column[padding_offset..] {     let val =
-        // ordered_diluted_vals.next().unwrap();     *diluted_val =
-        // BigUint::from(dilute::<DILUTED_CHECK_SPACING>(U256::from(val))).into();
-        // }
-
-        // // ensure dilution check values have been fully consumed
-        // assert!(ordered_diluted_padding_vals.next().is_none());
-        // assert!(ordered_diluted_vals.next().is_none());
+        // ensure dilution check values have been fully consumed
+        assert!(ordered_diluted_padding_vals.next().is_none());
+        assert!(ordered_diluted_vals.next().is_none());
 
         // VM Memory
         // =========
