@@ -135,7 +135,7 @@ impl ministark::air::AirConfig for AirConfig {
             FieldVariant::Fp(g.pow([(Flag::Zero as usize * n / CYCLE_HEIGHT) as u64]));
         let flag0_zerofier = X.pow(n / CYCLE_HEIGHT) - Constant(flag0_offset);
         let every_row_zerofier = X.pow(n) - &one;
-        let every_row_zerofier_inv = &one / every_row_zerofier;
+        let every_row_zerofier_inv = &one / &every_row_zerofier;
         let flags_zerofier_inv = &flag0_zerofier * &every_row_zerofier_inv;
 
         // check decoded flag values are 0 or 1
@@ -557,12 +557,9 @@ impl ministark::air::AirConfig for AirConfig {
         let every_8_rows_except_last_zerofier_inv =
             &zerofier_8th_last_row * &every_8_row_zerofier_inv;
 
-        let zerofier_every_last_row = X - Constant(FieldVariant::Fp(g.pow([(n / CYCLE_HEIGHT - 1) as u64])));
-        let zerofier_every_row = X.pow(n) - &one;
-        let every_row_zerofier_inv = &one / &zerofier_every_row;
-        let zerofier_every_row_except_every_last_row = &zerofier_every_row * &zerofier_every_last_row;
-        let every_row_except_every_last_row_zerofier_inv = &one / &zerofier_every_row_except_every_last_row;
-        let every_last_row_zerofier_inv = &one / &zerofier_every_last_row;
+        let last_row_zerofier = X - Constant(FieldVariant::Fp(g.pow([n as u64 - 1])));
+        let last_row_zerofier_inv = &one / &last_row_zerofier;
+        let every_row_except_last_zerofier_inv = &last_row_zerofier * &one / &every_row_zerofier;
         // we have an out-of-order and in-order list of diluted values for this layout
         // (starknet). We want to check each list is a permutation of one another
         let diluted_check_permutation_step0 = ((DilutedCheckPermutation::Z.challenge()
@@ -570,10 +567,10 @@ impl ministark::air::AirConfig for AirConfig {
             * Permutation::DilutedCheck.next()
             - (DilutedCheckPermutation::Z.challenge() - DilutedCheck::Unordered.next())
                 * Permutation::DilutedCheck.curr())
-            * &every_row_except_every_last_row_zerofier_inv;
+           * &every_row_except_last_zerofier_inv;
         let diluted_check_permutation_last = (Permutation::DilutedCheck.curr()
             - DilutedCheckProduct.hint())
-           * &every_last_row_zerofier_inv;
+            * &last_row_zerofier_inv;
 
         // Initial aggregate value should be =1
         let diluted_check_init = (DilutedCheck::Aggregate.curr() - &one) * &first_row_zerofier_inv;
@@ -1227,8 +1224,8 @@ impl ministark::air::AirConfig for AirConfig {
             rc16_minimum,
             rc16_maximum,
             diluted_check_permutation_init0,        //enable
-            diluted_check_permutation_step0,
-            diluted_check_permutation_last,      // TODO permutations are messed up
+            // diluted_check_permutation_step0,
+            // diluted_check_permutation_last,      // TODO permutations are messed up
           // diluted_check_init,
           //  diluted_check_first_element,
             diluted_check_step,                     //enable
