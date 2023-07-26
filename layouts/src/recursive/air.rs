@@ -590,7 +590,8 @@ impl ministark::air::AirConfig for AirConfig {
         // Pedersen builtin
         // ================
         // Each hash spans across 256 rows - that's one hash per 16 cairo steps.
-        let every_256_row_zerofier_inv = &one / (X.pow(n / 256) - &one);
+        let every_1024_row_zerofier_inv = &one / (X.pow(n / 1024) - &one);
+        // let every_256_row_zerofier_inv = &one / (X.pow(n / 256) - &one);
         // let every_256_row_zerofier_inv = &one / (X.pow(n / 256) - &one);
 
         // These first few pedersen constraints check that the number is in the range
@@ -604,37 +605,37 @@ impl ministark::air::AirConfig for AirConfig {
         let pedersen_hash0_ec_subset_sub_bit_unpacking_last_one_is_zero =
             (Pedersen::Bit251AndBit196AndBit192.curr()
                 * (Pedersen::Suffix.curr() - (Pedersen::Suffix.next() + Pedersen::Suffix.next())))
-                * &every_256_row_zerofier_inv;
+                * &every_1024_row_zerofier_inv;
         let shift191 = Constant(FieldVariant::Fp(Fp::from(BigUint::from(2u32).pow(191u32))));
         let pedersen_hash0_ec_subset_sub_bit_unpacking_zeros_between_ones =
             (Pedersen::Bit251AndBit196AndBit192.curr()
                 * (Pedersen::Suffix.offset(1) - Pedersen::Suffix.offset(192) * shift191))
-                * &every_256_row_zerofier_inv;
+                * &every_1024_row_zerofier_inv;
         let pedersen_hash0_ec_subset_sum_bit_unpacking_cumulative_bit192 =
             (Pedersen::Bit251AndBit196AndBit192.curr()
                 - Pedersen::Bit251AndBit196.curr()
                     * (Pedersen::Suffix.offset(192)
                         - (Pedersen::Suffix.offset(193) + Pedersen::Suffix.offset(193))))
-                * &every_256_row_zerofier_inv;
+                * &every_1024_row_zerofier_inv;
         let shift3 = Constant(FieldVariant::Fp(Fp::from(BigUint::from(2u32).pow(3u32))));
         let pedersen_hash0_ec_subset_sum_bit_unpacking_zeroes_between_ones192 =
             (Pedersen::Bit251AndBit196.curr()
-                * (Pedersen::Suffix.offset(772) - Pedersen::Suffix.offset(784) * shift3))
-                * &every_256_row_zerofier_inv;
+                * (Pedersen::Suffix.offset(193) - Pedersen::Suffix.offset(196) * shift3))
+                * &every_1024_row_zerofier_inv;
         let pedersen_hash0_ec_subset_sum_bit_unpacking_cumulative_bit196 =
             (Pedersen::Bit251AndBit196.curr()
-                - (Pedersen::Suffix.offset(1004)
-                    - (Pedersen::Suffix.offset(1008) + Pedersen::Suffix.offset(1008)))
-                    * (Pedersen::Suffix.offset(784)
-                        - (Pedersen::Suffix.offset(788) + Pedersen::Suffix.offset(788))))
-                * &every_256_row_zerofier_inv;
+                - (Pedersen::Suffix.offset(251)
+                    - (Pedersen::Suffix.offset(252) + Pedersen::Suffix.offset(252)))
+                    * (Pedersen::Suffix.offset(196)
+                        - (Pedersen::Suffix.offset(197) + Pedersen::Suffix.offset(197))))
+                * &every_1024_row_zerofier_inv;
         // TODO: docs
         let shift54 = Constant(FieldVariant::Fp(Fp::from(BigUint::from(2u32).pow(54u32))));
         let pedersen_hash0_ec_subset_sum_bit_unpacking_zeroes_between_ones196 = ((Pedersen::Suffix
-            .offset(1004)
-            - (Pedersen::Suffix.offset(1008) + Pedersen::Suffix.offset(1008)))
-            * (Pedersen::Suffix.offset(788) - Pedersen::Suffix.offset(1004) * shift54))
-            * &every_256_row_zerofier_inv;
+            .offset(251)
+            - (Pedersen::Suffix.offset(252) + Pedersen::Suffix.offset(252)))
+            * (Pedersen::Suffix.offset(197) - Pedersen::Suffix.offset(251) * shift54))
+            * &every_1024_row_zerofier_inv;
 
         // example for trace length n=512
         // =============================
@@ -642,12 +643,9 @@ impl ministark::air::AirConfig for AirConfig {
         // (x-ω^255)(x-ω^511) / (X^n-1) = 1/(x-ω^0)..(x-ω^254)(x-ω^256)..(x-ω^510)
         // vanishes on groups of 256 consecutive rows except the last row in each group
         // TODO: come up with better names for these
-        const PEDERSEN_INSTANCE_ROWS: usize = PEDERSEN_BUILTIN_RATIO * CYCLE_HEIGHT;
-        let pedersen_transition_zerofier_inv = (X.pow(n / PEDERSEN_INSTANCE_ROWS)
-            - Constant(FieldVariant::Fp(g.pow([((PEDERSEN_INSTANCE_ROWS - 1) * n
-                / PEDERSEN_INSTANCE_ROWS)
-                as u64]))))
-            * &every_row_zerofier_inv;
+        let pedersen_transition_zerofier_inv = (X.pow(n / 1024)
+            - Constant(FieldVariant::Fp(g.pow([(255 * n / 256) as u64]))))
+            * &every_fourth_row_zerofier_inv;
 
         // Constraint operated on groups of 256 rows.
         // Each row shifts a large number to the right. E.g.
@@ -673,7 +671,7 @@ impl ministark::air::AirConfig for AirConfig {
         // (x-ω^255)(x-ω^511) / (X^n-1) = 1/(x-ω^0)..(x-ω^254)(x-ω^256)..(x-ω^510)
         // vanishes on the 252nd row of every 256 rows
         let pedersen_zero_suffix_zerofier_inv =
-            &one / (X.pow(n / 256) - Constant(FieldVariant::Fp(g.pow([(63 * n / 64) as u64]))));
+            &one / (X.pow(n / 1024) - Constant(FieldVariant::Fp(g.pow([(63 * n / 64) as u64]))));
 
         // Note that with cairo's default field each element is 252 bits.
         // Therefore we are decomposing 252 bit numbers to do pedersen hash.
@@ -705,7 +703,8 @@ impl ministark::air::AirConfig for AirConfig {
         // TODO: is this constraint even needed?
         // check suffix in row 255 of each 256 row group is zero
         let pedersen_hash0_ec_subset_sum_zeros_tail = Pedersen::Suffix.curr()
-            * (&one / (X.pow(n / 256) - Constant(FieldVariant::Fp(g.pow([255 * n as u64 / 256])))));
+            * (&one
+                / (X.pow(n / 1024) - Constant(FieldVariant::Fp(g.pow([255 * n as u64 / 256])))));
 
         // Create a periodic table comprising of the constant Pedersen points we need to
         // add together. The columns of this table are represented by polynomials that
@@ -775,8 +774,8 @@ impl ministark::air::AirConfig for AirConfig {
         let pedersen_points_y = Polynomial::new(pedersen_y_coeffs.to_vec());
 
         // TODO: double check if the value that's being evaluated is correct
-        let pedersen_point_x = pedersen_points_x.horner_eval(X.pow(n / 512));
-        let pedersen_point_y = pedersen_points_y.horner_eval(X.pow(n / 512));
+        let pedersen_point_x = pedersen_points_x.horner_eval(X.pow(n / 2048));
+        let pedersen_point_y = pedersen_points_y.horner_eval(X.pow(n / 2048));
 
         // let `P = (Px, Py)` be the point to be added (see above)
         // let `Q = (Qx, Qy)` be the partial result
@@ -824,9 +823,9 @@ impl ministark::air::AirConfig for AirConfig {
         // has been calculated already and as a result of how constraints are
         // evaluated it will be cached.
         // TODO: check all zerofiers are being multiplied or divided correctly
-        let every_512_row_zerofier_inv = (X.pow(n / 512)
+        let every_2048_row_zerofier_inv = (X.pow(n / 2048)
             - Constant(FieldVariant::Fp(g.pow([n as u64 / 2]))))
-            * &every_256_row_zerofier_inv;
+            * &every_1024_row_zerofier_inv;
 
         // A single pedersen hash `H(a, b)` is computed every 512 cycles.
         // The constraints for each hash is split in two consecutive 256 row groups.
@@ -835,59 +834,58 @@ impl ministark::air::AirConfig for AirConfig {
         // We make sure the initial value of each group is loaded correctly:
         // - 1st group we check P0 (the shift point) is the first partial sum
         // - 2nd group we check e0 (processed `a`) is the first partial sum
-        let pedersen_hash0_copy_point_x = (Pedersen::PartialSumX.offset(1024)
-            - Pedersen::PartialSumX.offset(1020))
-            * &every_512_row_zerofier_inv;
-        let pedersen_hash0_copy_point_y = (Pedersen::PartialSumY.offset(1024)
-            - Pedersen::PartialSumY.offset(1020))
-            * &every_512_row_zerofier_inv;
+        let pedersen_hash0_copy_point_x = (Pedersen::PartialSumX.offset(256)
+            - Pedersen::PartialSumX.offset(255))
+            * &every_2048_row_zerofier_inv;
+        let pedersen_hash0_copy_point_y = (Pedersen::PartialSumY.offset(256)
+            - Pedersen::PartialSumY.offset(255))
+            * &every_2048_row_zerofier_inv;
         // TODO: introducing a new zerofier that's equivalent to the
-        // previous one? double check every_512_row_zerofier
-        let every_512_row_zerofier = X.pow(n / 512) - Constant(FieldVariant::Fp(Fp::ONE));
-        let every_512_row_zerofier_inv = &one / &every_512_row_zerofier;
+        // previous one? double check every_2048_row_zerofier
+        let every_2048_row_zerofier = X.pow(n / 2048) - &one;
+        let every_2048_row_zerofier_inv = &one / &every_2048_row_zerofier;
         let shift_point = pedersen::constants::P0;
         let pedersen_hash0_init_x = (Pedersen::PartialSumX.curr()
             - Constant(FieldVariant::Fp(shift_point.x)))
-            * &every_512_row_zerofier_inv;
+            * &every_2048_row_zerofier_inv;
         let pedersen_hash0_init_y = (Pedersen::PartialSumY.curr()
             - Constant(FieldVariant::Fp(shift_point.y)))
-            * &every_512_row_zerofier_inv;
+            * &every_2048_row_zerofier_inv;
 
         // TODO: fix naming
-        let zerofier_512th_last_row =
-            X - Constant(FieldVariant::Fp(g.pow([512 * (n as u64 / 512 - 1)])));
-        let every_512_rows_except_last_zerofier =
-            &zerofier_512th_last_row * &every_512_row_zerofier_inv;
+        let zerofier_2048th_last_row =
+            X - Constant(FieldVariant::Fp(g.pow([2048 * (n as u64 / 2048 - 1)])));
+        let every_2048_rows_except_last_zerofier =
+            &zerofier_2048th_last_row * &every_2048_row_zerofier_inv;
 
         // Link Input0 into the memory pool.
-        let pedersen_input0_value0 =
-            (Npc::PedersenInput0Val.curr() - Pedersen::Suffix.curr()) * &every_512_row_zerofier_inv;
+        let pedersen_input0_value0 = (Npc::PedersenInput0Val.curr() - Pedersen::Suffix.curr())
+            * &every_2048_row_zerofier_inv;
         // Input0's next address should be the address directly
         // after the output address of the previous hash
         let pedersen_input0_addr = (Npc::PedersenInput0Addr.next()
             - (Npc::PedersenOutputAddr.curr() + &one))
-            * &every_512_rows_except_last_zerofier;
+            * &every_2048_rows_except_last_zerofier;
         // Ensure the first pedersen address matches the hint
         let pedersen_init_addr =
             (Npc::PedersenInput0Addr.curr() - InitialPedersenAddr.hint()) * &first_row_zerofier_inv;
 
         // Link Input1 into the memory pool.
         // Input1's address should be the address directly after input0's address
-        let pedersen_input1_value0 = (Npc::PedersenInput1Val.curr()
-            - Pedersen::Suffix.offset(1024))
-            * &every_512_row_zerofier_inv;
+        let pedersen_input1_value0 = (Npc::PedersenInput1Val.curr() - Pedersen::Suffix.offset(256))
+            * &every_2048_row_zerofier_inv;
         let pedersen_input1_addr = (Npc::PedersenInput1Addr.curr()
             - (Npc::PedersenInput0Addr.curr() + &one))
-            * &every_512_row_zerofier_inv;
+            * &every_2048_row_zerofier_inv;
 
         // Link pedersen output into the memory pool.
         // Output's address should be the address directly after input1's address.
         let pedersen_output_value0 = (Npc::PedersenOutputVal.curr()
-            - Pedersen::PartialSumX.offset(2045))
-            * &every_512_row_zerofier_inv;
+            - Pedersen::PartialSumX.offset(511))
+            * &every_2048_row_zerofier_inv;
         let pedersen_output_addr = (Npc::PedersenOutputAddr.curr()
             - (Npc::PedersenInput1Addr.curr() + &one))
-            * &every_512_row_zerofier_inv;
+            * &every_2048_row_zerofier_inv;
 
         // 128bit Range check builtin
         // ===================
@@ -971,6 +969,7 @@ impl ministark::air::AirConfig for AirConfig {
         // s3 = 0b0001_0001_0000_0001_0000_0000_0000_0000_0000_0000_0000_0000_0001_0000_0001
         // ```
         // note that `v = s0 * 2^0 + s1 * 2^1 + s2 * 2^2 + s3 * 2^3`.
+        let every_256_row_zerofier_inv = &one / (X.pow(n / 256) - &one);
         let bitwise_partition = (&bitwise_sum_var_0_0 + &bitwise_sum_var_8_0
             - Npc::BitwisePoolVal.curr())
             * &every_256_row_zerofier_inv;
@@ -1226,31 +1225,31 @@ impl ministark::air::AirConfig for AirConfig {
             diluted_check_first_element,
             diluted_check_step,
             diluted_check_last,
-            // pedersen_hash0_ec_subset_sub_bit_unpacking_last_one_is_zero,
-            // pedersen_hash0_ec_subset_sub_bit_unpacking_zeros_between_ones,
-            // pedersen_hash0_ec_subset_sum_bit_unpacking_cumulative_bit192,
-            // pedersen_hash0_ec_subset_sum_bit_unpacking_zeroes_between_ones192,
-            // pedersen_hash0_ec_subset_sum_bit_unpacking_cumulative_bit196,
-            // pedersen_hash0_ec_subset_sum_bit_unpacking_zeroes_between_ones196,
-            // pedersen_hash0_ec_subset_sum_booleanity_test,
-            // pedersen_hash0_ec_subset_sum_bit_extraction_end,
-            // pedersen_hash0_ec_subset_sum_zeros_tail,
-            // pedersen_hash0_ec_subset_sum_add_points_slope,
-            // pedersen_hash0_ec_subset_sum_add_points_x,
-            // pedersen_hash0_ec_subset_sum_add_points_y,
-            // pedersen_hash0_ec_subset_sum_copy_point_x,
-            // pedersen_hash0_ec_subset_sum_copy_point_y,
-            // pedersen_hash0_copy_point_x,
-            // pedersen_hash0_copy_point_y,
-            // pedersen_hash0_init_x,
-            // pedersen_hash0_init_y,
-            // pedersen_input0_value0,
-            // pedersen_input0_addr,
-            // pedersen_init_addr,
-            // pedersen_input1_value0,
-            // pedersen_input1_addr,
-            // pedersen_output_value0,
-            // pedersen_output_addr,
+            pedersen_hash0_ec_subset_sub_bit_unpacking_last_one_is_zero,
+            pedersen_hash0_ec_subset_sub_bit_unpacking_zeros_between_ones,
+            pedersen_hash0_ec_subset_sum_bit_unpacking_cumulative_bit192,
+            pedersen_hash0_ec_subset_sum_bit_unpacking_zeroes_between_ones192,
+            pedersen_hash0_ec_subset_sum_bit_unpacking_cumulative_bit196,
+            pedersen_hash0_ec_subset_sum_bit_unpacking_zeroes_between_ones196,
+            pedersen_hash0_ec_subset_sum_booleanity_test,
+            pedersen_hash0_ec_subset_sum_bit_extraction_end,
+            pedersen_hash0_ec_subset_sum_zeros_tail,
+            pedersen_hash0_ec_subset_sum_add_points_slope,
+            pedersen_hash0_ec_subset_sum_add_points_x,
+            pedersen_hash0_ec_subset_sum_add_points_y,
+            pedersen_hash0_ec_subset_sum_copy_point_x,
+            pedersen_hash0_ec_subset_sum_copy_point_y,
+            pedersen_hash0_copy_point_x,
+            pedersen_hash0_copy_point_y,
+            pedersen_hash0_init_x,
+            pedersen_hash0_init_y,
+            pedersen_input0_value0,
+            pedersen_input0_addr,
+            pedersen_init_addr,
+            pedersen_input1_value0,
+            pedersen_input1_addr,
+            pedersen_output_value0,
+            pedersen_output_addr,
             rc_builtin_value,
             rc_builtin_addr_step,
             rc_builtin_init_addr,
@@ -1566,7 +1565,7 @@ impl ExecutionTraceColumn for Pedersen {
             Self::Suffix | Self::Slope => 4 * offset + *self as isize,
             Self::PartialSumX | Self::PartialSumY => 4 * offset + *self as isize,
             Self::Bit251AndBit196AndBit192 | Self::Bit251AndBit196 => {
-                (PEDERSEN_BUILTIN_RATIO * CYCLE_HEIGHT) as isize * offset + *self as isize
+                (PEDERSEN_BUILTIN_RATIO * CYCLE_HEIGHT / 2) as isize * offset + *self as isize
             }
         };
         AlgebraicItem::Trace(column, trace_offset).into()

@@ -346,19 +346,17 @@ impl CairoTrace for ExecutionTrace {
                         suffix_and_slope[Pedersen::Slope as usize] = step.slope;
                     }
 
-                    // // load fields for unique bit decomposition checks into the trace
-                    // // TODO split_at_mut(256) is that correct?
-                    // let (a_suffixes_slopes, b_suffixes_slopes) =
-                    //     suffixe_and_slope_step.split_at_mut(PART_ROWS * 256);
-                    // let (a_aux, b_aux) = aux.split_at_mut(256);
-                    // a_suffixes_slopes[Pedersen::Bit251AndBit196 as usize] =
-                    //     pedersen_trace.a_bit251_and_bit196.into();
-                    // b_suffixes_slopes[Pedersen::Bit251AndBit196 as usize] =
-                    //     pedersen_trace.b_bit251_and_bit196.into();
-                    // a_aux[Pedersen::Bit251AndBit196AndBit192 as usize] =
-                    //     pedersen_trace.a_bit251_and_bit196_and_bit192.into();
-                    // b_aux[Pedersen::Bit251AndBit196AndBit192 as usize] =
-                    //     pedersen_trace.b_bit251_and_bit196_and_bit192.into();
+                    // load fields for unique bit decomposition checks into the trace
+                    // TODO split_at_mut(256) is that correct?
+                    let (a_aux, b_aux) = suffixe_and_slope_step.split_at_mut(PART_ROWS * 256);
+                    a_aux[Pedersen::Bit251AndBit196 as usize] =
+                        pedersen_trace.a_bit251_and_bit196.into();
+                    a_aux[Pedersen::Bit251AndBit196AndBit192 as usize] =
+                        pedersen_trace.a_bit251_and_bit196_and_bit192.into();
+                    b_aux[Pedersen::Bit251AndBit196 as usize] =
+                        pedersen_trace.b_bit251_and_bit196.into();
+                    b_aux[Pedersen::Bit251AndBit196AndBit192 as usize] =
+                        pedersen_trace.b_bit251_and_bit196_and_bit192.into();
 
                     // add the hash to the memory pool
                     let instance = pedersen_trace.instance;

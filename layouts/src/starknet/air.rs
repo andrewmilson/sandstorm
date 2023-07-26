@@ -2877,7 +2877,7 @@ impl ExecutionTraceColumn for Pedersen {
         let trace_offset = match self {
             Self::PartialSumX | Self::PartialSumY | Self::Suffix | Self::Slope => offset,
             Self::Bit251AndBit196AndBit192 | Self::Bit251AndBit196 => {
-                (PEDERSEN_BUILTIN_RATIO * CYCLE_HEIGHT) as isize * offset + *self as isize
+                (PEDERSEN_BUILTIN_RATIO * CYCLE_HEIGHT / 2) as isize * offset + *self as isize
             }
         };
         AlgebraicItem::Trace(column, trace_offset).into()
