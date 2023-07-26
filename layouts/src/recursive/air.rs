@@ -642,8 +642,11 @@ impl ministark::air::AirConfig for AirConfig {
         // (x-ω^255)(x-ω^511) / (X^n-1) = 1/(x-ω^0)..(x-ω^254)(x-ω^256)..(x-ω^510)
         // vanishes on groups of 256 consecutive rows except the last row in each group
         // TODO: come up with better names for these
-        let pedersen_transition_zerofier_inv = (X.pow(n / 256)
-            - Constant(FieldVariant::Fp(g.pow([(255 * n / 256) as u64]))))
+        const PEDERSEN_INSTANCE_ROWS: usize = PEDERSEN_BUILTIN_RATIO * CYCLE_HEIGHT;
+        let pedersen_transition_zerofier_inv = (X.pow(n / PEDERSEN_INSTANCE_ROWS)
+            - Constant(FieldVariant::Fp(g.pow([((PEDERSEN_INSTANCE_ROWS - 1) * n
+                / PEDERSEN_INSTANCE_ROWS)
+                as u64]))))
             * &every_row_zerofier_inv;
 
         // Constraint operated on groups of 256 rows.
@@ -1232,7 +1235,7 @@ impl ministark::air::AirConfig for AirConfig {
             // pedersen_hash0_ec_subset_sum_booleanity_test,
             // pedersen_hash0_ec_subset_sum_bit_extraction_end,
             // pedersen_hash0_ec_subset_sum_zeros_tail,
-            // pedersen_hash0_ec_subset_sum_add_points_slope,
+            pedersen_hash0_ec_subset_sum_add_points_slope,
             // pedersen_hash0_ec_subset_sum_add_points_x,
             // pedersen_hash0_ec_subset_sum_add_points_y,
             // pedersen_hash0_ec_subset_sum_copy_point_x,
@@ -1559,7 +1562,7 @@ impl ExecutionTraceColumn for Pedersen {
     fn offset<T>(&self, offset: isize) -> Expr<AlgebraicItem<T>> {
         let column = self.index();
         let trace_offset = match self {
-            Self::Suffix | Self::Slope => offset + *self as isize,
+            Self::Suffix | Self::Slope => 4 * offset + *self as isize,
             Self::PartialSumX | Self::PartialSumY => 4 * offset + *self as isize,
             Self::Bit251AndBit196AndBit192 | Self::Bit251AndBit196 => {
                 (PEDERSEN_BUILTIN_RATIO * CYCLE_HEIGHT) as isize * offset + *self as isize

@@ -22,6 +22,7 @@ use builtins::range_check;
 use num_bigint::BigUint;
 use ruint::aliases::U256;
 use crate::CairoWitness;
+use crate::recursive::PEDERSEN_BUILTIN_RATIO;
 use super::BITWISE_RATIO;
 use super::DILUTED_CHECK_N_BITS;
 use super::DILUTED_CHECK_SPACING;
@@ -285,38 +286,33 @@ impl CairoTrace for ExecutionTrace {
         let mut diluted_check_unordered_column = Vec::new_in(GpuAllocator);
         diluted_check_unordered_column.resize(trace_len, Fp::ZERO);
 
-        // // Generate trace for pedersen hash
-        // // ================================
-        // let mut pedersen_partial_xs_column = Vec::new_in(GpuAllocator);
-        // pedersen_partial_xs_column.resize(trace_len, Fp::zero());
-        // let mut pedersen_partial_ys_column = Vec::new_in(GpuAllocator);
-        // pedersen_partial_ys_column.resize(trace_len, Fp::zero());
-        // let mut pedersen_suffixes_column = Vec::new_in(GpuAllocator);
-        // pedersen_suffixes_column.resize(trace_len, Fp::zero());
-        // let mut pedersen_slopes_column = Vec::new_in(GpuAllocator);
-        // pedersen_slopes_column.resize(trace_len, Fp::zero());
+        // Generate trace for pedersen hash
+        // ================================
+        let mut pedersen_partial_xs_column = Vec::new_in(GpuAllocator);
+        pedersen_partial_xs_column.resize(trace_len, Fp::zero());
+        let mut pedersen_partial_ys_column = Vec::new_in(GpuAllocator);
+        pedersen_partial_ys_column.resize(trace_len, Fp::zero());
+        let mut pedersen_suffixes_column = Vec::new_in(GpuAllocator);
+        pedersen_suffixes_column.resize(trace_len, Fp::zero());
+        let mut pedersen_slopes_column = Vec::new_in(GpuAllocator);
+        pedersen_slopes_column.resize(trace_len, Fp::zero());
 
-        // // the trace for each hash spans 2048 rows
-        // let (pedersen_partial_xs_steps, _) =
-        // pedersen_partial_xs_column.as_chunks_mut::<2048>();
-        // let (pedersen_partial_ys_steps, _) =
-        // pedersen_partial_ys_column.as_chunks_mut::<2048>();
-        // let (pedersen_suffixes_steps, _) =
-        // pedersen_suffixes_column.as_chunks_mut::<2048>();
-        // let (pedersen_slopes_steps, _) =
-        // pedersen_slopes_column.as_chunks_mut::<2048>();
-        // let (pedersen_npc_steps, _) = npc_column.as_chunks_mut::<2048>();
-        // let (pedersen_aux_steps, _) = auxiliary_column.as_chunks_mut::<2048>();
+        // the trace for each hash spans 2048 rows
+        const PEDERSEN_STEP_ROWS: usize = PEDERSEN_BUILTIN_RATIO * CYCLE_HEIGHT;
+        let (pedersen_partial_point_steps, _) =
+            range_check_column.as_chunks_mut::<PEDERSEN_STEP_ROWS>();
+        let (pedersen_suffix_and_slope_steps, _) =
+            auxiliary_column.as_chunks_mut::<PEDERSEN_STEP_ROWS>();
+        let (pedersen_npc_steps, _) = npc_column.as_chunks_mut::<PEDERSEN_STEP_ROWS>();
 
-        // // create dummy instances if there are cells that need to be filled
-        // let pedersen_instances = air_private_input.pedersen;
-        // let num_pedersen_instances = pedersen_instances.len() as u32;
-        // let empty_pedersen_instances =
-        // (num_pedersen_instances..).map(PedersenInstance::new_empty);
-        // let pedersen_traces = pedersen_instances
-        //     .into_iter()
-        //     .chain(empty_pedersen_instances)
-        //     .map(pedersen::InstanceTrace::new);
+        // create dummy instances if there are cells that need to be filled
+        let pedersen_instances = air_private_input.pedersen;
+        let num_pedersen_instances = pedersen_instances.len() as u32;
+        let empty_pedersen_instances = (num_pedersen_instances..).map(PedersenInstance::new_empty);
+        let pedersen_traces = pedersen_instances
+            .into_iter()
+            .chain(empty_pedersen_instances)
+            .map(pedersen::InstanceTrace::new);
 
         let pedersen_memory_segment = air_public_input
             .memory_segments
@@ -324,58 +320,57 @@ impl CairoTrace for ExecutionTrace {
             .expect("layout requires a pedersen memory segment");
         let initial_pedersen_address = pedersen_memory_segment.begin_addr;
 
-        // // load individual hash traces into the global execution trace
-        // ark_std::cfg_iter_mut!(pedersen_partial_xs_steps)
-        //     .zip(pedersen_partial_ys_steps)
-        //     .zip(pedersen_suffixes_steps)
-        //     .zip(pedersen_slopes_steps)
-        //     .zip(pedersen_npc_steps)
-        //     .zip(pedersen_aux_steps)
-        //     .zip(pedersen_traces)
-        //     .for_each(
-        //         |((((((partial_xs, partial_ys), suffixes), slopes), npc), aux), pedersen_trace)| {
-        //             let a_steps = pedersen_trace.a_steps;
-        //             let b_steps = pedersen_trace.b_steps;
-        //             let partial_steps = [a_steps, b_steps].concat();
+        // load individual hash traces into the global execution trace
+        ark_std::cfg_iter_mut!(pedersen_partial_point_steps)
+            .zip(pedersen_suffix_and_slope_steps)
+            .zip(pedersen_npc_steps)
+            .zip(pedersen_traces)
+            .for_each(
+                |(((partial_points_step, suffixe_and_slope_step), npc), pedersen_trace)| {
+                    let a_steps = pedersen_trace.a_steps;
+                    let b_steps = pedersen_trace.b_steps;
+                    let partial_steps = [a_steps, b_steps].concat();
 
-        //             for ((((suffix, partial_x), partial_y), slope), step) in
-        //                 zip(suffixes.iter_mut(), partial_xs.iter_mut())
-        //                     .zip(partial_ys.iter_mut())
-        //                     .zip(slopes.iter_mut())
-        //                     .zip(partial_steps)
-        //             {
-        //                 *suffix = step.suffix;
-        //                 *partial_x = step.point.x;
-        //                 *partial_y = step.point.y;
-        //                 *slope = step.slope;
-        //             }
+                    const PART_ROWS: usize = PEDERSEN_STEP_ROWS / 512;
+                    let (partial_points, _) = partial_points_step.as_chunks_mut::<PART_ROWS>();
+                    let (suffixes_and_slopes, _) =
+                        suffixe_and_slope_step.as_chunks_mut::<PART_ROWS>();
 
-        //             // load fields for unique bit decomposition checks into the trace
-        //             // TODO split_at_mut(256) is that correct?
-        //             let (a_slopes, b_slopes) = slopes.split_at_mut(256);
-        //             let (a_aux, b_aux) = aux.split_at_mut(256);
-        //             a_slopes[Pedersen::Bit251AndBit196 as usize] =
-        //                 pedersen_trace.a_bit251_and_bit196.into();
-        //             b_slopes[Pedersen::Bit251AndBit196 as usize] =
-        //                 pedersen_trace.b_bit251_and_bit196.into();
-        //             a_aux[Pedersen::Bit251AndBit196AndBit192 as usize] =
-        //                 pedersen_trace.a_bit251_and_bit196_and_bit192.into();
-        //             b_aux[Pedersen::Bit251AndBit196AndBit192 as usize] =
-        //                 pedersen_trace.b_bit251_and_bit196_and_bit192.into();
+                    for ((partial_point, suffix_and_slope), step) in
+                        zip(partial_points.iter_mut(), suffixes_and_slopes.iter_mut())
+                            .zip(partial_steps)
+                    {
+                        partial_point[Pedersen::PartialSumX as usize] = step.point.x;
+                        partial_point[Pedersen::PartialSumY as usize] = step.point.y;
+                        suffix_and_slope[Pedersen::Suffix as usize] = step.suffix;
+                        suffix_and_slope[Pedersen::Slope as usize] = step.slope;
+                    }
 
-        //             // add the hash to the memory pool
-        //             let instance = pedersen_trace.instance;
-        //             let (a_addr, b_addr, output_addr) =
-        // instance.mem_addr(initial_pedersen_address);
-        // npc[Npc::PedersenInput0Addr as usize] = a_addr.into();
-        // npc[Npc::PedersenInput0Val as usize] = Fp::from(BigUint::from(instance.a));
-        //             npc[Npc::PedersenInput1Addr as usize] = b_addr.into();
-        //             npc[Npc::PedersenInput1Val as usize] =
-        // Fp::from(BigUint::from(instance.b));
-        // npc[Npc::PedersenOutputAddr as usize] = output_addr.into();
-        //             npc[Npc::PedersenOutputVal as usize] = pedersen_trace.output;
-        //         },
-        //     );
+                    // // load fields for unique bit decomposition checks into the trace
+                    // // TODO split_at_mut(256) is that correct?
+                    // let (a_suffixes_slopes, b_suffixes_slopes) =
+                    //     suffixe_and_slope_step.split_at_mut(PART_ROWS * 256);
+                    // let (a_aux, b_aux) = aux.split_at_mut(256);
+                    // a_suffixes_slopes[Pedersen::Bit251AndBit196 as usize] =
+                    //     pedersen_trace.a_bit251_and_bit196.into();
+                    // b_suffixes_slopes[Pedersen::Bit251AndBit196 as usize] =
+                    //     pedersen_trace.b_bit251_and_bit196.into();
+                    // a_aux[Pedersen::Bit251AndBit196AndBit192 as usize] =
+                    //     pedersen_trace.a_bit251_and_bit196_and_bit192.into();
+                    // b_aux[Pedersen::Bit251AndBit196AndBit192 as usize] =
+                    //     pedersen_trace.b_bit251_and_bit196_and_bit192.into();
+
+                    // add the hash to the memory pool
+                    let instance = pedersen_trace.instance;
+                    let (a_addr, b_addr, output_addr) = instance.mem_addr(initial_pedersen_address);
+                    npc[Npc::PedersenInput0Addr as usize] = a_addr.into();
+                    npc[Npc::PedersenInput0Val as usize] = Fp::from(BigUint::from(instance.a));
+                    npc[Npc::PedersenInput1Addr as usize] = b_addr.into();
+                    npc[Npc::PedersenInput1Val as usize] = Fp::from(BigUint::from(instance.b));
+                    npc[Npc::PedersenOutputAddr as usize] = output_addr.into();
+                    npc[Npc::PedersenOutputVal as usize] = pedersen_trace.output;
+                },
+            );
 
         // Generate trace for range check builtin
         // ======================================
