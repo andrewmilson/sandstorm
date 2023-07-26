@@ -1015,22 +1015,22 @@ impl ministark::air::AirConfig for AirConfig {
         // $\prod_{i=1}^{15}(x - ω^(16 * i))(x - ω^(1024 + (16 * i)))$
         // now multiply this product by $x^(n / 1024) - 1$
         // TODO: isn't this zerofier just equivalent to $x^(n / 16) - 1$?
-        let every_16_bit_segment_zerofier = (X.pow(n / 1024)
+        let every_16_bit_segment_zerofier = (X.pow(n / 128)
             - Constant(FieldVariant::Fp(g.pow([n as u64 / 64]))))
-            * (X.pow(n / 1024) - Constant(FieldVariant::Fp(g.pow([n as u64 / 32]))))
-            * (X.pow(n / 1024) - Constant(FieldVariant::Fp(g.pow([3 * n as u64 / 64]))))
-            * (X.pow(n / 1024) - Constant(FieldVariant::Fp(g.pow([n as u64 / 16]))))
-            * (X.pow(n / 1024) - Constant(FieldVariant::Fp(g.pow([5 * n as u64 / 64]))))
-            * (X.pow(n / 1024) - Constant(FieldVariant::Fp(g.pow([3 * n as u64 / 32]))))
-            * (X.pow(n / 1024) - Constant(FieldVariant::Fp(g.pow([7 * n as u64 / 64]))))
-            * (X.pow(n / 1024) - Constant(FieldVariant::Fp(g.pow([n as u64 / 8]))))
-            * (X.pow(n / 1024) - Constant(FieldVariant::Fp(g.pow([9 * n as u64 / 64]))))
-            * (X.pow(n / 1024) - Constant(FieldVariant::Fp(g.pow([5 * n as u64 / 32]))))
-            * (X.pow(n / 1024) - Constant(FieldVariant::Fp(g.pow([11 * n as u64 / 64]))))
-            * (X.pow(n / 1024) - Constant(FieldVariant::Fp(g.pow([3 * n as u64 / 16]))))
-            * (X.pow(n / 1024) - Constant(FieldVariant::Fp(g.pow([13 * n as u64 / 64]))))
-            * (X.pow(n / 1024) - Constant(FieldVariant::Fp(g.pow([7 * n as u64 / 32]))))
-            * (X.pow(n / 1024) - Constant(FieldVariant::Fp(g.pow([15 * n as u64 / 64]))))
+            * (X.pow(n / 128) - Constant(FieldVariant::Fp(g.pow([n as u64 / 32]))))
+            * (X.pow(n / 128) - Constant(FieldVariant::Fp(g.pow([3 * n as u64 / 64]))))
+            * (X.pow(n / 128) - Constant(FieldVariant::Fp(g.pow([n as u64 / 16]))))
+            * (X.pow(n / 128) - Constant(FieldVariant::Fp(g.pow([5 * n as u64 / 64]))))
+            * (X.pow(n / 128) - Constant(FieldVariant::Fp(g.pow([3 * n as u64 / 32]))))
+            * (X.pow(n / 128) - Constant(FieldVariant::Fp(g.pow([7 * n as u64 / 64]))))
+            * (X.pow(n / 128) - Constant(FieldVariant::Fp(g.pow([n as u64 / 8]))))
+            * (X.pow(n / 128) - Constant(FieldVariant::Fp(g.pow([9 * n as u64 / 64]))))
+            * (X.pow(n / 128) - Constant(FieldVariant::Fp(g.pow([5 * n as u64 / 32]))))
+            * (X.pow(n / 128) - Constant(FieldVariant::Fp(g.pow([11 * n as u64 / 64]))))
+            * (X.pow(n / 128) - Constant(FieldVariant::Fp(g.pow([3 * n as u64 / 16]))))
+            * (X.pow(n / 128) - Constant(FieldVariant::Fp(g.pow([13 * n as u64 / 64]))))
+            * (X.pow(n / 128) - Constant(FieldVariant::Fp(g.pow([7 * n as u64 / 32]))))
+            * (X.pow(n / 128) - Constant(FieldVariant::Fp(g.pow([15 * n as u64 / 64]))))
             * &all_bitwise_zerofier;
         let every_16_bit_segment_zerofier_inv = &one / every_16_bit_segment_zerofier;
 
@@ -1251,17 +1251,17 @@ impl ministark::air::AirConfig for AirConfig {
             rc_builtin_value,
             rc_builtin_addr_step,
             rc_builtin_init_addr,
-            // bitwise_init_var_pool_addr,
-            // bitwise_step_var_pool_addr,
-            // bitwise_x_or_y_addr,
-            // bitwise_next_var_pool_addr,
-            // bitwise_partition,
-            // bitwise_or_is_and_plus_xor,
-            // bitwise_addition_is_xor_with_and,
-            // bitwise_unique_unpacking192,
-            // bitwise_unique_unpacking193,
-            // bitwise_unique_unpacking194,
-            // bitwise_unique_unpacking195,
+            bitwise_init_var_pool_addr,
+            bitwise_step_var_pool_addr,
+            bitwise_x_or_y_addr,
+            bitwise_next_var_pool_addr,
+            bitwise_partition,
+            bitwise_or_is_and_plus_xor,
+            bitwise_addition_is_xor_with_and,
+            bitwise_unique_unpacking192,
+            bitwise_unique_unpacking193,
+            bitwise_unique_unpacking194,
+            bitwise_unique_unpacking195,
         ]
         .into_iter()
         .map(Constraint::new)
