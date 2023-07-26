@@ -591,6 +591,7 @@ impl ministark::air::AirConfig for AirConfig {
         // ================
         // Each hash spans across 256 rows - that's one hash per 16 cairo steps.
         let every_256_row_zerofier_inv = &one / (X.pow(n / 256) - &one);
+        // let every_256_row_zerofier_inv = &one / (X.pow(n / 256) - &one);
 
         // These first few pedersen constraints check that the number is in the range
         // ```text
@@ -889,18 +890,20 @@ impl ministark::air::AirConfig for AirConfig {
         // ===================
 
         // TODO: fix naming
-        let zerofier_256th_last_row =
-            X - Constant(FieldVariant::Fp(g.pow([256 * (n as u64 / 256 - 1)])));
-        let every_256_rows_except_last_zerofier =
-            &zerofier_256th_last_row * &every_256_row_zerofier_inv;
+        let every_128_rows_zerofier = X.pow(n / 256) - &one;
+        let every_128_rows_zerofier_inv = &one / &every_128_rows_zerofier;
+        let zerofier_128th_last_row =
+            X - Constant(FieldVariant::Fp(g.pow([128 * (n as u64 / 128 - 1)])));
+        let every_128_rows_except_last_zerofier =
+            &zerofier_128th_last_row * &every_128_rows_zerofier_inv;
 
         // Hook up range check with the memory pool
         // TODO Zerofier every 128_row_zerofier?
         let rc_builtin_value =
-            (rc_builtin_value7_0 - Npc::RangeCheck128Val.curr()) * &every_256_row_zerofier_inv;
+            (rc_builtin_value7_0 - Npc::RangeCheck128Val.curr()) * &every_128_rows_zerofier_inv;
         let rc_builtin_addr_step = (Npc::RangeCheck128Addr.next()
             - (Npc::RangeCheck128Addr.curr() + &one))
-            * &every_256_rows_except_last_zerofier;
+            * &every_128_rows_except_last_zerofier;
 
         let rc_builtin_init_addr =
             (Npc::RangeCheck128Addr.curr() - InitialRcAddr.hint()) * &first_row_zerofier_inv;
@@ -915,14 +918,16 @@ impl ministark::air::AirConfig for AirConfig {
 
         // example for trace length n=1024
         // ================================
-        // x^(n/1024) - ω^(3*n/4)      = x^(n/1024) - ω^(768*n/1024)
-        // x^(n/1024) - ω^(768*n/1024) = (x-ω^768)
-        // x^(n/256) - 1               = (x-ω^0)(x-ω^256)(x-ω^512)(x-ω^768)
-        // (x-ω^768)/(x^(n/256) - 1)   = 1/((x-ω^0)(x-ω^256)(x-ω^512))
-        // vanishes on every 256th row except the 3rd of every 4
+        // x^(n/128) - ω^(3*n/4)    = x^(n/128) - ω^(96*n/128)
+        // x^(n/128) - ω^(96*n/128) = (x-ω^96)
+        // x^(n/32) - 1            = (x-ω^0)(x-ω^32)(x-ω^64)(x-ω^96)
+        // (x-ω^96)/(x^(n/32) - 1) = 1/((x-ω^0)(x-ω^32)(x-ω^64))
+        // vanishes on every 128th row except the 3rd of every 4
+        let every_32_row_zerofier = X.pow(n / 32) - &one;
+        let every_32_row_zerofier_inv = &one / &every_32_row_zerofier;
         let bitwise_transition_zerofier_inv = (X.pow(n / 128)
             - Constant(FieldVariant::Fp(g.pow([(3 * n / 4) as u64]))))
-            * &every_256_row_zerofier_inv;
+            * &every_32_row_zerofier_inv;
 
         let all_bitwise_zerofier = X.pow(n / 128) - &one;
         let all_bitwise_zerofier_inv = &one / &all_bitwise_zerofier;
@@ -1243,9 +1248,9 @@ impl ministark::air::AirConfig for AirConfig {
             // pedersen_input1_addr,
             // pedersen_output_value0,
             // pedersen_output_addr,
-            // rc_builtin_value,
-            // rc_builtin_addr_step,
-            // rc_builtin_init_addr,
+            rc_builtin_value,
+            rc_builtin_addr_step,
+            rc_builtin_init_addr,
             // bitwise_init_var_pool_addr,
             // bitwise_step_var_pool_addr,
             // bitwise_x_or_y_addr,

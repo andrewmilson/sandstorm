@@ -377,12 +377,11 @@ impl CairoTrace for ExecutionTrace {
         //         },
         //     );
 
-        // // Generate trace for range check builtin
-        // // ======================================
-        // const RC_STEP_ROWS: usize = RANGE_CHECK_BUILTIN_RATIO * CYCLE_HEIGHT;
-        // let (rc_range_check_steps, _) =
-        // range_check_column.as_chunks_mut::<RC_STEP_ROWS>();
-        // let (rc_npc_steps, _) = npc_column.as_chunks_mut::<RC_STEP_ROWS>();
+        // Generate trace for range check builtin
+        // ======================================
+        const RC_STEP_ROWS: usize = RANGE_CHECK_BUILTIN_RATIO * CYCLE_HEIGHT;
+        let (rc_range_check_steps, _) = range_check_column.as_chunks_mut::<RC_STEP_ROWS>();
+        let (rc_npc_steps, _) = npc_column.as_chunks_mut::<RC_STEP_ROWS>();
 
         let rc_memory_segment = air_public_input
             .memory_segments
@@ -390,37 +389,33 @@ impl CairoTrace for ExecutionTrace {
             .expect("layout requires a range check memory segment");
         let initial_rc_address = rc_memory_segment.begin_addr;
 
-        // ark_std::cfg_iter_mut!(rc_range_check_steps)
-        //     .zip(rc_npc_steps)
-        //     .zip(rc128_traces.into_iter().chain(rc128_dummy_traces))
-        //     .for_each(|((rc, npc), rc_trace)| {
-        //         // add the 128-bit range check to the 16-bit range check pool
-        //         let parts = rc_trace.parts;
-        //         const RC_PART_ROWS: usize = RC_STEP_ROWS / RANGE_CHECK_BUILTIN_PARTS;
-        //         rc[RangeCheckBuiltin::Rc16Component as usize] = parts[0].into();
-        //         rc[RangeCheckBuiltin::Rc16Component as usize + RC_PART_ROWS] =
-        // parts[1].into();         rc[RangeCheckBuiltin::Rc16Component as usize
-        // + RC_PART_ROWS * 2] = parts[2].into(); rc[RangeCheckBuiltin::Rc16Component as
-        //   usize + RC_PART_ROWS * 3] =
-        // parts[3].into();         rc[RangeCheckBuiltin::Rc16Component as usize
-        // + RC_PART_ROWS * 4] = parts[4].into(); rc[RangeCheckBuiltin::Rc16Component as
-        //   usize + RC_PART_ROWS * 5] =
-        // parts[5].into();         rc[RangeCheckBuiltin::Rc16Component as usize
-        // + RC_PART_ROWS * 6] = parts[6].into(); rc[RangeCheckBuiltin::Rc16Component as
-        //   usize + RC_PART_ROWS * 7] =
-        // parts[7].into();
+        ark_std::cfg_iter_mut!(rc_range_check_steps)
+            .zip(rc_npc_steps)
+            .zip(rc128_traces.into_iter().chain(rc128_dummy_traces))
+            .for_each(|((rc, npc), rc_trace)| {
+                // add the 128-bit range check to the 16-bit range check pool
+                let parts = rc_trace.parts;
+                const RC_PART_ROWS: usize = RC_STEP_ROWS / RANGE_CHECK_BUILTIN_PARTS;
+                rc[RangeCheckBuiltin::Rc16Component as usize] = parts[0].into();
+                rc[RangeCheckBuiltin::Rc16Component as usize + RC_PART_ROWS] = parts[1].into();
+                rc[RangeCheckBuiltin::Rc16Component as usize + RC_PART_ROWS * 2] = parts[2].into();
+                rc[RangeCheckBuiltin::Rc16Component as usize + RC_PART_ROWS * 3] = parts[3].into();
+                rc[RangeCheckBuiltin::Rc16Component as usize + RC_PART_ROWS * 4] = parts[4].into();
+                rc[RangeCheckBuiltin::Rc16Component as usize + RC_PART_ROWS * 5] = parts[5].into();
+                rc[RangeCheckBuiltin::Rc16Component as usize + RC_PART_ROWS * 6] = parts[6].into();
+                rc[RangeCheckBuiltin::Rc16Component as usize + RC_PART_ROWS * 7] = parts[7].into();
 
-        //         // TODO: could turn above into loop
-        //         // for (dst, val) in zip(range_check.chunks_mut(RC_PART_ROWS),
-        // rc_trace.parts) {         //     dst[RangeCheckBuiltin::Rc16Component
-        // as usize] = val.into();         // }
+                // TODO: could turn above into loop
+                // for (dst, val) in zip(range_check.chunks_mut(RC_PART_ROWS), rc_trace.parts) {
+                //     dst[RangeCheckBuiltin::Rc16Component as usize] = val.into();
+                // }
 
-        //         // add the range check to the memory pool
-        //         let instance = rc_trace.instance;
-        //         let addr = instance.mem_addr(initial_rc_address);
-        //         npc[Npc::RangeCheck128Addr as usize] = addr.into();
-        //         npc[Npc::RangeCheck128Val as usize] =
-        // Fp::from(BigUint::from(instance.value));     });
+                // add the range check to the memory pool
+                let instance = rc_trace.instance;
+                let addr = instance.mem_addr(initial_rc_address);
+                npc[Npc::RangeCheck128Addr as usize] = addr.into();
+                npc[Npc::RangeCheck128Val as usize] = Fp::from(BigUint::from(instance.value));
+            });
 
         // Generate trace for bitwise builtin
         // ==================================
