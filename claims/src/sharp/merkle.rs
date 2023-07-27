@@ -2,7 +2,8 @@ use ark_serialize::CanonicalDeserialize;
 use ark_serialize::CanonicalSerialize;
 use ark_serialize::Valid;
 use digest::Digest;
-use digest::Output;
+use ministark::hash::ElementHashFn;
+use ministark::hash::HashFn;
 use ministark::merkle::Error;
 use ark_ff::Zero;
 use ministark::merkle::MatrixMerkleTree;
@@ -13,11 +14,8 @@ use ministark::merkle::MerkleTreeImpl;
 use ministark::utils::SerdeOutput;
 use ministark::Matrix;
 use ministark_gpu::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481::ark::Fp;
-use ruint::aliases::U256;
 use std::iter::zip;
 use std::marker::PhantomData;
-
-use super::utils::to_montgomery;
 
 pub const HASH_MASK: [u8; 32] = [
     0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
@@ -32,55 +30,47 @@ pub fn mask_bytes(bytes: &mut [u8], mask: &[u8]) {
 }
 
 #[derive(Default)]
-pub struct UnhashedLeafConfig<D>(PhantomData<(D, Fp)>);
+pub struct UnhashedLeafConfig<H>(PhantomData<H>);
 
-impl<D: Digest + Send + Sync + 'static> MerkleTreeConfig for UnhashedLeafConfig<D> {
-    type Digest = D;
+impl<H: ElementHashFn<Fp>> MerkleTreeConfig for UnhashedLeafConfig<H> {
+    type Digest = H::Digest;
+    type HashFn = H;
     type Leaf = Fp;
 
-    fn hash_leaves(l0: &Fp, l1: &Fp) -> Output<D> {
-        let mut hasher = D::new();
-        hasher.update(U256::from(to_montgomery(*l0)).to_be_bytes::<32>());
-        hasher.update(U256::from(to_montgomery(*l1)).to_be_bytes::<32>());
-        let mut hash = hasher.finalize();
-        mask_bytes(&mut hash, &HASH_MASK);
-        hash
+    fn hash_leaves(l0: &Fp, l1: &Fp) -> H::Digest {
+        H::hash_elements([*l0, *l1])
     }
 
-    #[inline]
-    fn pre_process_node_hash(hash: &mut Output<D>) {
-        mask_bytes(hash, &HASH_MASK);
-    }
+    // #[inline]
+    // fn pre_process_node_hash(hash: &mut H::Digest) {
+    //     mask_bytes(hash, &HASH_MASK);
+    // }
 }
 
 #[derive(Default)]
-pub struct HashedLeafConfig<D>(PhantomData<D>);
+pub struct HashedLeafConfig<H>(PhantomData<H>);
 
-impl<D: Digest + Send + Sync + 'static> MerkleTreeConfig for HashedLeafConfig<D> {
-    type Digest = D;
-    type Leaf = SerdeOutput<D>;
+impl<H: ElementHashFn<Fp>> MerkleTreeConfig for HashedLeafConfig<H> {
+    type Digest = H::Digest;
+    type HashFn = H;
+    type Leaf = H::Digest;
 
-    fn hash_leaves(l0: &SerdeOutput<D>, l1: &SerdeOutput<D>) -> Output<D> {
-        let mut hasher = D::new();
-        hasher.update(&**l0);
-        hasher.update(&**l1);
-        let mut hash = hasher.finalize();
-        mask_bytes(&mut hash, &HASH_MASK);
-        hash
+    fn hash_leaves(l0: &H::Digest, l1: &H::Digest) -> H::Digest {
+        H::merge(l0, l1)
     }
 
-    #[inline]
-    fn pre_process_node_hash(hash: &mut Output<D>) {
-        mask_bytes(hash, &HASH_MASK);
-    }
+    // #[inline]
+    // fn pre_process_node_hash(hash: &mut Output<D>) {
+    //     mask_bytes(hash, &HASH_MASK);
+    // }
 }
 
-pub enum MerkleTreeVariantProof<D: Digest + Send + Sync + 'static> {
-    Hashed(MerkleProof<HashedLeafConfig<D>>),
-    Unhashed(MerkleProof<UnhashedLeafConfig<D>>),
+pub enum MerkleTreeVariantProof<H: ElementHashFn<Fp>> {
+    Hashed(MerkleProof<HashedLeafConfig<H>>),
+    Unhashed(MerkleProof<UnhashedLeafConfig<H>>),
 }
 
-impl<D: Digest + Send + Sync + 'static> Clone for MerkleTreeVariantProof<D> {
+impl<H: ElementHashFn<Fp>> Clone for MerkleTreeVariantProof<H> {
     fn clone(&self) -> Self {
         match self {
             Self::Hashed(proof) => Self::Hashed(proof.clone()),
@@ -89,7 +79,7 @@ impl<D: Digest + Send + Sync + 'static> Clone for MerkleTreeVariantProof<D> {
     }
 }
 
-impl<D: Digest + Send + Sync + 'static> CanonicalSerialize for MerkleTreeVariantProof<D> {
+impl<H: ElementHashFn<Fp>> CanonicalSerialize for MerkleTreeVariantProof<H> {
     fn serialize_with_mode<W: ark_serialize::Write>(
         &self,
         mut writer: W,
@@ -115,13 +105,13 @@ impl<D: Digest + Send + Sync + 'static> CanonicalSerialize for MerkleTreeVariant
     }
 }
 
-impl<D: Digest + Send + Sync + 'static> Valid for MerkleTreeVariantProof<D> {
+impl<H: ElementHashFn<Fp>> Valid for MerkleTreeVariantProof<H> {
     fn check(&self) -> Result<(), ark_serialize::SerializationError> {
         Ok(())
     }
 }
 
-impl<D: Digest + Send + Sync + 'static> CanonicalDeserialize for MerkleTreeVariantProof<D> {
+impl<H: ElementHashFn<Fp>> CanonicalDeserialize for MerkleTreeVariantProof<H> {
     fn deserialize_with_mode<R: ark_serialize::Read>(
         mut reader: R,
         compress: ark_serialize::Compress,
@@ -136,12 +126,12 @@ impl<D: Digest + Send + Sync + 'static> CanonicalDeserialize for MerkleTreeVaria
     }
 }
 
-pub enum MerkleTreeVariant<D: Digest + Send + Sync + 'static> {
-    Hashed(MerkleTreeImpl<HashedLeafConfig<D>>),
-    Unhashed(MerkleTreeImpl<UnhashedLeafConfig<D>>),
+pub enum MerkleTreeVariant<H: ElementHashFn<Fp>> {
+    Hashed(MerkleTreeImpl<HashedLeafConfig<H>>),
+    Unhashed(MerkleTreeImpl<UnhashedLeafConfig<H>>),
 }
 
-impl<D: Digest + Send + Sync + 'static> Clone for MerkleTreeVariant<D> {
+impl<H: ElementHashFn<Fp>> Clone for MerkleTreeVariant<H> {
     fn clone(&self) -> Self {
         match self {
             Self::Hashed(mt) => Self::Hashed(mt.clone()),
@@ -150,9 +140,9 @@ impl<D: Digest + Send + Sync + 'static> Clone for MerkleTreeVariant<D> {
     }
 }
 
-impl<D: Digest + Send + Sync + 'static> MerkleTree for MerkleTreeVariant<D> {
-    type Proof = MerkleTreeVariantProof<D>;
-    type Root = Output<D>;
+impl<H: ElementHashFn<Fp>> MerkleTree for MerkleTreeVariant<H> {
+    type Proof = MerkleTreeVariantProof<H>;
+    type Root = H::Digest;
 
     fn root(&self) -> &Self::Root {
         match self {
@@ -161,7 +151,7 @@ impl<D: Digest + Send + Sync + 'static> MerkleTree for MerkleTreeVariant<D> {
         }
     }
 
-    fn prove(&self, index: usize) -> Result<MerkleTreeVariantProof<D>, Error> {
+    fn prove(&self, index: usize) -> Result<MerkleTreeVariantProof<H>, Error> {
         Ok(match self {
             Self::Hashed(mt) => MerkleTreeVariantProof::Hashed(mt.prove(index)?),
             Self::Unhashed(mt) => MerkleTreeVariantProof::Unhashed(mt.prove(index)?),
@@ -176,7 +166,7 @@ impl<D: Digest + Send + Sync + 'static> MerkleTree for MerkleTreeVariant<D> {
     }
 }
 
-impl<D: Digest + Send + Sync + 'static> MatrixMerkleTree<Fp> for MerkleTreeVariant<D> {
+impl<H: ElementHashFn<Fp>> MatrixMerkleTree<Fp> for MerkleTreeVariant<H> {
     fn from_matrix(matrix: &Matrix<Fp>) -> Self {
         match matrix.num_cols() {
             0 => unreachable!(),
@@ -186,40 +176,40 @@ impl<D: Digest + Send + Sync + 'static> MatrixMerkleTree<Fp> for MerkleTreeVaria
                 Self::Unhashed(MerkleTreeImpl::new(leaves).unwrap())
             }
             _ => {
-                let mut row_hashes = hash_rows::<D>(matrix);
+                let mut row_hashes = hash_rows::<H>(matrix);
                 for hash in &mut row_hashes {
-                    mask_bytes(hash, &HASH_MASK);
+                    // mask_bytes(hash, &HASH_MASK);
                 }
-                let leaves = row_hashes.into_iter().map(SerdeOutput::new).collect();
-                Self::Hashed(MerkleTreeImpl::new(leaves).unwrap())
+                // let leaves = row_hashes.into_iter().map(SerdeOutput::new).collect();
+                Self::Hashed(MerkleTreeImpl::new(row_hashes).unwrap())
             }
         }
     }
 
-    fn prove_row(&self, row_idx: usize) -> Result<MerkleTreeVariantProof<D>, Error> {
+    fn prove_row(&self, row_idx: usize) -> Result<MerkleTreeVariantProof<H>, Error> {
         self.prove(row_idx)
     }
 
     fn verify_row(
-        root: &Output<D>,
+        root: &H::Digest,
         row_idx: usize,
         row: &[Fp],
-        proof: &MerkleTreeVariantProof<D>,
+        proof: &MerkleTreeVariantProof<H>,
     ) -> Result<(), Error> {
         match (row, proof) {
             (&[], _) => Err(Error::InvalidProof),
             (&[leaf], MerkleTreeVariantProof::Unhashed(proof)) => {
                 if *proof.leaf() == leaf {
-                    MerkleTreeImpl::<UnhashedLeafConfig<D>>::verify(root, proof, row_idx)
+                    MerkleTreeImpl::<UnhashedLeafConfig<H>>::verify(root, proof, row_idx)
                 } else {
                     Err(Error::InvalidProof)
                 }
             }
             (row, MerkleTreeVariantProof::Hashed(proof)) => {
-                let mut row_hash = hash_row::<D>(row);
-                mask_bytes(&mut row_hash, &HASH_MASK);
-                if **proof.leaf() == row_hash {
-                    MerkleTreeImpl::<HashedLeafConfig<D>>::verify(root, proof, row_idx)
+                let mut row_hash = hash_row::<H>(row);
+                // mask_bytes(&mut row_hash, &HASH_MASK);
+                if proof.leaf() == &row_hash {
+                    MerkleTreeImpl::<HashedLeafConfig<H>>::verify(root, proof, row_idx)
                 } else {
                     Err(Error::InvalidProof)
                 }
@@ -230,18 +220,19 @@ impl<D: Digest + Send + Sync + 'static> MatrixMerkleTree<Fp> for MerkleTreeVaria
 }
 
 #[inline]
-fn hash_row<D: Digest>(row: &[Fp]) -> Output<D> {
-    let mut hasher = D::new();
-    for v in row {
-        let v = U256::from(to_montgomery(*v));
-        hasher.update(v.to_be_bytes::<32>())
-    }
-    hasher.finalize()
+fn hash_row<H: ElementHashFn<Fp>>(row: &[Fp]) -> H::Digest {
+    H::hash_elements(row.iter().copied())
+    // let mut hasher = D::new();
+    // for v in row {
+    //     let v = U256::from(to_montgomery(*v));
+    //     hasher.update(v.to_be_bytes::<32>())
+    // }
+    // hasher.finalize()
 }
 
-fn hash_rows<D: Digest>(matrix: &Matrix<Fp>) -> Vec<Output<D>> {
+fn hash_rows<H: ElementHashFn<Fp>>(matrix: &Matrix<Fp>) -> Vec<H::Digest> {
     let num_rows = matrix.num_rows();
-    let mut row_hashes = vec![Output::<D>::default(); num_rows];
+    let mut row_hashes = vec![H::Digest::default(); num_rows];
 
     #[cfg(not(feature = "parallel"))]
     let chunk_size = row_hashes.len();
@@ -260,7 +251,7 @@ fn hash_rows<D: Digest>(matrix: &Matrix<Fp>) -> Vec<Output<D>> {
 
             for (i, row_hash) in chunk.iter_mut().enumerate() {
                 matrix.read_row(offset + i, &mut row_buffer);
-                *row_hash = hash_row::<D>(&row_buffer);
+                *row_hash = hash_row::<H>(&row_buffer);
             }
         });
 
@@ -271,6 +262,7 @@ fn hash_rows<D: Digest>(matrix: &Matrix<Fp>) -> Vec<Output<D>> {
 mod tests {
     use super::MerkleTree;
     use super::MerkleTreeVariant;
+    use crate::sharp::hash::Keccak256HashFn;
     use ark_ff::MontFp as Fp;
     use ministark::merkle::Error;
     use ministark::merkle::MatrixMerkleTree;
@@ -282,7 +274,7 @@ mod tests {
     fn verify_unhashed_leaves() -> Result<(), Error> {
         let leaves = [Fp!("1"), Fp!("2"), Fp!("3"), Fp!("4")];
         let single_column_matrix = Matrix::new(vec![leaves.to_vec_in(GpuAllocator)]);
-        let tree = MerkleTreeVariant::<Keccak256>::from_matrix(&single_column_matrix);
+        let tree = MerkleTreeVariant::<Keccak256HashFn>::from_matrix(&single_column_matrix);
         let commitment = tree.root();
         let i = 3;
 
@@ -299,7 +291,7 @@ mod tests {
             leaves.to_vec_in(GpuAllocator),
             leaves.to_vec_in(GpuAllocator),
         ]);
-        let tree = MerkleTreeVariant::<Keccak256>::from_matrix(&multi_column_matrix);
+        let tree = MerkleTreeVariant::<Keccak256HashFn>::from_matrix(&multi_column_matrix);
         let commitment = tree.root();
         let i = 3;
 

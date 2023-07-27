@@ -3,24 +3,27 @@ use std::fmt::Debug;
 use std::iter;
 
 use ministark::random::PublicCoin;
+use ministark::utils::SerdeOutput;
 use ministark_gpu::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481::ark::Fp;
 use num_bigint::BigUint;
 use ruint::aliases::U256;
 use ruint::uint;
+use sha3::Keccak256;
 use sha3::digest::Output;
 use ark_ff::PrimeField;
 use ministark::random::leading_zeros;
 use sha3::Digest;
+use super::hash::Keccak256HashFn;
 use super::utils::to_montgomery;
 use super::utils::from_montgomery;
 
 /// Public coin based off of StarkWare's solidity verifier
-pub struct PublicCoinImpl<D: Digest> {
-    digest: Output<D>,
+pub struct SolidityPublicCoin {
+    digest: SerdeOutput<Keccak256>,
     counter: usize,
 }
 
-impl<D: Digest> Debug for PublicCoinImpl<D> {
+impl Debug for SolidityPublicCoin {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("PublicCoinImpl")
             .field("digest", &self.digest)
@@ -29,35 +32,36 @@ impl<D: Digest> Debug for PublicCoinImpl<D> {
     }
 }
 
-impl<D: Digest> PublicCoinImpl<D> {
+impl SolidityPublicCoin {
     fn reseed_with_bytes(&mut self, bytes: impl AsRef<[u8]>) {
         let digest = U256::try_from_be_slice(&self.digest).unwrap();
-        let mut hasher = D::new();
+        let mut hasher = Keccak256::new();
         hasher.update((digest + uint!(1_U256)).to_be_bytes::<32>());
         hasher.update(bytes);
-        self.digest = hasher.finalize();
+        self.digest = SerdeOutput::new(hasher.finalize());
         self.counter = 0;
     }
 
     fn draw_bytes(&mut self) -> [u8; 32] {
-        let mut hasher = D::new();
-        hasher.update(&self.digest);
+        let mut hasher = Keccak256::new();
+        hasher.update(&*self.digest);
         hasher.update(U256::from(self.counter).to_be_bytes::<32>());
         self.counter += 1;
         (*hasher.finalize()).try_into().unwrap()
     }
 }
 
-impl<D: Digest> PublicCoin for PublicCoinImpl<D> {
-    type Digest = D;
+impl PublicCoin for SolidityPublicCoin {
+    type Digest = SerdeOutput<Keccak256>;
+    type HashFn = Keccak256HashFn;
     type Field = Fp;
 
-    fn new(digest: Output<D>) -> Self {
+    fn new(digest: SerdeOutput<Keccak256>) -> Self {
         Self { digest, counter: 0 }
     }
 
-    fn reseed_with_hash(&mut self, val: &Output<D>) {
-        self.reseed_with_bytes(val);
+    fn reseed_with_digest(&mut self, val: &SerdeOutput<Keccak256>) {
+        self.reseed_with_bytes(&**val);
     }
 
     fn reseed_with_field_element(&mut self, val: &Fp) {
@@ -111,13 +115,13 @@ impl<D: Digest> PublicCoin for PublicCoinImpl<D> {
     }
 
     fn verify_proof_of_work(&self, proof_of_work_bits: u8, nonce: u64) -> bool {
-        let mut prefix_hasher = D::new();
+        let mut prefix_hasher = Keccak256::new();
         prefix_hasher.update(0x0123456789ABCDEDu64.to_be_bytes());
-        prefix_hasher.update(&self.digest);
+        prefix_hasher.update(&*self.digest);
         prefix_hasher.update([proof_of_work_bits]);
         let prefix_hash = prefix_hasher.finalize();
 
-        let mut proof_of_work_hasher = D::new();
+        let mut proof_of_work_hasher = Keccak256::new();
         proof_of_work_hasher.update(prefix_hash);
         proof_of_work_hasher.update(nonce.to_be_bytes());
         let proof_of_work_hash = proof_of_work_hasher.finalize();
@@ -128,11 +132,12 @@ impl<D: Digest> PublicCoin for PublicCoinImpl<D> {
 
 #[cfg(test)]
 mod tests {
-    use super::PublicCoinImpl;
+    use super::SolidityPublicCoin;
     use ark_ff::MontFp as Fp;
     use ark_poly::Radix2EvaluationDomain;
     use ark_poly::EvaluationDomain;
     use ministark::random::PublicCoin;
+    use ministark::utils::SerdeOutput;
     use ministark_gpu::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481::ark::Fp;
     use sha2::digest::Output;
     use ark_ff::FftField;
@@ -140,8 +145,8 @@ mod tests {
 
     #[test]
     fn draw_matches_solidity_verifier() {
-        let pub_input_hash = Output::<Keccak256>::default();
-        let mut public_coin = PublicCoinImpl::<Keccak256>::new(pub_input_hash);
+        let pub_input_hash = SerdeOutput::new(Output::<Keccak256>::default());
+        let mut public_coin = SolidityPublicCoin::new(pub_input_hash);
 
         assert_eq!(
             Fp!("914053382091189896561965228399096618375831658573140010954888220151670628653"),

@@ -2,6 +2,8 @@ extern crate alloc;
 
 use std::collections::BTreeMap;
 use super::CairoClaim;
+use super::SolidityVerifierMaskedHashFn;
+use super::hash::MaskedKeccak256HashFn;
 use super::merkle::MerkleTreeVariant;
 use ark_ff::Field;
 use binary::AirPublicInput;
@@ -12,6 +14,7 @@ use ministark::random::draw_multiple;
 use layouts::SharpAirConfig;
 use ministark::challenges::Challenges;
 use ministark::fri::FriVerifier;
+use ministark::utils::SerdeOutput;
 use ministark::verifier::VerificationError;
 use ministark::random::PublicCoin;
 use ministark::verifier::verify_positions;
@@ -21,7 +24,7 @@ use ministark::Air;
 use ministark::Proof;
 use ministark::verifier::ood_constraint_evaluation;
 use ministark_gpu::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481::ark::Fp;
-use digest::Digest;
+use sha3::Keccak256;
 
 pub struct SharpMetadata {
     pub public_memory_product: Fp,
@@ -36,12 +39,16 @@ pub struct SharpMetadata {
 impl<
         A: SharpAirConfig<Fp = Fp, Fq = Fp, PublicInputs = AirPublicInput<Fp>>,
         T: CairoTrace<Fp = Fp, Fq = Fp>,
-        D: Digest + Send + Sync + 'static,
-    > CairoClaim<A, T, D>
+    > CairoClaim<A, T>
 {
     pub fn verify_sharp(
         &self,
-        proof: Proof<Fp, Fp, D, MerkleTreeVariant<D>>,
+        proof: Proof<
+            Fp,
+            Fp,
+            SerdeOutput<Keccak256>,
+            MerkleTreeVariant<SolidityVerifierMaskedHashFn>,
+        >,
     ) -> Result<SharpMetadata, VerificationError> {
         use VerificationError::*;
 
@@ -62,7 +69,7 @@ impl<
         let air = Air::new(trace_len, self.get_public_inputs(), options);
         let mut public_coin = self.gen_public_coin(&air);
 
-        public_coin.reseed_with_hash(&base_trace_commitment);
+        public_coin.reseed_with_digest(&base_trace_commitment);
         let num_challenges = air.num_challenges();
         let challenges = Challenges::new(draw_multiple(&mut public_coin, num_challenges));
         let hints = air.gen_hints(&challenges);
@@ -81,13 +88,13 @@ impl<
         }
 
         let extension_trace_commitment = extension_trace_commitment.map(|commitment| {
-            public_coin.reseed_with_hash(&commitment);
+            public_coin.reseed_with_digest(&commitment);
             commitment
         });
 
         let num_composition_coeffs = air.num_composition_constraint_coeffs();
         let composition_coeffs = draw_multiple(&mut public_coin, num_composition_coeffs);
-        public_coin.reseed_with_hash(&composition_trace_commitment);
+        public_coin.reseed_with_digest(&composition_trace_commitment);
 
         let z = public_coin.draw();
         println!("oods z is: {z}");
@@ -121,7 +128,11 @@ impl<
         }
 
         let deep_coeffs = self.gen_deep_coeffs(&mut public_coin, &air);
-        let fri_verifier = FriVerifier::<Fp, D, MerkleTreeVariant<D>>::new(
+        let fri_verifier = FriVerifier::<
+            Fp,
+            SerdeOutput<Keccak256>,
+            MerkleTreeVariant<SolidityVerifierMaskedHashFn>,
+        >::new(
             &mut public_coin,
             options.into_fri_options(),
             fri_proof,
@@ -158,7 +169,7 @@ impl<
             .collect::<Vec<&[Fp]>>();
 
         // base trace positions
-        verify_positions::<Fp, MerkleTreeVariant<D>>(
+        verify_positions::<Fp, MerkleTreeVariant<SolidityVerifierMaskedHashFn>>(
             &base_trace_commitment,
             &query_positions,
             &base_trace_rows,
@@ -168,7 +179,7 @@ impl<
 
         if let Some(extension_trace_commitment) = extension_trace_commitment {
             // extension trace positions
-            verify_positions::<Fp, MerkleTreeVariant<D>>(
+            verify_positions::<Fp, MerkleTreeVariant<SolidityVerifierMaskedHashFn>>(
                 &extension_trace_commitment,
                 &query_positions,
                 &extension_trace_rows,
@@ -178,7 +189,7 @@ impl<
         }
 
         // composition trace positions
-        verify_positions::<Fp, MerkleTreeVariant<D>>(
+        verify_positions::<Fp, MerkleTreeVariant<SolidityVerifierMaskedHashFn>>(
             &composition_trace_commitment,
             &query_positions,
             &composition_trace_rows,
