@@ -99,7 +99,7 @@ fn main() {
                 Layout::Recursive => {
                     type A = layouts::recursive::AirConfig;
                     type T = layouts::recursive::ExecutionTrace;
-                    type C = claims::sharp::CairoClaim<A, T, Keccak256>;
+                    type C = claims::sharp::CairoClaim<A, T>;
                     let claim = C::new(program, air_public_input);
                     execute_command(command, options, claim);
                 }
