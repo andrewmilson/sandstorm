@@ -504,6 +504,7 @@ impl ministark::air::AirConfig for AirConfig {
         let every_fourth_row_zerofier_inv = &one / (X.pow(n / 4) - &one);
         let fourth_last_row_zerofier =
             X - Constant(FieldVariant::Fp(g.pow([4 * (n as u64 / 4 - 1)])));
+        let fourth_last_row_zerofier_inv = &one / &fourth_last_row_zerofier;
         let every_fourth_row_except_last_zerofier_inv =
             &fourth_last_row_zerofier * &every_fourth_row_zerofier_inv;
 
@@ -521,8 +522,8 @@ impl ministark::air::AirConfig for AirConfig {
             - (RangeCheckPermutation::Z.challenge() - RangeCheck::OffOp1.curr())
                 * Permutation::RangeCheck.curr())
             * &every_fourth_row_except_last_zerofier_inv;
-        let rc16_perm_last =
-            (Permutation::RangeCheck.curr() - RangeCheckProduct.hint()) / &fourth_last_row_zerofier;
+        let rc16_perm_last = (Permutation::RangeCheck.curr() - RangeCheckProduct.hint())
+            * &fourth_last_row_zerofier_inv;
         // Check the value increases by 0 or 1
         let rc16_diff_is_bit = (&rc16_diff_0 * &rc16_diff_0 - &rc16_diff_0)
             * &every_fourth_row_except_last_zerofier_inv;
@@ -531,7 +532,7 @@ impl ministark::air::AirConfig for AirConfig {
         let rc16_minimum =
             (RangeCheck::Ordered.curr() - RangeCheckMin.hint()) * &first_row_zerofier_inv;
         let rc16_maximum =
-            (RangeCheck::Ordered.curr() - RangeCheckMax.hint()) / &fourth_last_row_zerofier;
+            (RangeCheck::Ordered.curr() - RangeCheckMax.hint()) * &fourth_last_row_zerofier_inv;
 
         // Diluted Check constraints
         // =========================
@@ -891,7 +892,7 @@ impl ministark::air::AirConfig for AirConfig {
         // ===================
 
         // TODO: fix naming
-        let every_128_rows_zerofier = X.pow(n / 256) - &one;
+        let every_128_rows_zerofier = X.pow(n / 128) - &one;
         let every_128_rows_zerofier_inv = &one / &every_128_rows_zerofier;
         let zerofier_128th_last_row =
             X - Constant(FieldVariant::Fp(g.pow([128 * (n as u64 / 128 - 1)])));
@@ -969,10 +970,10 @@ impl ministark::air::AirConfig for AirConfig {
         // s3 = 0b0001_0001_0000_0001_0000_0000_0000_0000_0000_0000_0000_0000_0001_0000_0001
         // ```
         // note that `v = s0 * 2^0 + s1 * 2^1 + s2 * 2^2 + s3 * 2^3`.
-        let every_256_row_zerofier_inv = &one / (X.pow(n / 256) - &one);
+        let every_32_row_zerofier_inv = &one / (X.pow(n / 32) - &one);
         let bitwise_partition = (&bitwise_sum_var_0_0 + &bitwise_sum_var_8_0
             - Npc::BitwisePoolVal.curr())
-            * &every_256_row_zerofier_inv;
+            * &every_32_row_zerofier_inv;
 
         // NOTE: `x | y = (x & y) + (x ^ y)`
         let bitwise_x_and_y_val = Npc::BitwisePoolVal.offset(2);
@@ -1073,197 +1074,101 @@ impl ministark::air::AirConfig for AirConfig {
             - Bitwise::Bits16Chunk3Offset3ResShifted.curr())
             * &all_bitwise_zerofier_inv;
 
-        let _: &[&Expr<AlgebraicItem<FieldVariant<Self::Fp, Self::Fq>>>] = &[
-            &cpu_decode_opcode_rc_b,
-            &cpu_decode_opcode_rc_zero,
-            &cpu_decode_opcode_rc_input,
-            &cpu_decode_flag_op1_base_op0_bit,
-            &cpu_decode_flag_res_op1_bit,
-            &cpu_decode_flag_pc_update_regular_bit,
-            &cpu_decode_fp_update_regular_bit,
-            &cpu_operands_mem_dst_addr,
-            &cpu_operands_mem_op0_addr,
-            &cpu_operands_mem_op1_addr,
-            &cpu_operands_ops_mul,
-            &cpu_operands_res,
-            &cpu_update_registers_update_pc_tmp0,
-            &cpu_update_registers_update_pc_tmp1,
-            &cpu_update_registers_update_pc_pc_cond_negative,
-            &cpu_update_registers_update_pc_pc_cond_positive,
-            &cpu_update_registers_update_ap_ap_update,
-            &cpu_update_registers_update_fp_fp_update,
-            &cpu_opcodes_call_push_fp,
-            &cpu_opcodes_call_push_pc,
-            &cpu_opcodes_call_off0,
-            &cpu_opcodes_call_off1,
-            &cpu_opcodes_call_flags,
-            &cpu_opcodes_ret_off0,
-            &cpu_opcodes_ret_off2,
-            &cpu_opcodes_ret_flags,
-            &cpu_opcodes_assert_eq_assert_eq,
-            &initial_ap,
-            &initial_fp,
-            &initial_pc,
-            &final_ap,
-            &final_fp,
-            &final_pc,
-            &memory_multi_column_perm_perm_init0,
-            &memory_multi_column_perm_perm_step0,
-            &memory_multi_column_perm_perm_last,
-            &memory_diff_is_bit,
-            &memory_is_func,
-            &memory_initial_addr,
-            &public_memory_addr_zero,
-            &public_memory_value_zero,
-            &rc16_perm_init0,
-            &rc16_perm_step0,
-            &rc16_perm_last,
-            &rc16_diff_is_bit,
-            &rc16_minimum,
-            &rc16_maximum,
-            &diluted_check_permutation_init0,
-            &diluted_check_permutation_step0,
-            &diluted_check_permutation_last,
-            &diluted_check_init,
-            &diluted_check_first_element,
-            &diluted_check_step,
-            &diluted_check_last,
-            &pedersen_hash0_ec_subset_sub_bit_unpacking_last_one_is_zero,
-            &pedersen_hash0_ec_subset_sub_bit_unpacking_zeros_between_ones,
-            &pedersen_hash0_ec_subset_sum_bit_unpacking_cumulative_bit192,
-            &pedersen_hash0_ec_subset_sum_bit_unpacking_zeroes_between_ones192,
-            &pedersen_hash0_ec_subset_sum_bit_unpacking_cumulative_bit196,
-            &pedersen_hash0_ec_subset_sum_bit_unpacking_zeroes_between_ones196,
-            &pedersen_hash0_ec_subset_sum_booleanity_test,
-            &pedersen_hash0_ec_subset_sum_bit_extraction_end,
-            &pedersen_hash0_ec_subset_sum_zeros_tail,
-            &pedersen_hash0_ec_subset_sum_add_points_slope,
-            &pedersen_hash0_ec_subset_sum_add_points_x,
-            &pedersen_hash0_ec_subset_sum_add_points_y,
-            &pedersen_hash0_ec_subset_sum_copy_point_x,
-            &pedersen_hash0_ec_subset_sum_copy_point_y,
-            &pedersen_hash0_copy_point_x,
-            &pedersen_hash0_copy_point_y,
-            &pedersen_hash0_init_x,
-            &pedersen_hash0_init_y,
-            &pedersen_input0_value0,
-            &pedersen_input0_addr,
-            &pedersen_init_addr,
-            &pedersen_input1_value0,
-            &pedersen_input1_addr,
-            &pedersen_output_value0,
-            &pedersen_output_addr,
-            &rc_builtin_value,
-            &rc_builtin_addr_step,
-            &rc_builtin_init_addr,
-            &bitwise_init_var_pool_addr,
-            &bitwise_step_var_pool_addr,
-            &bitwise_x_or_y_addr,
-            &bitwise_next_var_pool_addr,
-            &bitwise_partition,
-            &bitwise_or_is_and_plus_xor,
-            &bitwise_addition_is_xor_with_and,
-            &bitwise_unique_unpacking192,
-            &bitwise_unique_unpacking193,
-            &bitwise_unique_unpacking194,
-            &bitwise_unique_unpacking195,
-        ];
-
         // NOTE: for composition OODs only seem to involve one random per constraint
         vec![
-             // cpu_decode_opcode_rc_b,
-           // cpu_decode_opcode_rc_zero,
-           // cpu_decode_opcode_rc_input,
-           // cpu_decode_flag_op1_base_op0_bit,
-           // cpu_decode_flag_res_op1_bit,
-           // cpu_decode_flag_pc_update_regular_bit,
-           // cpu_decode_fp_update_regular_bit,
-           // cpu_operands_mem_dst_addr,
-           // cpu_operands_mem_op0_addr,
-           // cpu_operands_mem_op1_addr,
-           // cpu_operands_ops_mul,
-           // cpu_operands_res,
-          //  cpu_update_registers_update_pc_tmp0,
-          //  cpu_update_registers_update_pc_tmp1,
-          //  cpu_update_registers_update_pc_pc_cond_negative,
-          //  cpu_update_registers_update_pc_pc_cond_positive,
-          //  cpu_update_registers_update_ap_ap_update,
-          //  cpu_update_registers_update_fp_fp_update,
-          //  cpu_opcodes_call_push_fp,
-          //  cpu_opcodes_call_push_pc,
-          //  cpu_opcodes_call_off0,
-          //  cpu_opcodes_call_off1,
-          //  cpu_opcodes_call_flags,
-          //  cpu_opcodes_ret_off0,
-          //  cpu_opcodes_ret_off2,
-          //  cpu_opcodes_ret_flags,
-          //  cpu_opcodes_assert_eq_assert_eq,
-          //  initial_ap,
-          //  initial_fp,
-          //  initial_pc,
-          //  final_ap,
-          //  final_fp,
-          //  final_pc,
-          //  memory_multi_column_perm_perm_init0,
-            memory_multi_column_perm_perm_step0,    // need
-          //  memory_multi_column_perm_perm_last,
-          //  memory_diff_is_bit,
-          //  memory_is_func,
-          //  memory_initial_addr,
-          //  public_memory_addr_zero,
-          //  public_memory_value_zero,
-          //  rc16_perm_init0,
-            rc16_perm_step0,    // need
-          //  rc16_perm_last,
-          //  rc16_diff_is_bit,
-          //  rc16_minimum,
-          //  rc16_maximum,
-          //  diluted_check_permutation_init0,
-          //  diluted_check_permutation_step0,    // need
-          //  diluted_check_permutation_last,
-          //  diluted_check_init,
-          //  diluted_check_first_element,
-            diluted_check_step, // need
-          //  diluted_check_last,
-          //  pedersen_hash0_ec_subset_sub_bit_unpacking_last_one_is_zero,
-          //  pedersen_hash0_ec_subset_sub_bit_unpacking_zeros_between_ones,
-          //  pedersen_hash0_ec_subset_sum_bit_unpacking_cumulative_bit192,
-          //  pedersen_hash0_ec_subset_sum_bit_unpacking_zeroes_between_ones192,
-          //  pedersen_hash0_ec_subset_sum_bit_unpacking_cumulative_bit196,
-          //  pedersen_hash0_ec_subset_sum_bit_unpacking_zeroes_between_ones196,
-          //  pedersen_hash0_ec_subset_sum_booleanity_test,
-          //  pedersen_hash0_ec_subset_sum_bit_extraction_end,
-          //  pedersen_hash0_ec_subset_sum_zeros_tail,
-          //  pedersen_hash0_ec_subset_sum_add_points_slope,
-          //  pedersen_hash0_ec_subset_sum_add_points_x,
-          //  pedersen_hash0_ec_subset_sum_add_points_y,
-          //  pedersen_hash0_ec_subset_sum_copy_point_x,
-          //  pedersen_hash0_ec_subset_sum_copy_point_y,
-          //  pedersen_hash0_copy_point_x,
-          //  pedersen_hash0_copy_point_y,
-          //  pedersen_hash0_init_x,
-          //  pedersen_hash0_init_y,
-          //  pedersen_input0_value0,
-          //  pedersen_input0_addr,
-          //  pedersen_init_addr,
-          //  pedersen_input1_value0,
-          //  pedersen_input1_addr,
-          //  pedersen_output_value0,
-          //  pedersen_output_addr,
-          //  rc_builtin_value,
-          //  rc_builtin_addr_step,
-          //  rc_builtin_init_addr,
-          //  bitwise_init_var_pool_addr,
-          //  bitwise_step_var_pool_addr,
-          //  bitwise_x_or_y_addr,
-          //  bitwise_next_var_pool_addr,
-          //  bitwise_partition,
-          //  bitwise_or_is_and_plus_xor,
-          //  bitwise_addition_is_xor_with_and,
-          //  bitwise_unique_unpacking192,
-          //  bitwise_unique_unpacking193,
-          //  bitwise_unique_unpacking194,
-          //  bitwise_unique_unpacking195,
+            cpu_decode_opcode_rc_b, // +1
+            cpu_decode_opcode_rc_zero,
+            cpu_decode_opcode_rc_input,
+            cpu_decode_flag_op1_base_op0_bit,
+            cpu_decode_flag_res_op1_bit,
+            cpu_decode_flag_pc_update_regular_bit,
+            cpu_decode_fp_update_regular_bit,
+            cpu_operands_mem_dst_addr,
+            cpu_operands_mem_op0_addr,
+            cpu_operands_mem_op1_addr,
+            cpu_operands_ops_mul,
+            cpu_operands_res,
+            cpu_update_registers_update_pc_tmp0,
+            cpu_update_registers_update_pc_tmp1,
+            cpu_update_registers_update_pc_pc_cond_negative,
+            cpu_update_registers_update_pc_pc_cond_positive,
+            cpu_update_registers_update_ap_ap_update,
+            cpu_update_registers_update_fp_fp_update,
+            cpu_opcodes_call_push_fp,
+            cpu_opcodes_call_push_pc,
+            cpu_opcodes_call_off0,
+            cpu_opcodes_call_off1,
+            cpu_opcodes_call_flags,
+            cpu_opcodes_ret_off0,
+            cpu_opcodes_ret_off2,
+            cpu_opcodes_ret_flags,
+            cpu_opcodes_assert_eq_assert_eq,
+            initial_ap,
+            initial_fp,
+            initial_pc,
+            final_ap,
+            final_fp,
+            final_pc,
+            memory_multi_column_perm_perm_init0,
+            memory_multi_column_perm_perm_step0,
+            memory_multi_column_perm_perm_last,
+            memory_diff_is_bit,
+            memory_is_func,
+            memory_initial_addr,
+            public_memory_addr_zero,
+            public_memory_value_zero,
+            rc16_perm_init0,
+            rc16_perm_step0,
+            rc16_perm_last,
+            rc16_diff_is_bit,
+            rc16_minimum,
+            rc16_maximum,
+            diluted_check_permutation_init0,
+            diluted_check_permutation_step0,
+            diluted_check_permutation_last,
+            diluted_check_init,
+            diluted_check_first_element,
+            diluted_check_step,
+            diluted_check_last,
+            pedersen_hash0_ec_subset_sub_bit_unpacking_last_one_is_zero,
+            pedersen_hash0_ec_subset_sub_bit_unpacking_zeros_between_ones,
+            pedersen_hash0_ec_subset_sum_bit_unpacking_cumulative_bit192,
+            pedersen_hash0_ec_subset_sum_bit_unpacking_zeroes_between_ones192,
+            pedersen_hash0_ec_subset_sum_bit_unpacking_cumulative_bit196,
+            pedersen_hash0_ec_subset_sum_bit_unpacking_zeroes_between_ones196,
+            pedersen_hash0_ec_subset_sum_booleanity_test,
+            pedersen_hash0_ec_subset_sum_bit_extraction_end,
+            pedersen_hash0_ec_subset_sum_zeros_tail,
+            pedersen_hash0_ec_subset_sum_add_points_slope,
+            pedersen_hash0_ec_subset_sum_add_points_x,
+            pedersen_hash0_ec_subset_sum_add_points_y,
+            pedersen_hash0_ec_subset_sum_copy_point_x,
+            pedersen_hash0_ec_subset_sum_copy_point_y,
+            pedersen_hash0_copy_point_x,
+            pedersen_hash0_copy_point_y,
+            pedersen_hash0_init_x,
+            pedersen_hash0_init_y,
+            pedersen_input0_value0,
+            pedersen_input0_addr,
+            pedersen_init_addr,
+            pedersen_input1_value0,
+            pedersen_input1_addr,
+            pedersen_output_value0,
+            pedersen_output_addr,
+            rc_builtin_value,
+            rc_builtin_addr_step,
+            rc_builtin_init_addr,
+            bitwise_init_var_pool_addr, // +1
+            bitwise_step_var_pool_addr,
+            bitwise_x_or_y_addr,
+            bitwise_next_var_pool_addr,
+            bitwise_partition,
+            bitwise_or_is_and_plus_xor,
+            bitwise_addition_is_xor_with_and,
+            bitwise_unique_unpacking192,
+            bitwise_unique_unpacking193,
+            bitwise_unique_unpacking194,
+            bitwise_unique_unpacking195,
         ]
         .into_iter()
         .map(Constraint::new)
@@ -1809,9 +1714,9 @@ impl ExecutionTraceColumn for Permutation {
     fn offset<T>(&self, offset: isize) -> Expr<AlgebraicItem<T>> {
         let (column, shift) = self.col_and_shift();
         let trace_offset = match self {
-            Self::Memory => MEMORY_STEP as isize * offset + shift as isize,
-            Self::RangeCheck => 4 * offset + shift as isize,
-            Self::DilutedCheck => offset + shift as isize, // TODO this is probably 2 * offset
+            Self::Memory => MEMORY_STEP as isize * offset + shift,
+            Self::RangeCheck => 4 * offset + shift,
+            Self::DilutedCheck => offset + shift,
         };
         AlgebraicItem::Trace(column, trace_offset).into()
     }

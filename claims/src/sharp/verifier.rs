@@ -1,10 +1,6 @@
 extern crate alloc;
 
 use std::collections::BTreeMap;
-
-
-use crate::sharp::utils::to_montgomery;
-
 use super::CairoClaim;
 use super::merkle::MerkleTreeVariant;
 use ark_ff::Field;
@@ -216,44 +212,5 @@ impl<
             deep_evaluations,
             fri_alphas,
         })
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use ark_ff::MontFp;
-    use ark_poly::univariate::DensePolynomial;
-    use ark_poly::DenseUVPolynomial;
-    use ark_poly::EvaluationDomain;
-    use ark_poly::Polynomial;
-    use ministark_gpu::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481::ark::Fp;
-    use ark_poly::Radix2EvaluationDomain;
-    use ark_ff::Field;
-
-    #[test]
-    fn test_fft_example() {
-        let coeffs = vec![MontFp!("5"), MontFp!("6")];
-        let mut poly = DensePolynomial::from_coefficients_vec(coeffs);
-        let domain = Radix2EvaluationDomain::new(2).unwrap();
-        let evals = poly.clone().evaluate_over_domain(domain);
-
-        let x0 = Fp::ONE;
-        let x1 = -Fp::ONE;
-
-        let fx0 = poly.evaluate(&x0);
-        let fx1 = poly.evaluate(&x1);
-
-        let eval_point = MontFp!("789");
-
-        // (f(x) + f(-x) + evalPoint*(f(x) - f(-x))/x) / 2.
-        println!(
-            "starkware expected: {}",
-            (fx0 + fx1 + eval_point * (fx0 - fx1))
-        );
-
-        for coeff in &mut poly.coeffs {
-            *coeff *= MontFp!("2");
-        }
-        println!("fft actual: {}", poly.evaluate(&eval_point));
     }
 }

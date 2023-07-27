@@ -134,7 +134,7 @@ pub fn get_ordered_memory_accesses<const PUBLIC_MEMORY_STEP: usize, F: PrimeFiel
     // justification for this is explained in section 9.8 of the Cairo paper https://eprint.iacr.org/2021/1063.pdf.
     // SHARP starts the first address at address 1
     let (zeros, ordered_accesses) = ordered_accesses.split_at(num_pub_mem_cells);
-    // assert!(zeros.iter().all(|e| e.address.is_zero()));
+    assert!(zeros.iter().all(|e| e.address.is_zero()));
     assert!(ordered_accesses[0].address.is_one());
 
     // check memory is "continuous" and "single valued"

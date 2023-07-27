@@ -26,11 +26,9 @@ use crate::recursive::PEDERSEN_BUILTIN_RATIO;
 use super::BITWISE_RATIO;
 use super::DILUTED_CHECK_N_BITS;
 use super::DILUTED_CHECK_SPACING;
-use super::DILUTED_CHECK_STEP;
 use super::RANGE_CHECK_BUILTIN_PARTS;
 use super::RANGE_CHECK_BUILTIN_RATIO;
 use super::air::Bitwise;
-use super::air::DilutedCheck;
 use super::air::DilutedCheckAggregation;
 use super::air::DilutedCheckPermutation;
 use super::air::Pedersen;
@@ -514,11 +512,11 @@ impl CairoTrace for ExecutionTrace {
                     }
 
                     // load bitwise values into memory
-                    let addr_step = BITWISE_RATIO * CYCLE_HEIGHT / 4;
+                    const ADDR_STEP: usize = BITWISE_RATIO * CYCLE_HEIGHT / 4;
                     let input_x_offset = Npc::BitwisePoolAddr as usize;
-                    let input_y_offset = input_x_offset + addr_step;
-                    let x_and_y_offset = input_y_offset + addr_step;
-                    let x_xor_y_offset = x_and_y_offset + addr_step;
+                    let input_y_offset = input_x_offset + ADDR_STEP;
+                    let x_and_y_offset = input_y_offset + ADDR_STEP;
+                    let x_xor_y_offset = x_and_y_offset + ADDR_STEP;
                     let x_or_y_offset = Npc::BitwiseXOrYAddr as usize;
                     let (input_x_addr, input_y_addr, x_and_y_addr, x_xor_y_addr, x_or_y_addr) =
                         instance.mem_addr(initial_bitwise_address);
