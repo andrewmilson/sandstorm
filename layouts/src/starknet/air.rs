@@ -2404,13 +2404,14 @@ impl ministark::air::AirConfig for AirConfig {
         let initial_ec_op_address = ec_op_segment.begin_addr.into();
         let initial_poseidon_address = poseidon_segment.begin_addr.into();
 
-        let memory_quotient = utils::compute_public_memory_quotient(
-            challenges[MemoryPermutation::Z],
-            challenges[MemoryPermutation::A],
-            trace_len,
-            &execution_info.public_memory,
-            execution_info.public_memory_padding(),
-        );
+        let memory_quotient =
+            utils::compute_public_memory_quotient::<PUBLIC_MEMORY_STEP, Self::Fp, Self::Fq>(
+                challenges[MemoryPermutation::Z],
+                challenges[MemoryPermutation::A],
+                trace_len,
+                &execution_info.public_memory,
+                execution_info.public_memory_padding(),
+            );
 
         let diluted_cumulative_val = compute_diluted_cumulative_value::<
             Fp,
@@ -2876,7 +2877,7 @@ impl ExecutionTraceColumn for Pedersen {
         let trace_offset = match self {
             Self::PartialSumX | Self::PartialSumY | Self::Suffix | Self::Slope => offset,
             Self::Bit251AndBit196AndBit192 | Self::Bit251AndBit196 => {
-                (PEDERSEN_BUILTIN_RATIO * CYCLE_HEIGHT) as isize * offset + *self as isize
+                (PEDERSEN_BUILTIN_RATIO * CYCLE_HEIGHT / 2) as isize * offset + *self as isize
             }
         };
         AlgebraicItem::Trace(column, trace_offset).into()

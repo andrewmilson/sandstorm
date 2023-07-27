@@ -86,6 +86,28 @@ impl<'a> CairoAuxInput<'a> {
                 vals[OFFSET_N_PUBLIC_MEMORY_PAGES] = Some(uint!(1_U256));
                 vals.map(Option::unwrap).to_vec()
             }
+            Layout::Recursive => {
+                const OFFSET_BITWISE_BEGIN_ADDR: usize = 0;
+                const OFFSET_BITWISE_STOP_ADDR: usize = 1;
+                const OFFSET_PUBLIC_MEMORY_PADDING_ADDR: usize = 2;
+                const OFFSET_PUBLIC_MEMORY_PADDING_VALUE: usize = 3;
+                const OFFSET_N_PUBLIC_MEMORY_PAGES: usize = 4;
+
+                const NUM_VALS: usize = OFFSET_N_PUBLIC_MEMORY_PAGES + 1;
+                let mut vals = [None; NUM_VALS];
+
+                vals[OFFSET_BITWISE_BEGIN_ADDR] =
+                    segments.bitwise.map(|s| U256::from(s.begin_addr));
+                vals[OFFSET_BITWISE_STOP_ADDR] = segments.bitwise.map(|s| U256::from(s.stop_ptr));
+                vals[OFFSET_PUBLIC_MEMORY_PADDING_ADDR] =
+                    Some(U256::from(public_memory_padding.address));
+                vals[OFFSET_PUBLIC_MEMORY_PADDING_VALUE] =
+                    Some(U256::from::<BigUint>(public_memory_padding.value.into()));
+                // Only 1 memory page currently for the main memory page
+                // TODO: support more memory pages
+                vals[OFFSET_N_PUBLIC_MEMORY_PAGES] = Some(uint!(1_U256));
+                vals.map(Option::unwrap).to_vec()
+            }
             _ => unimplemented!(),
         }
     }

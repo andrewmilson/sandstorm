@@ -539,13 +539,14 @@ impl<Fp: GpuFftField + PrimeField, Fq: StarkExtensionOf<Fp>> ministark::air::Air
     ) -> Hints<Self::Fq> {
         use PublicInputHint::*;
 
-        let memory_product = utils::compute_public_memory_quotient(
-            challenges[MemoryPermutation::Z],
-            challenges[MemoryPermutation::A],
-            trace_len,
-            &public_input.public_memory,
-            public_input.public_memory_padding(),
-        );
+        let memory_product =
+            utils::compute_public_memory_quotient::<PUBLIC_MEMORY_STEP, Self::Fp, Self::Fq>(
+                challenges[MemoryPermutation::Z],
+                challenges[MemoryPermutation::A],
+                trace_len,
+                &public_input.public_memory,
+                public_input.public_memory_padding(),
+            );
 
         // assert!(range_check_min <= range_check_max);
         let initial_ap = public_input.initial_ap().into();

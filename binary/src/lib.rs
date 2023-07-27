@@ -70,19 +70,22 @@ pub enum Layout {
 }
 
 impl Layout {
-    const SHARP_CODE_STARKNET: u64 = 8319381555716711796;
+    const SHARP_CODE_STARKNET: u128 = 8319381555716711796;
+    const SHARP_CODE_RECURSIVE: u128 = 2110234636557836973669;
 
     // Returns the unique code used by SHARP associated to this layout
-    pub const fn sharp_code(&self) -> u64 {
+    pub const fn sharp_code(&self) -> u128 {
         match self {
             Self::Starknet => Self::SHARP_CODE_STARKNET,
+            Self::Recursive => Self::SHARP_CODE_RECURSIVE,
             _ => unimplemented!(),
         }
     }
 
-    pub const fn from_sharp_code(code: u64) -> Self {
+    pub const fn from_sharp_code(code: u128) -> Self {
         match code {
             Self::SHARP_CODE_STARKNET => Self::Starknet,
+            Self::SHARP_CODE_RECURSIVE => Self::Recursive,
             _ => unimplemented!(),
         }
     }
@@ -94,11 +97,13 @@ impl CanonicalSerialize for Layout {
         writer: W,
         compress: ark_serialize::Compress,
     ) -> Result<(), ark_serialize::SerializationError> {
-        self.sharp_code().serialize_with_mode(writer, compress)
+        self.sharp_code()
+            .to_be_bytes()
+            .serialize_with_mode(writer, compress)
     }
 
     fn serialized_size(&self, _compress: ark_serialize::Compress) -> usize {
-        core::mem::size_of::<u64>()
+        core::mem::size_of::<u128>()
     }
 }
 
@@ -114,9 +119,9 @@ impl CanonicalDeserialize for Layout {
         compress: ark_serialize::Compress,
         validate: ark_serialize::Validate,
     ) -> Result<Self, ark_serialize::SerializationError> {
-        Ok(Self::from_sharp_code(u64::deserialize_with_mode(
-            reader, compress, validate,
-        )?))
+        Ok(Self::from_sharp_code(u128::from_be_bytes(
+            <[u8; 16]>::deserialize_with_mode(reader, compress, validate)?,
+        )))
     }
 }
 
@@ -499,10 +504,14 @@ pub struct AirPrivateInput {
     pub trace_path: PathBuf,
     pub memory_path: PathBuf,
     pub pedersen: Vec<PedersenInstance>,
-    pub ecdsa: Vec<EcdsaInstance>,
     pub range_check: Vec<RangeCheckInstance>,
+    #[serde(default)]
+    pub ecdsa: Vec<EcdsaInstance>,
+    #[serde(default)]
     pub bitwise: Vec<BitwiseInstance>,
+    #[serde(default)]
     pub ec_op: Vec<EcOpInstance>,
+    #[serde(default)]
     pub poseidon: Vec<PoseidonInstance>,
 }
 

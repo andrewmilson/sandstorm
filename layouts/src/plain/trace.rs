@@ -225,7 +225,7 @@ impl<Fp: GpuFftField + PrimeField, Fq: StarkExtensionOf<Fp>> CairoTrace for Exec
                 }
             })
             .collect();
-        let ordered_memory_accesses = get_ordered_memory_accesses(
+        let ordered_memory_accesses = get_ordered_memory_accesses::<PUBLIC_MEMORY_STEP, Fp>(
             trace_len,
             &memory_accesses,
             &air_public_input.public_memory,

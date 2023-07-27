@@ -2,7 +2,6 @@
 
 pub mod input;
 pub mod merkle;
-pub mod prover;
 pub mod random;
 pub mod utils;
 pub mod verifier;
