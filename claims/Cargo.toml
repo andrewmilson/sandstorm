@@ -17,6 +17,7 @@ ministark = { path = "../../ministark-mirror" }
 ruint = { version = "1.7", features = [ "serde", "num-bigint" ] }
 sha2 = "0.10"
 sha3 = "0.10"
+blake2 = "0.10"
 rand = "0.8"
 num-bigint = "0.4"
 ark-serialize = "0.4"

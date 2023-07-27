@@ -6,7 +6,7 @@ use ruint::aliases::U256;
 use digest::Digest as _;
 use sha3::Keccak256;
 
-use super::utils::to_montgomery;
+use super::super::utils::to_montgomery;
 
 /// Hash function used by StarkWare's Solidity verifier
 pub struct Keccak256HashFn;

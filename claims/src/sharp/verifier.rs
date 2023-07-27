@@ -3,7 +3,6 @@ extern crate alloc;
 use std::collections::BTreeMap;
 use super::CairoClaim;
 use super::SolidityVerifierMaskedHashFn;
-use super::hash::MaskedKeccak256HashFn;
 use super::merkle::MerkleTreeVariant;
 use ark_ff::Field;
 use binary::AirPublicInput;

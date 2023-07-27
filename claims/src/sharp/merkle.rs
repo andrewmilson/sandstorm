@@ -1,9 +1,7 @@
 use ark_serialize::CanonicalDeserialize;
 use ark_serialize::CanonicalSerialize;
 use ark_serialize::Valid;
-use digest::Digest;
 use ministark::hash::ElementHashFn;
-use ministark::hash::HashFn;
 use ministark::merkle::Error;
 use ark_ff::Zero;
 use ministark::merkle::MatrixMerkleTree;
@@ -11,7 +9,6 @@ use ministark::merkle::MerkleProof;
 use ministark::merkle::MerkleTree;
 use ministark::merkle::MerkleTreeConfig;
 use ministark::merkle::MerkleTreeImpl;
-use ministark::utils::SerdeOutput;
 use ministark::Matrix;
 use ministark_gpu::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481::ark::Fp;
 use std::iter::zip;
@@ -40,11 +37,6 @@ impl<H: ElementHashFn<Fp>> MerkleTreeConfig for UnhashedLeafConfig<H> {
     fn hash_leaves(l0: &Fp, l1: &Fp) -> H::Digest {
         H::hash_elements([*l0, *l1])
     }
-
-    // #[inline]
-    // fn pre_process_node_hash(hash: &mut H::Digest) {
-    //     mask_bytes(hash, &HASH_MASK);
-    // }
 }
 
 #[derive(Default)]
@@ -177,10 +169,6 @@ impl<H: ElementHashFn<Fp>> MatrixMerkleTree<Fp> for MerkleTreeVariant<H> {
             }
             _ => {
                 let mut row_hashes = hash_rows::<H>(matrix);
-                for hash in &mut row_hashes {
-                    // mask_bytes(hash, &HASH_MASK);
-                }
-                // let leaves = row_hashes.into_iter().map(SerdeOutput::new).collect();
                 Self::Hashed(MerkleTreeImpl::new(row_hashes).unwrap())
             }
         }
@@ -262,7 +250,7 @@ fn hash_rows<H: ElementHashFn<Fp>>(matrix: &Matrix<Fp>) -> Vec<H::Digest> {
 mod tests {
     use super::MerkleTree;
     use super::MerkleTreeVariant;
-    use crate::sharp::hash::Keccak256HashFn;
+    use crate::sharp::solidity::hash::Keccak256HashFn;
     use ark_ff::MontFp as Fp;
     use ministark::merkle::Error;
     use ministark::merkle::MatrixMerkleTree;
