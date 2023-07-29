@@ -41,8 +41,8 @@ rayon = { version = "1.5", optional = true }
 opt-level = 3
 
 [profile.release]
-codegen-units = 16
-lto = false
+codegen-units = 1
+lto = true
 
 [profile.bench]
 codegen-units = 1

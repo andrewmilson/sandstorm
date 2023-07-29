@@ -15,8 +15,6 @@ use ministark::Proof;
 use ministark::ProofOptions;
 use ministark_gpu::fields::p18446744069414584321;
 use ministark_gpu::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481;
-use sha2::Sha256;
-use sha3::Keccak256;
 use std::fs;
 use std::fs::File;
 use std::io::Write;
@@ -42,29 +40,27 @@ enum Command {
         output: PathBuf,
         #[structopt(long, parse(from_os_str))]
         air_private_input: PathBuf,
+        // TODO: add validation to the proof options
+        #[structopt(long, default_value = "65")]
+        num_queries: u8,
+        #[structopt(long, default_value = "2")]
+        lde_blowup_factor: u8,
+        #[structopt(long, default_value = "16")]
+        proof_of_work_bits: u8,
+        #[structopt(long, default_value = "8")]
+        fri_folding_factor: u8,
+        #[structopt(long, default_value = "16")]
+        fri_max_remainder_coeffs: u8,
     },
     Verify {
         #[structopt(long, parse(from_os_str))]
         proof: PathBuf,
+        #[structopt(long, default_value = "80")]
+        required_security_bits: u8,
     },
 }
 
 fn main() {
-    // TODO:
-    // proof options for 95 bit security level
-    let num_queries = 16;
-    let lde_blowup_factor = 2;
-    let grinding_factor = 16;
-    let fri_folding_factor = 8;
-    let fri_max_remainder_coeffs = 16;
-    let options = ProofOptions::new(
-        num_queries,
-        lde_blowup_factor,
-        grinding_factor,
-        fri_folding_factor,
-        fri_max_remainder_coeffs,
-    );
-
     // read command-line args
     let SandstormOptions {
         program,
@@ -89,19 +85,19 @@ fn main() {
                     type T = layouts::plain::ExecutionTrace<Fp, Fp>;
                     type C = claims::base::CairoClaim<Fp, A, T, Sha256HashFn>;
                     let claim = C::new(program, air_public_input);
-                    execute_command(command, options, claim);
+                    execute_command(command, claim);
                 }
                 Layout::Starknet => {
                     use claims::sharp_to_solidity::StarknetSolidityClaim;
                     let claim = StarknetSolidityClaim::new(program, air_public_input);
-                    execute_command(command, options, claim);
+                    execute_command(command, claim);
                 }
                 Layout::Recursive => {
                     type A = layouts::recursive::AirConfig;
                     type T = layouts::recursive::ExecutionTrace;
                     type C = claims::sharp_to_cairo::CairoClaim<A, T>;
                     let claim = C::new(program, air_public_input);
-                    execute_command(command, options, claim);
+                    execute_command(command, claim);
                 }
                 _ => unimplemented!(),
             }
@@ -119,7 +115,7 @@ fn main() {
                     type T = layouts::plain::ExecutionTrace<Fp, Fq3>;
                     type C = claims::base::CairoClaim<Fp, A, T, Sha256HashFn>;
                     let claim = C::new(program, air_public_input);
-                    execute_command(command, options, claim);
+                    execute_command(command, claim);
                 }
                 Layout::Starknet => {
                     unimplemented!("'starknet' layout does not support Goldilocks field")
@@ -133,29 +129,44 @@ fn main() {
 
 fn execute_command<Fp: PrimeField, Claim: Stark<Fp = Fp, Witness = CairoWitness<Fp>>>(
     command: Command,
-    options: ProofOptions,
     claim: Claim,
 ) {
     match command {
         Command::Prove {
             output,
             air_private_input,
-        } => prove(options, &air_private_input, &output, claim),
-        Command::Verify { proof } => verify(options, &proof, claim),
+            num_queries,
+            lde_blowup_factor,
+            proof_of_work_bits,
+            fri_folding_factor,
+            fri_max_remainder_coeffs,
+        } => {
+            let options = ProofOptions::new(
+                num_queries,
+                lde_blowup_factor,
+                proof_of_work_bits,
+                fri_folding_factor,
+                fri_max_remainder_coeffs,
+            );
+            prove(options, &air_private_input, &output, claim)
+        }
+        Command::Verify {
+            proof,
+            required_security_bits,
+        } => verify(required_security_bits, &proof, claim),
     }
 }
 
 fn verify<Claim: Stark<Fp = impl Field>>(
-    options: ProofOptions,
+    required_security_bits: u8,
     proof_path: &PathBuf,
     claim: Claim,
 ) {
     let proof_bytes = fs::read(proof_path).unwrap();
     let proof: Proof<Claim::Fp, Claim::Fq, Claim::Digest, Claim::MerkleTree> =
         Proof::deserialize_compressed(&*proof_bytes).unwrap();
-    assert_eq!(options, proof.options);
     let now = Instant::now();
-    claim.verify(proof).unwrap();
+    claim.verify(proof, required_security_bits.into()).unwrap();
     println!("Proof verified in: {:?}", now.elapsed());
 }
 
@@ -183,7 +194,7 @@ fn prove<Fp: PrimeField, Claim: Stark<Fp = Fp, Witness = CairoWitness<Fp>>>(
     let now = Instant::now();
     let proof = pollster::block_on(claim.prove(options, witness)).unwrap();
     println!("Proof generated in: {:?}", now.elapsed());
-    let security_level_bits = proof.conjectured_security_level();
+    let security_level_bits = Claim::security_level(&proof);
     println!("Proof security (conjectured): {security_level_bits}bit");
 
     let mut proof_bytes = Vec::new();

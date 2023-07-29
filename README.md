@@ -37,6 +37,7 @@ cairo-run --program example/array-sum.json \
           --trace_file example/trace.bin \
           --memory_file example/memory.bin \
           --min_steps 128 \
+          --layout recursive \
           --proof_mode
 
 # 3. generate the proof

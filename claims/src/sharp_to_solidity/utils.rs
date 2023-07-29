@@ -3,10 +3,6 @@ use num_bigint::BigUint;
 use ark_ff::{PrimeField, BigInteger, MontFp as Fp};
 use ministark_gpu::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481::ark::Fp;
 
-pub(crate) fn get_public_input_hash(public_input: &[Fp]) {
-    todo!()
-}
-
 /// Hashes elemets to match SHARP
 pub fn hash_elements<F: PrimeField, D: Digest>(hasher: &mut D, elements: &[F]) {
     for element in elements {

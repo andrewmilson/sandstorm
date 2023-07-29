@@ -176,7 +176,7 @@ impl<H: ElementHashFn<Fp>> MatrixMerkleTree<Fp> for MerkleTreeVariant<H> {
                 }
             }
             (row, MerkleTreeVariantProof::Hashed(proof)) => {
-                let mut row_hash = hash_row::<H>(row);
+                let row_hash = hash_row::<H>(row);
                 if proof.leaf() == &row_hash {
                     MerkleTreeImpl::<HashedLeafConfig<H>>::verify(root, proof, row_idx)
                 } else {

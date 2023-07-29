@@ -49,16 +49,6 @@ impl CairoPublicCoin {
         self.counter += 1;
         (*hasher.finalize()).try_into().unwrap()
     }
-
-    fn reseed_with_non_motgomery_field_element(&mut self, val: &Fp) {
-        let bytes = U256::from(BigUint::from(*val)).to_be_bytes::<32>();
-        self.reseed_with_bytes(bytes);
-    }
-
-    fn reseed_with_montgomery_field_element(&mut self, val: &Fp) {
-        let bytes = U256::from(to_montgomery(*val)).to_be_bytes::<32>();
-        self.reseed_with_bytes(bytes);
-    }
 }
 
 impl PublicCoin for CairoPublicCoin {
@@ -80,7 +70,8 @@ impl PublicCoin for CairoPublicCoin {
 
     fn reseed_with_field_elements(&mut self, vals: &[Self::Field]) {
         let hash_felt = PedersenHashFn::hash_elements(vals.iter().copied());
-        self.reseed_with_non_motgomery_field_element(&hash_felt);
+        let bytes = U256::from(BigUint::from(*hash_felt)).to_be_bytes::<32>();
+        self.reseed_with_bytes(bytes);
     }
 
     fn reseed_with_field_element_vector(&mut self, vector: &[Self::Field]) {
@@ -150,10 +141,12 @@ mod tests {
     use super::CairoPublicCoin;
     use ark_ff::MontFp as Fp;
     use blake2::Blake2s256;
-    use digest::Digest as _;
     use digest::Output;
     use ministark::random::PublicCoin;
     use ministark::utils::SerdeOutput;
+    use num_bigint::BigUint;
+    use ruint::aliases::U256;
+    use ministark_gpu::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481::ark::Fp;
 
     #[test]
     fn reseed_with_field_element() {
@@ -164,8 +157,9 @@ mod tests {
         ]));
         let mut public_coin = CairoPublicCoin::new(seed);
 
-        let element = Fp!("941210603170996043151108091873286171552595656949");
-        public_coin.reseed_with_field_elements(&[element]);
+        let element: Fp = Fp!("941210603170996043151108091873286171552595656949");
+        let element_bytes = U256::from(BigUint::from(element));
+        public_coin.reseed_with_bytes(element_bytes.to_be_bytes::<32>());
 
         let expected_digest = [
             0x60, 0x57, 0x79, 0xf6, 0xc9, 0xae, 0x87, 0x1e, 0xd7, 0x30, 0x56, 0xb4, 0xeb, 0xaa,

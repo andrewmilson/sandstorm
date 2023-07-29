@@ -36,6 +36,14 @@ impl HashFn for Keccak256HashFn {
         hasher.update(value.to_be_bytes());
         SerdeOutput::new(hasher.finalize())
     }
+
+    fn hash_chunks<'a>(chunks: impl IntoIterator<Item = &'a [u8]>) -> Self::Digest {
+        let mut hasher = Keccak256::new();
+        for chunk in chunks {
+            hasher.update(chunk);
+        }
+        SerdeOutput::new(hasher.finalize())
+    }
 }
 
 impl ElementHashFn<Fp> for Keccak256HashFn {
@@ -68,6 +76,12 @@ impl<const N_UNMASKED_BYTES: u32> HashFn for MaskedKeccak256HashFn<N_UNMASKED_BY
 
     fn merge_with_int(seed: &Self::Digest, value: u64) -> Self::Digest {
         let mut hash = Keccak256HashFn::merge_with_int(seed, value);
+        mask_bytes::<N_UNMASKED_BYTES>(&mut hash);
+        hash
+    }
+
+    fn hash_chunks<'a>(chunks: impl IntoIterator<Item = &'a [u8]>) -> Self::Digest {
+        let mut hash = Keccak256HashFn::hash_chunks(chunks);
         mask_bytes::<N_UNMASKED_BYTES>(&mut hash);
         hash
     }

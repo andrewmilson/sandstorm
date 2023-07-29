@@ -3,6 +3,7 @@ extern crate alloc;
 use std::collections::BTreeMap;
 use super::CairoClaim;
 use super::SolidityVerifierMaskedHashFn;
+use super::StarknetSolidityProof;
 use super::merkle::MerkleTreeVariant;
 use ark_ff::Field;
 use binary::AirPublicInput;
@@ -42,14 +43,13 @@ impl<
 {
     pub fn verify_sharp(
         &self,
-        proof: Proof<
-            Fp,
-            Fp,
-            SerdeOutput<Keccak256>,
-            MerkleTreeVariant<SolidityVerifierMaskedHashFn>,
-        >,
+        proof: StarknetSolidityProof,
+        required_security_bits: usize,
     ) -> Result<SharpMetadata, VerificationError> {
         use VerificationError::*;
+        if Self::security_level(&proof) < required_security_bits {
+            return Err(InvalidProofSecurity);
+        }
 
         let Proof {
             options,

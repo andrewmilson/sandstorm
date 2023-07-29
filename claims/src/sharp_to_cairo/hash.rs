@@ -35,6 +35,14 @@ impl HashFn for Blake2sHashFn {
         SerdeOutput::new(hasher.finalize())
     }
 
+    fn hash_chunks<'a>(chunks: impl IntoIterator<Item = &'a [u8]>) -> SerdeOutput<Blake2s256> {
+        let mut hasher = Blake2s256::new();
+        for chunk in chunks {
+            hasher.update(chunk);
+        }
+        SerdeOutput::new(hasher.finalize())
+    }
+
     fn merge(
         v0: &SerdeOutput<Blake2s256>,
         v1: &SerdeOutput<Blake2s256>,
@@ -86,6 +94,12 @@ impl<const N_UNMASKED_BYTES: u32> HashFn for MaskedBlake2sHashFn<N_UNMASKED_BYTE
         mask_most_significant_bytes::<N_UNMASKED_BYTES>(&mut hash);
         hash
     }
+
+    fn hash_chunks<'a>(chunks: impl IntoIterator<Item = &'a [u8]>) -> Self::Digest {
+        let mut hash = Blake2sHashFn::hash_chunks(chunks);
+        mask_most_significant_bytes::<N_UNMASKED_BYTES>(&mut hash);
+        hash
+    }
 }
 
 impl<const N_UNMASKED_BYTES: u32> ElementHashFn<Fp> for MaskedBlake2sHashFn<N_UNMASKED_BYTES> {
@@ -126,7 +140,11 @@ impl HashFn for PedersenHashFn {
     type Digest = PedersenDigest;
     const COLLISION_RESISTANCE: u32 = 125;
 
-    fn hash(bytes: impl IntoIterator<Item = u8>) -> PedersenDigest {
+    fn hash(_bytes: impl IntoIterator<Item = u8>) -> PedersenDigest {
+        unreachable!()
+    }
+
+    fn hash_chunks<'a>(_chunks: impl IntoIterator<Item = &'a [u8]>) -> Self::Digest {
         unreachable!()
     }
 
@@ -157,8 +175,6 @@ mod tests {
     use digest::Digest;
     use blake2::Blake2s256;
     use ministark_gpu::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481::ark::Fp;
-    use num_bigint::BigUint;
-    use ruint::aliases::U256;
     use crate::sharp_to_cairo::utils::hash_elements;
 
     #[test]

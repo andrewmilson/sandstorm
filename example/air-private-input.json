@@ -3,8 +3,5 @@
     "memory_path": "/Users/andrewmilson/projects/sandstorm-mirror/example/memory.bin",
     "pedersen": [],
     "range_check": [],
-    "ecdsa": [],
-    "bitwise": [],
-    "ec_op": [],
-    "poseidon": []
+    "bitwise": []
 }

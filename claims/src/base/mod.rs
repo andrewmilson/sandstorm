@@ -12,7 +12,6 @@ use ministark::merkle::MatrixMerkleTreeImpl;
 use ministark::random::PublicCoinImpl;
 use ministark::stark::Stark;
 use ministark_gpu::GpuFftField;
-use sha2::Digest;
 use std::marker::PhantomData;
 
 pub struct CairoClaim<Fp: PrimeField, A: AirConfig<Fp = Fp>, T: CairoTrace<Fp = Fp>, H: HashFn> {

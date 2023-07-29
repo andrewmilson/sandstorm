@@ -8,7 +8,9 @@ pub mod utils;
 pub mod verifier;
 
 use crate::base;
+use ark_ff::BigInteger;
 use ark_ff::Field;
+use ark_ff::PrimeField;
 use blake2::Blake2s256;
 use ministark::hash::HashFn;
 use random::CairoPublicCoin;
@@ -25,12 +27,10 @@ use ministark::verifier::VerificationError;
 use ministark::random::PublicCoin;
 use ministark::Air;
 use ministark_gpu::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481::ark::Fp;
-use sha3::Keccak256;
 use input::CairoAuxInput;
 use layouts::starknet;
 use hash::Blake2sHashFn;
 use hash::MaskedBlake2sHashFn;
-use hash::PedersenDigest;
 use hash::PedersenHashFn;
 use merkle::MerkleTreeVariant;
 
@@ -42,7 +42,7 @@ pub type RecursiveCairoClaim = CairoClaim<starknet::AirConfig, starknet::Executi
 
 // List of proofs
 pub type RecursiveCairoProof =
-    Proof<Fp, Fp, PedersenDigest, MerkleTreeVariant<CairoVerifierMaskedHashFn>>;
+    Proof<Fp, Fp, SerdeOutput<Blake2s256>, MerkleTreeVariant<CairoVerifierMaskedHashFn>>;
 
 /// Wrapper around a base Cairo claim that has a custom implementation of proof
 /// generation and validation to match StarkWare's prover and verifier (SHARP)
@@ -113,6 +113,24 @@ impl<
         CairoPublicCoin::new(Blake2sHashFn::hash(self.public_coin_seed(air)))
     }
 
+    fn security_level(proof: &Proof<Fp, Fp, Self::Digest, Self::MerkleTree>) -> usize {
+        // TODO: for some reason this does not work: <<<Self as Stark>::Fq as
+        // Field>::BasePrimeField as PrimeField>::MODULUS
+        let base_field_bits = <Fp as PrimeField>::MODULUS.num_bits() as usize;
+        let extension_degree = usize::try_from(Self::Fq::extension_degree()).unwrap();
+        let field_bits = extension_degree * base_field_bits;
+        let comitment_hash_fn_security = CairoVerifierMaskedHashFn::COLLISION_RESISTANCE as usize;
+        let options = &proof.options;
+        ministark::utils::conjectured_security_level(
+            field_bits,
+            comitment_hash_fn_security,
+            options.lde_blowup_factor.into(),
+            proof.trace_len,
+            options.num_queries.into(),
+            options.grinding_factor.into(),
+        )
+    }
+
     // async fn prove(
     //     &self,
     //     options: ministark::ProofOptions,
@@ -122,9 +140,12 @@ impl<
     // > { self.prove_sharp(options, witness).await
     // }
 
-    // fn verify(
-    //     &self,
-    //     proof: Proof<Fp, Fp, Self::Digest, Self::MerkleTree>,
-    // ) -> Result<(), VerificationError> { self.verify_sharp(proof)?; Ok(())
-    // }
+    fn verify(
+        &self,
+        proof: Proof<Fp, Fp, Self::Digest, Self::MerkleTree>,
+        required_security_level: usize,
+    ) -> Result<(), VerificationError> {
+        self.verify_sharp(proof, required_security_level)?;
+        Ok(())
+    }
 }
