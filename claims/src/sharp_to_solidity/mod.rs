@@ -1,19 +1,21 @@
 //! Claim prover and verifier compatible with Starkware's SHARed Prover (SHARP)
 
+pub mod hash;
 pub mod input;
 pub mod merkle;
-pub mod solidity;
+pub mod random;
 pub mod utils;
 pub mod verifier;
+
 use crate::base;
 use ark_ff::Field;
 use ministark::hash::HashFn;
-use solidity::hash::MaskedKeccak256HashFn;
-use solidity::random::SolidityPublicCoin;
+use hash::MaskedKeccak256HashFn;
+use random::SolidityPublicCoin;
 use ministark::composer::DeepCompositionCoeffs;
 use ministark::stark::Stark;
 use binary::CompiledProgram;
-use solidity::hash::Keccak256HashFn;
+use hash::Keccak256HashFn;
 use ministark::utils::SerdeOutput;
 use binary::AirPublicInput;
 use layouts::CairoTrace;
@@ -25,8 +27,8 @@ use ministark::random::PublicCoin;
 use ministark::Air;
 use ministark_gpu::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481::ark::Fp;
 use sha3::Keccak256;
-use self::input::CairoAuxInput;
-use self::merkle::MerkleTreeVariant;
+use input::CairoAuxInput;
+use merkle::MerkleTreeVariant;
 use layouts::starknet;
 
 // List of the hash functions used by StarkWare's verifiers

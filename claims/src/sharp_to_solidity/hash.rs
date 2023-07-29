@@ -4,9 +4,9 @@ use ministark::utils::SerdeOutput;
 use ministark_gpu::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481::ark::Fp;
 use ruint::aliases::U256;
 use digest::Digest as _;
+use super::utils::mask_bytes;
+use super::utils::to_montgomery;
 use sha3::Keccak256;
-
-use super::super::utils::to_montgomery;
 
 /// Hash function used by StarkWare's Solidity verifier
 pub struct Keccak256HashFn;
@@ -78,15 +78,5 @@ impl<const N_UNMASKED_BYTES: u32> ElementHashFn<Fp> for MaskedKeccak256HashFn<N_
         let mut hash = Keccak256HashFn::hash_elements(elements);
         mask_bytes::<N_UNMASKED_BYTES>(&mut hash);
         hash
-    }
-}
-
-#[inline]
-pub fn mask_bytes<const N_UNMASKED_BYTES: u32>(bytes: &mut [u8]) {
-    let n = bytes.len();
-    let mut i = N_UNMASKED_BYTES as usize;
-    while i < n {
-        bytes[i] = 0;
-        i += 1;
     }
 }

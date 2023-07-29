@@ -5,7 +5,7 @@ use num_bigint::BigUint;
 use ruint::{aliases::U256, uint};
 use sha3::Keccak256;
 
-use crate::sharp::utils::hash_elements;
+use super::utils::hash_elements;
 
 pub struct CairoAuxInput<'a>(pub &'a AirPublicInput<Fp>);
 

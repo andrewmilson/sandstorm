@@ -92,14 +92,14 @@ fn main() {
                     execute_command(command, options, claim);
                 }
                 Layout::Starknet => {
-                    use claims::sharp::StarknetSolidityClaim;
+                    use claims::sharp_to_solidity::StarknetSolidityClaim;
                     let claim = StarknetSolidityClaim::new(program, air_public_input);
                     execute_command(command, options, claim);
                 }
                 Layout::Recursive => {
                     type A = layouts::recursive::AirConfig;
                     type T = layouts::recursive::ExecutionTrace;
-                    type C = claims::sharp::CairoClaim<A, T>;
+                    type C = claims::sharp_to_cairo::CairoClaim<A, T>;
                     let claim = C::new(program, air_public_input);
                     execute_command(command, options, claim);
                 }

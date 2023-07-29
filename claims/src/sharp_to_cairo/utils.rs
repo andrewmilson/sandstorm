@@ -28,10 +28,30 @@ pub fn to_montgomery(v: Fp) -> BigUint {
     BigUint::from(MONTGOMERY_R * v)
 }
 
+#[inline]
+pub fn mask_least_significant_bytes<const N_UNMASKED_BYTES: u32>(bytes: &mut [u8]) {
+    let n = bytes.len();
+    let mut i = N_UNMASKED_BYTES as usize;
+    while i < n {
+        bytes[i] = 0;
+        i += 1;
+    }
+}
+
+#[inline]
+pub fn mask_most_significant_bytes<const N_UNMASKED_BYTES: u32>(bytes: &mut [u8]) {
+    let n = bytes.len();
+    let mut i = 0;
+    while i < n - N_UNMASKED_BYTES as usize {
+        bytes[i] = 0;
+        i += 1;
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::sharp::utils::to_montgomery;
-    use crate::sharp::utils::from_montgomery;
+    use super::to_montgomery;
+    use super::from_montgomery;
     use super::hash_elements;
     use sha3::Keccak256;
     use digest::Digest;

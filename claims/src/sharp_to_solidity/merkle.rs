@@ -11,20 +11,7 @@ use ministark::merkle::MerkleTreeConfig;
 use ministark::merkle::MerkleTreeImpl;
 use ministark::Matrix;
 use ministark_gpu::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481::ark::Fp;
-use std::iter::zip;
 use std::marker::PhantomData;
-
-pub const HASH_MASK: [u8; 32] = [
-    0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-    0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-];
-
-#[inline]
-pub fn mask_bytes(bytes: &mut [u8], mask: &[u8]) {
-    for (byte, mask) in zip(bytes, mask) {
-        *byte &= mask;
-    }
-}
 
 #[derive(Default)]
 pub struct UnhashedLeafConfig<H>(PhantomData<H>);
@@ -50,11 +37,6 @@ impl<H: ElementHashFn<Fp>> MerkleTreeConfig for HashedLeafConfig<H> {
     fn hash_leaves(l0: &H::Digest, l1: &H::Digest) -> H::Digest {
         H::merge(l0, l1)
     }
-
-    // #[inline]
-    // fn pre_process_node_hash(hash: &mut Output<D>) {
-    //     mask_bytes(hash, &HASH_MASK);
-    // }
 }
 
 pub enum MerkleTreeVariantProof<H: ElementHashFn<Fp>> {
@@ -168,7 +150,7 @@ impl<H: ElementHashFn<Fp>> MatrixMerkleTree<Fp> for MerkleTreeVariant<H> {
                 Self::Unhashed(MerkleTreeImpl::new(leaves).unwrap())
             }
             _ => {
-                let mut row_hashes = hash_rows::<H>(matrix);
+                let row_hashes = hash_rows::<H>(matrix);
                 Self::Hashed(MerkleTreeImpl::new(row_hashes).unwrap())
             }
         }
@@ -195,7 +177,6 @@ impl<H: ElementHashFn<Fp>> MatrixMerkleTree<Fp> for MerkleTreeVariant<H> {
             }
             (row, MerkleTreeVariantProof::Hashed(proof)) => {
                 let mut row_hash = hash_row::<H>(row);
-                // mask_bytes(&mut row_hash, &HASH_MASK);
                 if proof.leaf() == &row_hash {
                     MerkleTreeImpl::<HashedLeafConfig<H>>::verify(root, proof, row_idx)
                 } else {
@@ -248,15 +229,14 @@ fn hash_rows<H: ElementHashFn<Fp>>(matrix: &Matrix<Fp>) -> Vec<H::Digest> {
 
 #[cfg(test)]
 mod tests {
+    use super::super::hash::Keccak256HashFn;
     use super::MerkleTree;
     use super::MerkleTreeVariant;
-    use crate::sharp::solidity::hash::Keccak256HashFn;
     use ark_ff::MontFp as Fp;
     use ministark::merkle::Error;
     use ministark::merkle::MatrixMerkleTree;
     use ministark::utils::GpuAllocator;
     use ministark::Matrix;
-    use sha3::Keccak256;
 
     #[test]
     fn verify_unhashed_leaves() -> Result<(), Error> {

@@ -13,12 +13,12 @@ use ark_ff::PrimeField;
 use ministark::random::leading_zeros;
 use sha3::Digest;
 use super::hash::Keccak256HashFn;
-use super::super::utils::to_montgomery;
-use super::super::utils::from_montgomery;
+use super::utils::to_montgomery;
+use super::utils::from_montgomery;
 
 /// Public coin based off of StarkWare's solidity verifier
 pub struct SolidityPublicCoin {
-    digest: SerdeOutput<Blake2s>,
+    digest: SerdeOutput<Keccak256>,
     counter: usize,
 }
 
@@ -63,14 +63,16 @@ impl PublicCoin for SolidityPublicCoin {
         self.reseed_with_bytes(**val);
     }
 
-    fn reseed_with_field_element(&mut self, val: &Fp) {
-        let bytes = U256::from(to_montgomery(*val)).to_be_bytes::<32>();
-        self.reseed_with_bytes(bytes);
+    fn reseed_with_field_elements(&mut self, vals: &[Fp]) {
+        for v in vals {
+            let bytes = U256::from(to_montgomery(*v)).to_be_bytes::<32>();
+            self.reseed_with_bytes(bytes);
+        }
     }
 
-    fn reseed_with_field_elements(&mut self, vals: &[Self::Field]) {
+    fn reseed_with_field_element_vector(&mut self, vector: &[Self::Field]) {
         let mut bytes = Vec::new();
-        for val in vals {
+        for val in vector {
             let val = U256::from(to_montgomery(*val));
             let val_bytes = val.to_be_bytes::<32>();
             bytes.extend_from_slice(&val_bytes)

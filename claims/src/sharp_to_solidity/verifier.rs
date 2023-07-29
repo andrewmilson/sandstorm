@@ -97,9 +97,12 @@ impl<
 
         let z = public_coin.draw();
         println!("oods z is: {z}");
-        for eval in &execution_trace_ood_evals {
-            public_coin.reseed_with_field_element(eval);
-        }
+        let ood_evals = [
+            execution_trace_ood_evals.clone(),
+            composition_trace_ood_evals.clone(),
+        ]
+        .concat();
+        public_coin.reseed_with_field_elements(&ood_evals);
         // execution trace ood evaluation map
         let trace_ood_eval_map = air
             .trace_arguments()
@@ -115,11 +118,6 @@ impl<
             z,
         );
 
-        println!("Mask size: {}", trace_ood_eval_map.len());
-
-        for eval in &composition_trace_ood_evals {
-            public_coin.reseed_with_field_element(eval);
-        }
         let provided_ood_constraint_evaluation = horner_evaluate(&composition_trace_ood_evals, &z);
 
         if calculated_ood_constraint_evaluation != provided_ood_constraint_evaluation {
