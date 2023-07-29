@@ -13,7 +13,6 @@ ruint = { version = "1.7", features = [ "serde", "num-bigint" ] }
 num-bigint = { version = "0.4" }
 ministark-gpu = { version = "0.1", path = "../../ministark-mirror/gpu" }
 ark-serialize = "0.4"
-zip = "0.6"
 num-traits = "0.2"
 ark-ec = "0.4"
 bincode = "1.2"
