@@ -1,21 +1,17 @@
 extern crate alloc;
 
 use std::collections::BTreeMap;
+use crate::sharp_to_cairo::merkle::FriendlyCommitment;
 use super::CairoClaim;
-use super::CairoVerifierMaskedHashFn;
-use super::RecursiveCairoProof;
-use super::merkle::MerkleTreeVariant;
 use ark_ff::Field;
 use binary::AirPublicInput;
 use binary::MemoryEntry;
-use blake2::Blake2s256;
 use layouts::CairoTrace;
 use ministark::stark::Stark;
 use ministark::random::draw_multiple;
 use layouts::SharpAirConfig;
 use ministark::challenges::Challenges;
 use ministark::fri::FriVerifier;
-use ministark::utils::SerdeOutput;
 use ministark::verifier::VerificationError;
 use ministark::random::PublicCoin;
 use ministark::verifier::verify_positions;
@@ -43,11 +39,11 @@ impl<
 {
     pub fn verify_sharp(
         &self,
-        proof: RecursiveCairoProof,
-        required_security_bits: usize,
+        proof: Proof<Self>,
+        required_security_bits: u32,
     ) -> Result<SharpMetadata, VerificationError> {
         use VerificationError::*;
-        if Self::security_level(&proof) < required_security_bits {
+        if proof.security_level_bits() < required_security_bits {
             return Err(InvalidProofSecurity);
         }
 
@@ -126,11 +122,7 @@ impl<
         }
 
         let deep_coeffs = self.gen_deep_coeffs(&mut public_coin, &air);
-        let fri_verifier = FriVerifier::<
-            Fp,
-            SerdeOutput<Blake2s256>,
-            MerkleTreeVariant<CairoVerifierMaskedHashFn>,
-        >::new(
+        let fri_verifier = FriVerifier::<Fp, FriendlyCommitment, <Self as Stark>::MerkleTree>::new(
             &mut public_coin,
             options.into_fri_options(),
             fri_proof,
@@ -167,7 +159,7 @@ impl<
             .collect::<Vec<&[Fp]>>();
 
         // base trace positions
-        verify_positions::<Fp, MerkleTreeVariant<CairoVerifierMaskedHashFn>>(
+        verify_positions::<Fp, <Self as Stark>::MerkleTree>(
             &base_trace_commitment,
             &query_positions,
             &base_trace_rows,
@@ -177,7 +169,7 @@ impl<
 
         if let Some(extension_trace_commitment) = extension_trace_commitment {
             // extension trace positions
-            verify_positions::<Fp, MerkleTreeVariant<CairoVerifierMaskedHashFn>>(
+            verify_positions::<Fp, <Self as Stark>::MerkleTree>(
                 &extension_trace_commitment,
                 &query_positions,
                 &extension_trace_rows,
@@ -187,7 +179,7 @@ impl<
         }
 
         // composition trace positions
-        verify_positions::<Fp, MerkleTreeVariant<CairoVerifierMaskedHashFn>>(
+        verify_positions::<Fp, <Self as Stark>::MerkleTree>(
             &composition_trace_commitment,
             &query_positions,
             &composition_trace_rows,

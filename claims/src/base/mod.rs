@@ -1,6 +1,7 @@
 extern crate alloc;
 
 use ark_ff::PrimeField;
+use ark_serialize::CanonicalSerialize;
 use binary::AirPublicInput;
 use binary::CompiledProgram;
 use layouts::CairoTrace;
@@ -9,6 +10,7 @@ use ministark::air::AirConfig;
 use ministark::hash::ElementHashFn;
 use ministark::hash::HashFn;
 use ministark::merkle::MatrixMerkleTreeImpl;
+use ministark::random::PublicCoin;
 use ministark::random::PublicCoinImpl;
 use ministark::stark::Stark;
 use ministark_gpu::GpuFftField;
@@ -43,7 +45,6 @@ impl<
     type Fq = A::Fq;
     type AirConfig = A;
     type Digest = H::Digest;
-    type HashFn = H;
     type PublicCoin = PublicCoinImpl<A::Fq, H>;
     type Witness = CairoWitness<Fp>;
     type MerkleTree = MatrixMerkleTreeImpl<H>;
@@ -51,6 +52,14 @@ impl<
 
     fn generate_trace(&self, witness: CairoWitness<Fp>) -> T {
         T::new(self.program.clone(), self.get_public_inputs(), witness)
+    }
+
+    fn gen_public_coin(&self, air: &ministark::Air<Self::AirConfig>) -> Self::PublicCoin {
+        let mut seed = Vec::new();
+        air.public_inputs().serialize_compressed(&mut seed).unwrap();
+        air.trace_len().serialize_compressed(&mut seed).unwrap();
+        air.options().serialize_compressed(&mut seed).unwrap();
+        PublicCoinImpl::new(H::hash_chunks([&*seed]))
     }
 
     fn get_public_inputs(&self) -> AirPublicInput<Fp> {

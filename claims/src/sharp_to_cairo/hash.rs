@@ -111,7 +111,7 @@ impl<const N_UNMASKED_BYTES: u32> ElementHashFn<Fp> for MaskedBlake2sHashFn<N_UN
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, CanonicalDeserialize, CanonicalSerialize)]
-pub struct PedersenDigest(Fp);
+pub struct PedersenDigest(pub Fp);
 
 impl Display for PedersenDigest {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

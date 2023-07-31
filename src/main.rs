@@ -163,8 +163,7 @@ fn verify<Claim: Stark<Fp = impl Field>>(
     claim: Claim,
 ) {
     let proof_bytes = fs::read(proof_path).unwrap();
-    let proof: Proof<Claim::Fp, Claim::Fq, Claim::Digest, Claim::MerkleTree> =
-        Proof::deserialize_compressed(&*proof_bytes).unwrap();
+    let proof = Proof::<Claim>::deserialize_compressed(&*proof_bytes).unwrap();
     let now = Instant::now();
     claim.verify(proof, required_security_bits.into()).unwrap();
     println!("Proof verified in: {:?}", now.elapsed());
@@ -194,7 +193,7 @@ fn prove<Fp: PrimeField, Claim: Stark<Fp = Fp, Witness = CairoWitness<Fp>>>(
     let now = Instant::now();
     let proof = pollster::block_on(claim.prove(options, witness)).unwrap();
     println!("Proof generated in: {:?}", now.elapsed());
-    let security_level_bits = Claim::security_level(&proof);
+    let security_level_bits = proof.security_level_bits();
     println!("Proof security (conjectured): {security_level_bits}bit");
 
     let mut proof_bytes = Vec::new();

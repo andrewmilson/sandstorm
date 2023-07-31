@@ -1,9 +1,12 @@
 use super::hash::Blake2sHashFn;
 use super::hash::PedersenHashFn;
+use super::merkle::FriendlyCommitment;
 use super::utils::from_montgomery;
 use super::utils::to_montgomery;
 use blake2::Blake2s256;
+use ministark::hash::Digest;
 use ministark::hash::ElementHashFn;
+use ministark::hash::HashFn;
 use ministark::random::PublicCoin;
 use ministark::random::leading_zeros;
 use ministark::utils::SerdeOutput;
@@ -12,7 +15,7 @@ use ruint::aliases::U256;
 use ministark_gpu::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481::ark::Fp;
 use ruint::uint;
 use ark_ff::PrimeField;
-use sha3::Digest;
+use digest::Digest as _;
 use std::collections::BTreeSet;
 use std::fmt::Debug;
 use std::iter;
@@ -52,20 +55,18 @@ impl CairoPublicCoin {
 }
 
 impl PublicCoin for CairoPublicCoin {
-    type Digest = SerdeOutput<Blake2s256>;
-    type HashFn = Blake2sHashFn;
+    type Digest = FriendlyCommitment;
     type Field = Fp;
 
-    fn new(digest: SerdeOutput<Blake2s256>) -> Self {
-        println!(
-            "random coin initial: {}",
-            U256::from_be_bytes::<32>(digest[0..32].try_into().unwrap())
-        );
-        Self { digest, counter: 0 }
+    fn new(digest: FriendlyCommitment) -> Self {
+        match digest {
+            FriendlyCommitment::Blake(digest) => Self { digest, counter: 0 },
+            FriendlyCommitment::Pedersen(_) => unreachable!(),
+        }
     }
 
-    fn reseed_with_digest(&mut self, val: &SerdeOutput<Blake2s256>) {
-        self.reseed_with_bytes(**val);
+    fn reseed_with_digest(&mut self, val: &FriendlyCommitment) {
+        self.reseed_with_bytes(val.as_bytes());
     }
 
     fn reseed_with_field_elements(&mut self, vals: &[Self::Field]) {
@@ -134,6 +135,10 @@ impl PublicCoin for CairoPublicCoin {
 
         leading_zeros(&proof_of_work_hash) >= u32::from(proof_of_work_bits)
     }
+
+    fn security_level_bits() -> u32 {
+        Blake2sHashFn::COLLISION_RESISTANCE
+    }
 }
 
 #[cfg(test)]
@@ -155,7 +160,7 @@ mod tests {
             0x80, 0x38, 0xae, 0xa4, 0x32, 0x96, 0x07, 0x41, 0xb8, 0x19, 0x79, 0x16, 0x36, 0xf8,
             0x2c, 0xc2, 0xd2, 0x5d,
         ]));
-        let mut public_coin = CairoPublicCoin::new(seed);
+        let mut public_coin = CairoPublicCoin::new(seed.into());
 
         let element: Fp = Fp!("941210603170996043151108091873286171552595656949");
         let element_bytes = U256::from(BigUint::from(element));

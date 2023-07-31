@@ -10,6 +10,8 @@ use ministark::merkle::MerkleTree;
 use ministark::merkle::MerkleTreeConfig;
 use ministark::merkle::MerkleTreeImpl;
 use ministark::Matrix;
+use ministark::merkle::build_merkle_nodes_default;
+use ministark::merkle::verify_proof_default;
 use ministark_gpu::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481::ark::Fp;
 use std::marker::PhantomData;
 
@@ -18,11 +20,26 @@ pub struct UnhashedLeafConfig<H>(PhantomData<H>);
 
 impl<H: ElementHashFn<Fp>> MerkleTreeConfig for UnhashedLeafConfig<H> {
     type Digest = H::Digest;
-    type HashFn = H;
     type Leaf = Fp;
 
     fn hash_leaves(l0: &Fp, l1: &Fp) -> H::Digest {
         H::hash_elements([*l0, *l1])
+    }
+
+    fn build_merkle_nodes(leaves: &[Self::Leaf]) -> Vec<Self::Digest> {
+        build_merkle_nodes_default::<Self, H>(leaves)
+    }
+
+    fn verify_proof(
+        root: &Self::Digest,
+        proof: &MerkleProof<H::Digest, Fp>,
+        index: usize,
+    ) -> Result<(), Error> {
+        verify_proof_default::<Self, H>(root, proof, index)
+    }
+
+    fn security_level_bits() -> u32 {
+        H::COLLISION_RESISTANCE
     }
 }
 
@@ -31,17 +48,32 @@ pub struct HashedLeafConfig<H>(PhantomData<H>);
 
 impl<H: ElementHashFn<Fp>> MerkleTreeConfig for HashedLeafConfig<H> {
     type Digest = H::Digest;
-    type HashFn = H;
     type Leaf = H::Digest;
 
     fn hash_leaves(l0: &H::Digest, l1: &H::Digest) -> H::Digest {
         H::merge(l0, l1)
     }
+
+    fn build_merkle_nodes(leaves: &[Self::Leaf]) -> Vec<Self::Digest> {
+        build_merkle_nodes_default::<Self, H>(leaves)
+    }
+
+    fn verify_proof(
+        root: &Self::Digest,
+        proof: &MerkleProof<H::Digest, H::Digest>,
+        index: usize,
+    ) -> Result<(), Error> {
+        verify_proof_default::<Self, H>(root, proof, index)
+    }
+
+    fn security_level_bits() -> u32 {
+        H::COLLISION_RESISTANCE
+    }
 }
 
 pub enum MerkleTreeVariantProof<H: ElementHashFn<Fp>> {
-    Hashed(MerkleProof<HashedLeafConfig<H>>),
-    Unhashed(MerkleProof<UnhashedLeafConfig<H>>),
+    Hashed(MerkleProof<H::Digest, H::Digest>),
+    Unhashed(MerkleProof<H::Digest, Fp>),
 }
 
 impl<H: ElementHashFn<Fp>> Clone for MerkleTreeVariantProof<H> {
@@ -118,7 +150,7 @@ impl<H: ElementHashFn<Fp>> MerkleTree for MerkleTreeVariant<H> {
     type Proof = MerkleTreeVariantProof<H>;
     type Root = H::Digest;
 
-    fn root(&self) -> &Self::Root {
+    fn root(&self) -> Self::Root {
         match self {
             Self::Hashed(mt) => mt.root(),
             Self::Unhashed(mt) => mt.root(),
@@ -134,9 +166,17 @@ impl<H: ElementHashFn<Fp>> MerkleTree for MerkleTreeVariant<H> {
 
     fn verify(root: &Self::Root, proof: &Self::Proof, index: usize) -> Result<(), Error> {
         match proof {
-            MerkleTreeVariantProof::Hashed(proof) => MerkleTreeImpl::verify(root, proof, index),
-            MerkleTreeVariantProof::Unhashed(proof) => MerkleTreeImpl::verify(root, proof, index),
+            MerkleTreeVariantProof::Hashed(proof) => {
+                MerkleTreeImpl::<HashedLeafConfig<H>>::verify(root, proof, index)
+            }
+            MerkleTreeVariantProof::Unhashed(proof) => {
+                MerkleTreeImpl::<UnhashedLeafConfig<H>>::verify(root, proof, index)
+            }
         }
+    }
+
+    fn security_level_bits() -> u32 {
+        H::COLLISION_RESISTANCE
     }
 }
 
@@ -249,7 +289,7 @@ mod tests {
         let proof = tree.prove_row(i)?;
 
         assert!(matches!(tree, MerkleTreeVariant::Unhashed(_)));
-        MerkleTreeVariant::verify_row(commitment, i, &[leaves[i]], &proof)
+        MerkleTreeVariant::verify_row(&commitment, i, &[leaves[i]], &proof)
     }
 
     #[test]
@@ -266,6 +306,6 @@ mod tests {
         let proof = tree.prove_row(i)?;
 
         assert!(matches!(tree, MerkleTreeVariant::Hashed(_)));
-        MerkleTreeVariant::verify_row(commitment, i, &[leaves[i], leaves[i]], &proof)
+        MerkleTreeVariant::verify_row(&commitment, i, &[leaves[i], leaves[i]], &proof)
     }
 }

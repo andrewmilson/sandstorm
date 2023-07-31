@@ -8,16 +8,14 @@ pub mod utils;
 pub mod verifier;
 
 use crate::base;
-use ark_ff::BigInteger;
 use ark_ff::Field;
-use ark_ff::PrimeField;
-use blake2::Blake2s256;
+use layouts::recursive;
+use merkle::FriendlyMerkleTree;
 use ministark::hash::HashFn;
 use random::CairoPublicCoin;
 use ministark::composer::DeepCompositionCoeffs;
 use ministark::stark::Stark;
 use binary::CompiledProgram;
-use ministark::utils::SerdeOutput;
 use binary::AirPublicInput;
 use layouts::CairoTrace;
 use layouts::CairoWitness;
@@ -32,17 +30,17 @@ use layouts::starknet;
 use hash::Blake2sHashFn;
 use hash::MaskedBlake2sHashFn;
 use hash::PedersenHashFn;
-use merkle::MerkleTreeVariant;
+
+use self::merkle::FriendlyCommitment;
+
+pub const NUM_FRIENDLY_LAYERS: u32 = 16;
 
 // List of the hash functions used by StarkWare's verifiers
 pub type CairoVerifierMaskedHashFn = MaskedBlake2sHashFn<20>;
+pub type CairoFriendlyMerkleTree = FriendlyMerkleTree<NUM_FRIENDLY_LAYERS>;
 
 // List of the targets for SHARP
-pub type RecursiveCairoClaim = CairoClaim<starknet::AirConfig, starknet::ExecutionTrace>;
-
-// List of proofs
-pub type RecursiveCairoProof =
-    Proof<Fp, Fp, SerdeOutput<Blake2s256>, MerkleTreeVariant<CairoVerifierMaskedHashFn>>;
+pub type RecursiveCairoClaim = CairoClaim<recursive::AirConfig, recursive::ExecutionTrace>;
 
 /// Wrapper around a base Cairo claim that has a custom implementation of proof
 /// generation and validation to match StarkWare's prover and verifier (SHARP)
@@ -77,9 +75,9 @@ impl<
     type Fp = Fp;
     type Fq = Fp;
     type AirConfig = A;
-    type Digest = SerdeOutput<Blake2s256>;
-    type HashFn = Blake2sHashFn;
-    type MerkleTree = MerkleTreeVariant<CairoVerifierMaskedHashFn>;
+    type Digest = FriendlyCommitment;
+    // type MerkleTree = MerkleTreeVariant<CairoVerifierMaskedHashFn>;
+    type MerkleTree = FriendlyMerkleTree<NUM_FRIENDLY_LAYERS>;
     type PublicCoin = CairoPublicCoin;
     type Witness = CairoWitness<Fp>;
     type Trace = T;
@@ -110,25 +108,9 @@ impl<
 
     fn gen_public_coin(&self, air: &Air<A>) -> CairoPublicCoin {
         println!("Generating public coin from SHARP verifier!");
-        CairoPublicCoin::new(Blake2sHashFn::hash(self.public_coin_seed(air)))
-    }
-
-    fn security_level(proof: &Proof<Fp, Fp, Self::Digest, Self::MerkleTree>) -> usize {
-        // TODO: for some reason this does not work: <<<Self as Stark>::Fq as
-        // Field>::BasePrimeField as PrimeField>::MODULUS
-        let base_field_bits = <Fp as PrimeField>::MODULUS.num_bits() as usize;
-        let extension_degree = usize::try_from(Self::Fq::extension_degree()).unwrap();
-        let field_bits = extension_degree * base_field_bits;
-        let comitment_hash_fn_security = CairoVerifierMaskedHashFn::COLLISION_RESISTANCE as usize;
-        let options = &proof.options;
-        ministark::utils::conjectured_security_level(
-            field_bits,
-            comitment_hash_fn_security,
-            options.lde_blowup_factor.into(),
-            proof.trace_len,
-            options.num_queries.into(),
-            options.grinding_factor.into(),
-        )
+        CairoPublicCoin::new(FriendlyCommitment::Blake(Blake2sHashFn::hash(
+            self.public_coin_seed(air),
+        )))
     }
 
     // async fn prove(
@@ -142,8 +124,8 @@ impl<
 
     fn verify(
         &self,
-        proof: Proof<Fp, Fp, Self::Digest, Self::MerkleTree>,
-        required_security_level: usize,
+        proof: Proof<Self>,
+        required_security_level: u32,
     ) -> Result<(), VerificationError> {
         self.verify_sharp(proof, required_security_level)?;
         Ok(())

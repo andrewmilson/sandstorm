@@ -9,7 +9,7 @@
         "ec_op",
         "poseidon"
     ],
-    "compiler_version": "0.11.2",
+    "compiler_version": "0.12.0",
     "data": [
         "0x40780017fff7fff",
         "0x7",

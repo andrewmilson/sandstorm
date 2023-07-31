@@ -2,6 +2,7 @@ use std::collections::BTreeSet;
 use std::fmt::Debug;
 use std::iter;
 
+use ministark::hash::HashFn;
 use ministark::random::PublicCoin;
 use ministark::utils::SerdeOutput;
 use ministark_gpu::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481::ark::Fp;
@@ -52,7 +53,6 @@ impl SolidityPublicCoin {
 
 impl PublicCoin for SolidityPublicCoin {
     type Digest = SerdeOutput<Keccak256>;
-    type HashFn = Keccak256HashFn;
     type Field = Fp;
 
     fn new(digest: SerdeOutput<Keccak256>) -> Self {
@@ -128,6 +128,10 @@ impl PublicCoin for SolidityPublicCoin {
         let proof_of_work_hash = proof_of_work_hasher.finalize();
 
         leading_zeros(&proof_of_work_hash) >= u32::from(proof_of_work_bits)
+    }
+
+    fn security_level_bits() -> u32 {
+        Keccak256HashFn::COLLISION_RESISTANCE
     }
 }
 
