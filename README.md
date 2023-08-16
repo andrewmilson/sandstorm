@@ -56,38 +56,6 @@ cargo +nightly run -r -F gpu,parallel,asm -- \
     verify --proof example/array-sum.proof
 ```
 
-## Demo - SHARP compatible proof
-
-```bash
-# 1. (optional) install Cairo and activate the venv
-# https://www.cairo-lang.org/docs/quickstart.html
-source ~/cairo_venv/bin/activate
-
-# 2. (optional) compile and run the Cairo program
-cairo-compile example/pedersen/main.cairo --proof_mode --output example/pedersen/main_compiled.json
-cairo-run --program example/pedersen/main_compiled.json \
-          --air_private_input example/pedersen/air-private-input.json \
-          --air_public_input example/pedersen/air-public-input.json \
-          --trace_file example/pedersen/trace.bin \
-          --memory_file example/pedersen/memory.bin \
-          --layout starknet \
-          --min_steps 128 \
-          --proof_mode --print_info
-
-# 3. generate the proof
-cargo +nightly run -r -F parallel,asm -- \
-    --program example/pedersen/main_compiled.json \
-    --air-public-input example/pedersen/air-public-input.json \
-    prove --air-private-input example/pedersen/air-private-input.json \
-          --output example/array-sum.proof
-
-# 4. verify the proof
-cargo +nightly run -r -F parallel,asm -- \
-    --program example/pedersen/main_compiled.json \
-    --air-public-input example/pedersen/air-public-input.json \
-    verify --proof example/array-sum.proof
-```
-
 <details>
 <summary>Proving Cairo programs with Goldilocks field</summary>
 
