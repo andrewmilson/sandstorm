@@ -9,7 +9,7 @@ use super::RANGE_CHECK_STEP;
 use super::DILUTED_CHECK_STEP;
 use super::DILUTED_CHECK_N_BITS;
 use super::DILUTED_CHECK_SPACING;
-use crate::SharpAirConfig;
+use crate::CairoAirConfig;
 use crate::utils;
 use crate::utils::compute_diluted_cumulative_value;
 use ark_poly::EvaluationDomain;
@@ -1565,7 +1565,7 @@ impl ExecutionTraceColumn for Npc {
     }
 }
 
-impl SharpAirConfig for AirConfig {
+impl CairoAirConfig for AirConfig {
     fn public_memory_challenges(challenges: &Challenges<Self::Fq>) -> (Self::Fq, Self::Fq) {
         (
             challenges[MemoryPermutation::Z],

@@ -5,8 +5,7 @@ edition = "2021"
 
 [features]
 default = [ ]
-# TODO: add parallel feature and fix issues
-# parallel = [ "ark-std/parallel", "ministark/parallel", "ministark-gpu/parallel" ]
+parallel = [ "dep:rayon", "ark-std/parallel", "ministark/parallel", "ministark-gpu/parallel" ]
 
 [dependencies]
 ministark-gpu = { version = "0.1", path = "../../ministark-mirror/gpu" }
@@ -23,3 +22,4 @@ num-bigint = "0.4"
 ark-std = "0.4"
 ruint = { version = "1.7", features = [ "serde", "num-bigint" ] }
 strum_macros = "0.24"
+rayon = { version = "1.5", optional = true }

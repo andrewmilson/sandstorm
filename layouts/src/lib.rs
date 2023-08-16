@@ -20,11 +20,11 @@ use ministark::hints::Hints;
 use ministark::Trace;
 
 pub mod plain;
-pub mod starknet;
 pub mod recursive;
+pub mod starknet;
 pub mod utils;
 
-pub trait SharpAirConfig: AirConfig {
+pub trait CairoAirConfig: AirConfig {
     /// Public memory permutation challenges
     /// Output is of the form: (z, alpha)
     fn public_memory_challenges(challenges: &Challenges<Self::Fq>) -> (Self::Fq, Self::Fq);

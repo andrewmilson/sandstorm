@@ -15,7 +15,7 @@ use super::DILUTED_CHECK_N_BITS;
 use super::DILUTED_CHECK_SPACING;
 use super::ECDSA_SIG_CONFIG_ALPHA;
 use super::ECDSA_SIG_CONFIG_BETA;
-use crate::SharpAirConfig;
+use crate::CairoAirConfig;
 use crate::utils;
 use crate::utils::compute_diluted_cumulative_value;
 use ark_ff::MontFp;
@@ -3077,7 +3077,7 @@ impl ExecutionTraceColumn for Npc {
     }
 }
 
-impl SharpAirConfig for AirConfig {
+impl CairoAirConfig for AirConfig {
     fn public_memory_challenges(challenges: &Challenges<Self::Fq>) -> (Self::Fq, Self::Fq) {
         (
             challenges[MemoryPermutation::Z],

@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 ark-ff = "0.4"
 ark-ec = "0.4"
+starknet-crypto = "0.6"
 ministark-gpu = { version = "0.1", path = "../../ministark-mirror/gpu" }
 ministark = { path = "../../ministark-mirror" }
 ark-poly = "0.4"

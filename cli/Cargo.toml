@@ -1,0 +1,32 @@
+[package]
+name = "sandstorm-cli"
+version = "0.1.0"
+edition = "2021"
+
+[features]
+default = [ ]
+# enables support for experimental provers and verifiers
+# e.g. proving cairo programs over the Goldilocks field
+experimental_claims = [ ]
+asm = [ "ministark/asm" ]
+gpu = [ "ministark/gpu" ]
+parallel = [ "dep:rayon", "ark-std/parallel", "ministark/parallel", "ministark-gpu/parallel", "sandstorm/parallel", "layouts/parallel" ]
+
+[dependencies]
+sandstorm = { path = "../" }
+layouts = { path = "../layouts", package = "sandstorm-layouts" }
+binary = { path = "../binary", package = "sandstorm-binary" }
+ministark-gpu = { version = "0.1", path = "../../ministark-mirror/gpu" }
+ministark = { path = "../../ministark-mirror" }
+ark-poly = "0.4"
+ark-std = "0.4"
+ark-ff = "0.4"
+ark-serialize = "0.4"
+structopt = "0.3"
+sha2 = "0.10"
+sha3 = "0.10"
+serde_json = "1.0"
+num-bigint = "0.4"
+num-traits = "0.2"
+pollster = "0.2"
+rayon = { version = "1.5", optional = true }

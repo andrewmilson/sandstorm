@@ -7,7 +7,9 @@ use super::air::Npc;
 use super::air::RangeCheck;
 use super::CYCLE_HEIGHT;
 use super::PUBLIC_MEMORY_STEP;
+use ark_ff::PrimeField;
 use super::RANGE_CHECK_STEP;
+use ark_ff::BigInt;
 use ark_ff::Zero;
 use binary::BitwiseInstance;
 use binary::MemoryEntry;
@@ -306,9 +308,9 @@ impl CairoTrace for ExecutionTrace {
         // create dummy instances if there are cells that need to be filled
         let pedersen_instances = air_private_input.pedersen;
         let num_pedersen_instances = pedersen_instances.len() as u32;
-        let empty_pedersen_instances = (num_pedersen_instances..).map(PedersenInstance::new_empty);
-        let pedersen_traces = pedersen_instances
-            .into_iter()
+        let empty_pedersen_instances = ark_std::cfg_into_iter!(num_pedersen_instances..u32::MAX)
+            .map(PedersenInstance::new_empty);
+        let pedersen_traces = ark_std::cfg_into_iter!(pedersen_instances)
             .chain(empty_pedersen_instances)
             .map(pedersen::InstanceTrace::new);
 
@@ -382,7 +384,7 @@ impl CairoTrace for ExecutionTrace {
 
         ark_std::cfg_iter_mut!(rc_range_check_steps)
             .zip(rc_npc_steps)
-            .zip(rc128_traces.into_iter().chain(rc128_dummy_traces))
+            .zip(ark_std::cfg_into_iter!(rc128_traces).chain(rc128_dummy_traces))
             .for_each(|((rc, npc), rc_trace)| {
                 // add the 128-bit range check to the 16-bit range check pool
                 let parts = rc_trace.parts;
@@ -434,7 +436,8 @@ impl CairoTrace for ExecutionTrace {
 
         // TODO: how does fold work with par_iter? Does it kill parallelism?
         // might be better to map multiple pools and then fold into one if so.
-        let diluted_check_pool = ark_std::cfg_iter_mut!(bitwise_npc_steps)
+        let diluted_check_pool = bitwise_npc_steps
+            .iter_mut()
             .zip(bitwise_dilution_steps)
             .zip(bitwise_traces)
             .fold(
@@ -541,8 +544,15 @@ impl CairoTrace for ExecutionTrace {
         const DILUTED_MAX: u128 = (1 << DILUTED_CHECK_N_BITS) - 1;
         let (ordered_diluted_vals, ordered_diluted_padding_vals) =
             diluted_check_pool.get_ordered_values_with_padding(DILUTED_MIN, DILUTED_MAX);
-        let mut ordered_diluted_vals = ordered_diluted_vals.into_iter();
-        let mut ordered_diluted_padding_vals = ordered_diluted_padding_vals.into_iter();
+        let mut ordered_diluted_vals = ark_std::cfg_into_iter!(ordered_diluted_vals)
+            .map(|v| BigInt(dilute::<DILUTED_CHECK_SPACING>(U256::from(v)).into_limbs()).into())
+            .collect::<Vec<Fp>>()
+            .into_iter();
+        let mut ordered_diluted_padding_vals =
+            ark_std::cfg_into_iter!(ordered_diluted_padding_vals)
+                .map(|v| BigInt(dilute::<DILUTED_CHECK_SPACING>(U256::from(v)).into_limbs()).into())
+                .collect::<Vec<Fp>>()
+                .into_iter();
 
         // add diluted padding values
         // TODO: this is a strange way to do it. fix
@@ -562,11 +572,11 @@ impl CairoTrace for ExecutionTrace {
                     && offset != Bitwise::Bits16Chunk3Offset2ResShifted as usize
                     && offset != Bitwise::Bits16Chunk3Offset3ResShifted as usize
                 {
-                    let padding_val = match ordered_diluted_padding_vals.next() {
-                        Some(v) => dilute::<DILUTED_CHECK_SPACING>(U256::from(v)),
-                        None => break 'outer,
-                    };
-                    *unordered_dilution_step = BigUint::from(padding_val).into();
+                    if let Some(padding_val) = ordered_diluted_padding_vals.next() {
+                        *unordered_dilution_step = padding_val;
+                    } else {
+                        break 'outer;
+                    }
                 }
             }
         }
@@ -574,8 +584,7 @@ impl CairoTrace for ExecutionTrace {
         // add ordered diluted check values
         let padding_offset = diluted_check_ordered_column.len() - ordered_diluted_vals.len();
         for diluted_val in &mut diluted_check_ordered_column[padding_offset..] {
-            let val = ordered_diluted_vals.next().unwrap();
-            *diluted_val = BigUint::from(dilute::<DILUTED_CHECK_SPACING>(U256::from(val))).into();
+            *diluted_val = ordered_diluted_vals.next().unwrap();
         }
 
         // ensure dilution check values have been fully consumed
@@ -592,16 +601,16 @@ impl CairoTrace for ExecutionTrace {
             let mut sorted_memory_accesses: Vec<MemoryEntry<Fp>> = npc_column
                 .array_chunks()
                 .map(|&[address, value]| {
-                    let address = u32::try_from(BigUint::from(address)).unwrap();
+                    let address = u32::try_from(U256::from_limbs(address.into_bigint().0)).unwrap();
                     MemoryEntry { value, address }
                 })
                 .chain(public_memory.clone())
                 .collect();
-            sorted_memory_accesses.sort_by_key(|e| e.address);
+            sorted_memory_accesses.sort_unstable_by_key(|e| e.address);
             let mut padding_addrs = Vec::new();
             for [a, b] in sorted_memory_accesses.array_windows() {
-                let a_addr = u32::try_from(BigUint::from(a.address)).unwrap();
-                let b_addr = u32::try_from(BigUint::from(b.address)).unwrap();
+                let a_addr = a.address;
+                let b_addr = b.address;
                 for padding_addr in a_addr.saturating_add(1)..b_addr {
                     padding_addrs.push(padding_addr)
                 }
@@ -622,7 +631,9 @@ impl CairoTrace for ExecutionTrace {
         let memory_accesses: Vec<MemoryEntry<Fp>> = npc_column
             .array_chunks()
             .map(|&[address_felt, value_felt]| MemoryEntry {
-                address: BigUint::from(address_felt).try_into().unwrap(),
+                address: U256::from_limbs(address_felt.into_bigint().0)
+                    .try_into()
+                    .unwrap(),
                 value: value_felt,
             })
             .collect();

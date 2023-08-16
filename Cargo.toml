@@ -6,32 +6,36 @@ version = "0.1.0"
 edition = "2021"
 
 [workspace]
-members = ["layouts", "binary", "builtins", "claims"]
+members = ["layouts", "binary", "builtins", "crypto", "cli"]
 
 [features]
 default = [ ]
 asm = [ "ministark/asm" ]
 gpu = [ "ministark/gpu" ]
-parallel = [ "dep:rayon", "ark-std/parallel", "ministark/parallel", "ministark-gpu/parallel" ]
+parallel = [ "dep:rayon", "ark-std/parallel", "ministark/parallel", "ministark-gpu/parallel", "crypto/parallel", "layouts/parallel" ]
 
 [dependencies]
+ark-ff = "0.4"
+ark-std = "0.4"
 layouts = { path = "./layouts", package = "sandstorm-layouts" }
-claims = { path = "./claims", package = "sandstorm-claims" }
+crypto = { path = "./crypto", package = "sandstorm-crypto" }
+builtins = { path = "./builtins", package = "sandstorm-builtins" }
 binary = { path = "./binary", package = "sandstorm-binary" }
 ministark-gpu = { version = "0.1", path = "../ministark-mirror/gpu" }
 ministark = { path = "../ministark-mirror" }
-ark-poly = "0.4"
-ark-std = "0.4"
-ark-ff = "0.4"
-ark-serialize = "0.4"
-structopt = "0.3"
+ruint = { version = "1.7", features = [ "serde", "num-bigint" ] }
 sha2 = "0.10"
 sha3 = "0.10"
-serde_json = "1.0"
+blake2 = "0.10"
+rand = "0.8"
 num-bigint = "0.4"
-num-traits = "0.2"
-pollster = "0.2"
+ark-serialize = "0.4"
+ark-poly = "0.4"
+digest = "0.10"
 rayon = { version = "1.5", optional = true }
+
+[dev-dependencies]
+serde_json = "1.0"
 
 # taken from https://github.com/recmo/uint
 # Compilation profile for any non-workspace member.
@@ -47,10 +51,3 @@ lto = false
 [profile.bench]
 codegen-units = 1
 lto = true
-
-# TODO: remove
-[dev-dependencies]
-num-bigint = "0.4"
-ark-ec = "0.4"
-layouts = { path = "./layouts", package = "sandstorm-layouts" }
-builtins = { path = "./builtins", package = "sandstorm-builtins" }

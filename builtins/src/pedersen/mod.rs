@@ -2,6 +2,7 @@ use ark_ec::CurveGroup;
 use ark_ec::Group;
 use ark_ec::short_weierstrass::Affine;
 use ark_ec::short_weierstrass::Projective;
+use ark_ff::BigInt;
 use ark_ff::Field;
 use ark_ff::PrimeField;
 use binary::PedersenInstance;
@@ -27,11 +28,21 @@ pub mod periodic;
 /// where x_low is the 248 low bits of x, x_high is the 4 high bits of x and
 /// similarly for y. shift_point, P_0, P_1, P_2, P_3 are constant points
 /// generated from the digits of pi.
-/// Based on StarkWare's Python reference implementation: <https://github.com/starkware-libs/starkex-for-spot-trading/blob/master/src/starkware/crypto/starkware/crypto/signature/pedersen_params.json>
 pub fn pedersen_hash(a: Fp, b: Fp) -> Fp {
-    let processed_a = process_element(a, P1.into(), P2.into());
-    let processed_b = process_element(b, P3.into(), P4.into());
-    (P0 + processed_a + processed_b).into_affine().x
+    let a = starknet_crypto::FieldElement::from_mont((a.0).0);
+    let b = starknet_crypto::FieldElement::from_mont((b.0).0);
+    let res = starknet_crypto::pedersen_hash(&a, &b);
+    Fp::new_unchecked(BigInt(res.into_mont()))
+}
+
+/// Based on StarkWare's Python reference implementation: <https://github.com/starkware-libs/starkex-for-spot-trading/blob/master/src/starkware/crypto/starkware/crypto/signature/pedersen_params.json>
+// TODO: remove
+#[deprecated]
+pub fn pedersen_hash_slow(a: Fp, b: Fp) -> Fp {
+    let a = starknet_crypto::FieldElement::from_mont((a.0).0);
+    let b = starknet_crypto::FieldElement::from_mont((b.0).0);
+    let res = starknet_crypto::pedersen_hash(&a, &b);
+    Fp::new_unchecked(BigInt(res.into_mont()))
 }
 
 fn process_element(

@@ -4,7 +4,6 @@ use binary::BitwiseInstance;
 use ministark_gpu::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481::ark::Fp;
 use num_bigint::BigUint;
 use ruint::aliases::U256;
-use ruint::uint;
 
 #[derive(Clone, Debug)]
 pub struct InstanceTrace<const SPACING: usize> {
@@ -127,8 +126,8 @@ impl<const SPACING: usize> Partition256<SPACING> {
 /// E.g. `SPACING=4, v=0b1111, diluted_v=0001000100010001`
 pub fn dilute<const SPACING: usize>(v: U256) -> U256 {
     let mut res = U256::ZERO;
-    for i in 1..=U256::BITS {
-        res = (res << SPACING) | ((v >> (U256::BITS - i)) & uint!(1_U256))
+    for i in 0..U256::BITS / SPACING {
+        res.set_bit(i * SPACING, v.bit(i));
     }
     res
 }

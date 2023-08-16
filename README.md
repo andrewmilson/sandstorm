@@ -11,7 +11,7 @@
 
 </div>
 
-Sandstorm uses [miniSTARK](https://github.com/andrewmilson/ministark/) to generate [SHARP](https://starknet.io/docs/sharp.html) compatible proofs for [Cairo](https://www.cairo-lang.org/) programs ([almost](#sandstorm-sharp-differences) 😉). The prover was built by reverse engineering [StarkWare's open source verifier](https://github.com/starkware-libs/starkex-contracts). Please get in touch with me at [andrew.j.milson@gmail.com](mailto:andrew.j.milson@gmail.com) if you want to fund the development of Cairo builtins, performance optimizations, full SHARP compatibility or proof recursion.
+Sandstorm if a fully SHARP compatible, production ready, Cairo prover built on top of miniSTARK. The prover was built by reverse engineering [StarkWare's open source verifier](https://github.com/starkware-libs/starkex-contracts) and was used to submit the first independent proof to StarkWare's Ethereum verifier (see tweet [here](https://twitter.com/andrewmilson/status/1686292241990692864)).
 
 ## Demo - proving Cairo programs
 
@@ -50,8 +50,9 @@ cargo +nightly run -r -F gpu,parallel,asm -- \
           --output example/array-sum.proof
 
 # 4. verify the proof
-cargo +nightly run -r -F parallel,asm -- \
+cargo +nightly run -r -F gpu,parallel,asm -- \
     --program example/array-sum.json \
+    --air-public-input example/air-public-input.json \
     verify --proof example/array-sum.proof
 ```
 

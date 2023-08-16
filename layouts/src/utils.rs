@@ -129,7 +129,7 @@ pub fn get_ordered_memory_accesses<const PUBLIC_MEMORY_STEP: usize, F: PrimeFiel
         .chain(public_memory.iter().copied())
         .collect::<Vec<MemoryEntry<F>>>();
 
-    ordered_accesses.sort_by_key(|e| e.address);
+    ordered_accesses.sort_unstable_by_key(|e| e.address);
 
     // justification for this is explained in section 9.8 of the Cairo paper https://eprint.iacr.org/2021/1063.pdf.
     // SHARP starts the first address at address 1
@@ -177,7 +177,7 @@ impl<F: PrimeField> MemoryPool<F> {
             .copied()
             .chain(public_memory)
             .collect::<Vec<MemoryEntry<F>>>();
-        ordered_accesses.sort_by_key(|a| a.address);
+        ordered_accesses.sort_unstable_by_key(|a| a.address);
 
         // memory values need to be continuos therefore any gaps
         // e.g. [..., (a:4, v:..), (a:7, v:..), ...] need to
@@ -296,7 +296,7 @@ impl<const N_BITS: usize, const SPACING: usize> DilutedCheckPool<N_BITS, SPACING
         }
 
         let mut ordered_vals = self.0.clone();
-        ordered_vals.sort();
+        ordered_vals.sort_unstable();
 
         // diluted check values need to be continuos therefore any gaps
         // e.g. [..., 3, 4, 7, 8, ...] need to be filled with [5, 6] as padding.
@@ -326,7 +326,7 @@ impl<const N_BITS: usize, const SPACING: usize> DilutedCheckPool<N_BITS, SPACING
         }
 
         // re-sort the values.
-        ordered_vals.sort();
+        ordered_vals.sort_unstable();
 
         (ordered_vals, padding_vals)
     }
@@ -359,7 +359,7 @@ impl RangeCheckPool {
     /// also provided. Output is of the form `(ordered_vals, padding_vals)`.
     pub fn get_ordered_values_with_padding(&self) -> (Vec<u16>, Vec<u16>) {
         let mut ordered_vals = self.0.clone();
-        ordered_vals.sort();
+        ordered_vals.sort_unstable();
 
         // range check values need to be continuos therefore any gaps
         // e.g. [..., 3, 4, 7, 8, ...] need to be filled with [5, 6] as padding.
@@ -376,7 +376,7 @@ impl RangeCheckPool {
         }
 
         // re-sort the values.
-        ordered_vals.sort();
+        ordered_vals.sort_unstable();
 
         (ordered_vals, padding_vals)
     }

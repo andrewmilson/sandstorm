@@ -13,6 +13,7 @@ use ruint::aliases::U256;
 use ruint::uint;
 use serde::Deserialize;
 use serde::Serialize;
+use std::fmt::Display;
 use std::io::BufRead;
 use std::io::BufReader;
 use std::io::Read;
@@ -54,8 +55,7 @@ pub struct RegisterState {
     pub pc: usize,
 }
 
-// TODO: not being used at all ATM
-/// https://www.youtube.com/live/jPxD9h7BdzU?feature=share&t=2800
+/// SHARP layouts: <https://www.youtube.com/live/jPxD9h7BdzU?feature=share&t=2800>
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Layout {
@@ -67,6 +67,25 @@ pub enum Layout {
     RecursiveLargeOutput = 5,
     AllSolidity = 6,
     StarknetWithKeccak = 7,
+}
+
+impl Display for Layout {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Self::Plain => "plain",
+                Self::Small => "small",
+                Self::Dex => "dex",
+                Self::Recursive => "recursive",
+                Self::Starknet => "starknet",
+                Self::RecursiveLargeOutput => "recursive_large_output",
+                Self::AllSolidity => "all_solidity",
+                Self::StarknetWithKeccak => "starknet_with_keccak",
+            }
+        )
+    }
 }
 
 impl Layout {
