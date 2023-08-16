@@ -11,7 +11,7 @@
 
 </div>
 
-Sandstorm if a fully SHARP compatible, production ready, Cairo prover built on top of miniSTARK. The prover was built by reverse engineering [StarkWare's open source verifier](https://github.com/starkware-libs/starkex-contracts) and was used to submit the first independent proof to StarkWare's Ethereum verifier (see tweet [here](https://twitter.com/andrewmilson/status/1686292241990692864)).
+Sandstorm is a production ready Cairo prover built on top of miniSTARK. The prover was built by reverse engineering [StarkWare's open source verifier](https://github.com/starkware-libs/starkex-contracts) and was used to submit the first independent proof to StarkWare's Ethereum verifier (see tweet [here](https://twitter.com/andrewmilson/status/1686292241990692864)).
 
 ## Demo - proving Cairo programs
 
@@ -88,6 +88,9 @@ cargo +nightly run -r -F parallel,asm -- \
     verify --proof example/array-sum.proof
 ```
 
+<details>
+<summary>Proving Cairo programs with Goldilocks field</summary>
+
 ## Proving Cairo programs with Goldilocks field
 
 The goldilocks field is a magical 64-bit prime field that has very fast arithmetic. This field was discovered after StarkWare built their Solidity verifier for Cairo programs. As a result Cairo uses a much larger 252-bit prime field by default. Arithmetic in this 252-bit field is slow and it can be hard to practically utilize the storage provided by each field element. 
@@ -115,52 +118,30 @@ cairo-compile example/array-sum.cairo \
 
 # 4. run the Cairo program
 cairo-run --program example/array-sum.json \
-          --trace_file example/trace.bin \
-          --memory_file example/memory.bin \
-          --min_steps 128 \
-          --proof_mode
+        --trace_file example/trace.bin \
+        --memory_file example/memory.bin \
+        --min_steps 128 \
+        --proof_mode
 
 # 5. generate the proof
 # use `-F parallel,asm` if not using an M1 Mac
 cargo +nightly run -r -F gpu,parallel,asm -- \
     --program example/array-sum.json \
     prove --trace example/trace.bin \
-          --memory example/memory.bin \
-          --output example/array-sum.proof
+        --memory example/memory.bin \
+        --output example/array-sum.proof
 
 # 6. verify the proof
 cargo +nightly run -r -F parallel,asm -- \
     --program example/array-sum.json \
     verify --proof example/array-sum.proof
 ```
+</details>
 
-<h2 id="sandstorm-sharp-differences">Differences between Sandstorm and SHARP</h2>
-
-Sandstorm implements a subset of the constraints and trace layout that's used by [StarkWare's STARK prover (SHARP)](https://starknet.io/docs/sharp.html). This subset contains all of all constraints outlined in the Cairo whitepaper (section 9.10) and characterizes the constraints required to prove correct execution of Cairo programs (no builtins... yet). Sandstorm has a different proof serialization format and calculates verifier randomness differently. These need to be the same to allow users to submit a Sandstorm generated proof to StarkWare's Ethereum STARK verifier (coming soon). 
+<details>
+<summary>How Sandstorm works</summary>
 
 ## How Sandstorm works
 
-Those curious about the inner workings of Sandstorm can read the comments in [air.rs](layouts/src/starknet/air.rs#36). The comments expect some understanding of how STARK proofs are generated - if you need some background on this then [Anatomy of a STARK (part 4)](https://aszepieniec.github.io/stark-anatomy/) by [Alan Szepieniec](https://twitter.com/aszepieniec) is a great resource. The pseudo code in section 4.5 of the [Cairo whitepaper](https://eprint.iacr.org/2021/1063.pdf) provides a nice high level overview of how some pieces fit together.
-
-
-```
-cairo-compile example/pedersen/main.cairo --proof_mode --output example/pedersen/main_compiled.json
-cairo-run --program example/pedersen/main_compiled.json \
-          --air_private_input example/pedersen/air-private-input.json \
-          --air_public_input example/pedersen/air-public-input.json \
-          --trace_file example/pedersen/trace.bin \
-          --memory_file example/pedersen/memory.bin \
-          --layout starknet \
-          --min_steps 128 \
-          --proof_mode
-
-cargo +nightly run -r -F parallel,asm -- \
-    --program example/pedersen/main_compiled.json --layout starknet \
-    prove --air-private-input example/pedersen/air-private-input.json \
-          --air-public-input example/pedersen/air-public-input.json \
-          --output example/array-sum.proof
-
-cargo +nightly run -r -F parallel,asm -- \
-    --program example/pedersen/main_compiled.json --layout starknet \
-    verify --proof example/array-sum.proof
-```
+Those curious about the inner workings of Sandstorm can read the comments in [air.rs](layouts/src/layout6/air.rs#36). The comments expect some understanding of how STARK proofs are generated - if you need some background on this then [Anatomy of a STARK (part 4)](https://aszepieniec.github.io/stark-anatomy/) by [Alan Szepieniec](https://twitter.com/aszepieniec) is a great resource. The pseudo code in section 4.5 of the [Cairo whitepaper](https://eprint.iacr.org/2021/1063.pdf) provides a nice high level overview of how some pieces fit together.
+</details>
