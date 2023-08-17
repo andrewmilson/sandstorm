@@ -2,7 +2,7 @@ use binary::AirPublicInput;
 use crypto::hash::blake2s::Blake2sHashFn;
 use crypto::hash::pedersen::PedersenDigest;
 use crypto::hash::pedersen::PedersenHashFn;
-use crypto::merkle::mixed::MixedDigest;
+use crypto::merkle::mixed::MixedMerkleDigest;
 use crypto::utils::from_montgomery;
 use crypto::utils::to_montgomery;
 use blake2::Blake2s256;
@@ -65,16 +65,18 @@ impl CairoPublicCoin for CairoVerifierPublicCoin {
         for element in aux_input.public_input_elements::<PedersenHashFn>() {
             seed.extend_from_slice(&element.to_be_bytes::<32>())
         }
-        Self::new(MixedDigest::LowLevel(Blake2sHashFn::hash_chunks([&*seed])))
+        Self::new(MixedMerkleDigest::LowLevel(Blake2sHashFn::hash_chunks([
+            &*seed,
+        ])))
     }
 }
 
 impl PublicCoin for CairoVerifierPublicCoin {
-    type Digest = MixedDigest<PedersenDigest, SerdeOutput<Blake2s256>>;
+    type Digest = MixedMerkleDigest<PedersenDigest, SerdeOutput<Blake2s256>>;
     type Field = Fp;
 
     fn new(digest: Self::Digest) -> Self {
-        if let MixedDigest::LowLevel(digest) = digest {
+        if let MixedMerkleDigest::LowLevel(digest) = digest {
             Self { digest, counter: 0 }
         } else {
             unreachable!()
@@ -164,7 +166,7 @@ mod tests {
     use super::CairoVerifierPublicCoin;
     use ark_ff::MontFp as Fp;
     use blake2::Blake2s256;
-    use crypto::merkle::mixed::MixedDigest;
+    use crypto::merkle::mixed::MixedMerkleDigest;
     use digest::Output;
     use ministark::random::PublicCoin;
     use ministark::utils::SerdeOutput;
@@ -179,7 +181,7 @@ mod tests {
             0x80, 0x38, 0xae, 0xa4, 0x32, 0x96, 0x07, 0x41, 0xb8, 0x19, 0x79, 0x16, 0x36, 0xf8,
             0x2c, 0xc2, 0xd2, 0x5d,
         ]));
-        let mut public_coin = CairoVerifierPublicCoin::new(MixedDigest::LowLevel(seed));
+        let mut public_coin = CairoVerifierPublicCoin::new(MixedMerkleDigest::LowLevel(seed));
 
         let element: Fp = Fp!("941210603170996043151108091873286171552595656949");
         let element_bytes = U256::from(BigUint::from(element));

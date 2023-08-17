@@ -22,7 +22,7 @@ use ministark::merkle::Error;
 use ministark_gpu::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481::ark::Fp;
 use mixed::FriendlyMerkleTreeConfig;
 use mixed::MixedHashMerkleTreeImpl;
-use mixed::MixedDigest;
+use mixed::MixedMerkleDigest;
 use crate::hash::blake2s::MaskedBlake2sHashFn;
 
 /// Friendly merkle tree is used as the merkle tree when generating recursive
@@ -67,12 +67,12 @@ where
     H::Digest: From<Fp>,
 {
     type Proof = FriendlyMerkleTreeProof<H>;
-    type Root = MixedDigest<H::Digest, SerdeOutput<Blake2s256>>;
+    type Root = MixedMerkleDigest<H::Digest, SerdeOutput<Blake2s256>>;
 
     fn root(&self) -> Self::Root {
         match self {
             Self::MultiCol(mt) => mt.root(),
-            Self::SingleCol(mt) => MixedDigest::HighLevel(mt.root()),
+            Self::SingleCol(mt) => MixedMerkleDigest::HighLevel(mt.root()),
         }
     }
 
@@ -89,7 +89,7 @@ where
                 FriendlyMerkleTreeConfig<N_FRIENDLY_LAYERS, H>,
             >::verify(root, proof, indices),
             FriendlyMerkleTreeProof::SingleCol(proof) => {
-                let MixedDigest::HighLevel(root) = root else {
+                let MixedMerkleDigest::HighLevel(root) = root else {
                     unreachable!()
                 };
                 MerkleTreeImpl::<UnhashedLeafConfig<H>>::verify(root, proof, indices)
@@ -168,7 +168,9 @@ where
 }
 
 pub enum FriendlyMerkleTreeProof<H: ElementHashFn<Fp>> {
-    MultiCol(MerkleView<MixedDigest<H::Digest, SerdeOutput<Blake2s256>>, SerdeOutput<Blake2s256>>),
+    MultiCol(
+        MerkleView<MixedMerkleDigest<H::Digest, SerdeOutput<Blake2s256>>, SerdeOutput<Blake2s256>>,
+    ),
     SingleCol(MerkleView<H::Digest, Fp>),
 }
 

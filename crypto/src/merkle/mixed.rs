@@ -32,18 +32,18 @@ pub trait MixedHashMerkleTreeConfig: Send + Sync + Sized + 'static {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub enum MixedDigest<HighLevelsDigest: Digest, LowLevelsDigest: Digest> {
+pub enum MixedMerkleDigest<HighLevelsDigest: Digest, LowLevelsDigest: Digest> {
     HighLevel(HighLevelsDigest),
     LowLevel(LowLevelsDigest),
 }
 
-impl<HLD: Digest, LLD: Digest> Default for MixedDigest<HLD, LLD> {
+impl<HLD: Digest, LLD: Digest> Default for MixedMerkleDigest<HLD, LLD> {
     fn default() -> Self {
         Self::HighLevel(HLD::default())
     }
 }
 
-impl<HLD: Digest, LLD: Digest> CanonicalSerialize for MixedDigest<HLD, LLD> {
+impl<HLD: Digest, LLD: Digest> CanonicalSerialize for MixedMerkleDigest<HLD, LLD> {
     fn serialize_with_mode<W: ark_serialize::Write>(
         &self,
         mut writer: W,
@@ -70,13 +70,13 @@ impl<HLD: Digest, LLD: Digest> CanonicalSerialize for MixedDigest<HLD, LLD> {
     }
 }
 
-impl<HLD: Digest, LLD: Digest> Valid for MixedDigest<HLD, LLD> {
+impl<HLD: Digest, LLD: Digest> Valid for MixedMerkleDigest<HLD, LLD> {
     fn check(&self) -> Result<(), SerializationError> {
         Ok(())
     }
 }
 
-impl<HLD: Digest, LLD: Digest> Digest for MixedDigest<HLD, LLD> {
+impl<HLD: Digest, LLD: Digest> Digest for MixedMerkleDigest<HLD, LLD> {
     fn as_bytes(&self) -> [u8; 32] {
         match self {
             Self::HighLevel(d) => d.as_bytes(),
@@ -85,7 +85,7 @@ impl<HLD: Digest, LLD: Digest> Digest for MixedDigest<HLD, LLD> {
     }
 }
 
-impl<HLD: Digest, LLD: Digest> CanonicalDeserialize for MixedDigest<HLD, LLD> {
+impl<HLD: Digest, LLD: Digest> CanonicalDeserialize for MixedMerkleDigest<HLD, LLD> {
     fn deserialize_with_mode<R: ark_serialize::Read>(
         mut reader: R,
         compress: ark_serialize::Compress,
@@ -104,18 +104,18 @@ impl<HLD: Digest, LLD: Digest> CanonicalDeserialize for MixedDigest<HLD, LLD> {
 pub struct MixedHashMerkleTreeConfigImpl<C: MixedHashMerkleTreeConfig>(PhantomData<C>);
 
 impl<C: MixedHashMerkleTreeConfig> MerkleTreeConfig for MixedHashMerkleTreeConfigImpl<C> {
-    type Digest = MixedDigest<C::HighLevelsDigest, C::LowLevelsDigest>;
+    type Digest = MixedMerkleDigest<C::HighLevelsDigest, C::LowLevelsDigest>;
     type Leaf = C::LowLevelsDigest;
 
     fn hash_leaves(depth: u32, l0: &Self::Leaf, l1: &Self::Leaf) -> Self::Digest {
         match depth < C::TRANSITION_DEPTH {
-            true => MixedDigest::HighLevel(C::hash_boundary(l0, l1)),
-            false => MixedDigest::LowLevel(C::LowLevelsHashFn::merge(l0, l1)),
+            true => MixedMerkleDigest::HighLevel(C::hash_boundary(l0, l1)),
+            false => MixedMerkleDigest::LowLevel(C::LowLevelsHashFn::merge(l0, l1)),
         }
     }
 
     fn hash_nodes(depth: u32, n0: &Self::Digest, n1: &Self::Digest) -> Self::Digest {
-        use MixedDigest::*;
+        use MixedMerkleDigest::*;
         match (depth < C::TRANSITION_DEPTH, n0, n1) {
             (false, LowLevel(n0), LowLevel(n1)) => LowLevel(C::LowLevelsHashFn::merge(n0, n1)),
             (true, LowLevel(n0), LowLevel(n1)) => HighLevel(C::hash_boundary(n0, n1)),

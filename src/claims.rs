@@ -7,6 +7,8 @@ use ministark_gpu::fields::p3618502788666131213697322783095070105623107215331596
 use crypto::hash::keccak::Keccak256HashFn;
 use crate::public_coin::cairo::CairoVerifierPublicCoin;
 
+pub const NUM_FRIENDLY_COMMITMENT_LAYERS: u32 = 22;
+
 pub mod starknet {
     use super::*;
     use crypto::hash::keccak::MaskedKeccak256HashFn;
@@ -16,7 +18,7 @@ pub mod starknet {
     pub type EthVerifierClaim =
         CairoClaim<Fp, AirConfig, ExecutionTrace, LeafVariantMerkleTree<MaskedKeccak256HashFn<20>>, SolidityVerifierPublicCoin>;
     pub type CairoVerifierClaim =
-        CairoClaim<Fp, AirConfig, ExecutionTrace, FriendlyMerkleTree<20, PedersenHashFn>, CairoVerifierPublicCoin>;
+        CairoClaim<Fp, AirConfig, ExecutionTrace, FriendlyMerkleTree<NUM_FRIENDLY_COMMITMENT_LAYERS, PedersenHashFn>, CairoVerifierPublicCoin>;
 }
 
 pub mod recursive {
@@ -27,5 +29,5 @@ pub mod recursive {
     pub type EthVerifierClaim =
         CairoClaim<Fp, AirConfig, ExecutionTrace, LeafVariantMerkleTree<Keccak256HashFn>, SolidityVerifierPublicCoin>;
     pub type CairoVerifierClaim =
-        CairoClaim<Fp, AirConfig, ExecutionTrace, FriendlyMerkleTree<20, PedersenHashFn>, CairoVerifierPublicCoin>;
+        CairoClaim<Fp, AirConfig, ExecutionTrace, FriendlyMerkleTree<NUM_FRIENDLY_COMMITMENT_LAYERS, PedersenHashFn>, CairoVerifierPublicCoin>;
 }
