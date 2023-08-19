@@ -11,7 +11,7 @@
 
 </div>
 
-Sandstorm is a production ready Cairo prover built on top of miniSTARK. The prover was built by reverse engineering [StarkWare's open source verifier](https://github.com/starkware-libs/starkex-contracts) and was used to submit the first independent proof to StarkWare's Ethereum verifier (see tweet [here](https://twitter.com/andrewmilson/status/1686292241990692864)).
+Sandstorm is a Cairo prover built on top of miniSTARK. The prover was built by reverse engineering [StarkWare's open source verifier](https://github.com/starkware-libs/starkex-contracts) and was used to submit the first independent proof to StarkWare's Ethereum verifier (see tweet [here](https://twitter.com/andrewmilson/status/1686292241990692864)).
 
 ## Demo - proving Cairo programs
 
@@ -41,16 +41,14 @@ cairo-run --program example/array-sum.json \
           --proof_mode
 
 # 3. generate the proof
-# use `-F parallel,asm` if not using an M1 Mac
-# make sure latest macOS is installed
-cargo +nightly run -r -F gpu,parallel,asm -- \
+cargo +nightly run -p sandstorm-cli -r -F parallel,asm -- \
     --program example/array-sum.json \
     --air-public-input example/air-public-input.json \
     prove --air-private-input example/air-private-input.json \
           --output example/array-sum.proof
 
 # 4. verify the proof
-cargo +nightly run -r -F gpu,parallel,asm -- \
+cargo +nightly run -p sandstorm-cli -r -F parallel,asm -- \
     --program example/array-sum.json \
     --air-public-input example/air-public-input.json \
     verify --proof example/array-sum.proof
@@ -92,8 +90,7 @@ cairo-run --program example/array-sum.json \
         --proof_mode
 
 # 5. generate the proof
-# use `-F parallel,asm` if not using an M1 Mac
-cargo +nightly run -r -F gpu,parallel,asm -- \
+cargo +nightly run -r -F parallel,asm -- \
     --program example/array-sum.json \
     prove --trace example/trace.bin \
         --memory example/memory.bin \

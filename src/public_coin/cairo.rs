@@ -136,9 +136,12 @@ impl PublicCoin for CairoVerifierPublicCoin {
 
         let domain_size = domain_size as u64;
         // NOTE: the cairo verifier samples batches of 4 queries at once
-        ints.take(max_n.next_multiple_of(4))
+        let mut res = ints
+            .take(max_n.next_multiple_of(4))
             .map(|v| (v % domain_size).try_into().unwrap())
-            .collect()
+            .collect::<Vec<usize>>();
+        res.truncate(max_n);
+        res.into_iter().collect()
     }
 
     fn verify_proof_of_work(&self, proof_of_work_bits: u8, nonce: u64) -> bool {

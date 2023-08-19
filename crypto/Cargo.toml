@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [features]
+asm = [ "blake2/simd_asm" ]
 parallel = [ "dep:rayon", "ark-std/parallel", "ministark/parallel", "ministark-gpu/parallel" ]
 
 [dependencies]

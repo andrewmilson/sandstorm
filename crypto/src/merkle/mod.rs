@@ -116,9 +116,7 @@ where
                 Self::SingleCol(MerkleTreeImpl::new(leaves).unwrap())
             }
             _ => {
-                let now = Instant::now();
                 let row_hashes = utils::hash_rows::<MaskedBlake2sHashFn<20>>(matrix);
-                println!("Hashing rows: {:?}", now.elapsed());
                 Self::MultiCol(MerkleTreeImpl::new(row_hashes).unwrap())
             }
         }

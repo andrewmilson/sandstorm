@@ -10,7 +10,7 @@ members = ["layouts", "binary", "builtins", "crypto", "cli"]
 
 [features]
 default = [ ]
-asm = [ "ministark/asm" ]
+asm = [ "ministark/asm", "crypto/asm" ]
 gpu = [ "ministark/gpu" ]
 parallel = [ "dep:rayon", "ark-std/parallel", "ministark/parallel", "ministark-gpu/parallel", "crypto/parallel", "layouts/parallel" ]
 
@@ -46,7 +46,7 @@ opt-level = 3
 
 [profile.release]
 codegen-units = 1
-lto = false
+lto = true
 
 [profile.bench]
 codegen-units = 1
