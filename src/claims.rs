@@ -1,11 +1,11 @@
-use crate::public_coin::solidity::SolidityVerifierPublicCoin;
+use crypto::public_coin::solidity::SolidityVerifierPublicCoin;
 use crate::CairoClaim;
 use crypto::merkle::LeafVariantMerkleTree;
 use crypto::merkle::FriendlyMerkleTree; 
 use crypto::hash::pedersen::PedersenHashFn;
 use ministark_gpu::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481::ark::Fp;
 use crypto::hash::keccak::Keccak256HashFn;
-use crate::public_coin::cairo::CairoVerifierPublicCoin;
+use crypto::public_coin::cairo::CairoVerifierPublicCoin;
 
 pub const NUM_FRIENDLY_COMMITMENT_LAYERS: u32 = 22;
 

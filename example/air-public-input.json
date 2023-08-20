@@ -2,7 +2,7 @@
     "layout": "recursive",
     "rc_min": 32764,
     "rc_max": 32770,
-    "n_steps": 1048576,
+    "n_steps": 262144,
     "memory_segments": {
         "program": {
             "begin_addr": 1,
@@ -21,12 +21,12 @@
             "stop_ptr": 76
         },
         "range_check": {
-            "begin_addr": 24652,
-            "stop_ptr": 24652
+            "begin_addr": 6220,
+            "stop_ptr": 6220
         },
         "bitwise": {
-            "begin_addr": 155724,
-            "stop_ptr": 155724
+            "begin_addr": 38988,
+            "stop_ptr": 38988
         }
     },
     "public_memory": [

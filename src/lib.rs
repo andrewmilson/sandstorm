@@ -2,23 +2,34 @@
 
 use ark_ff::Field;
 use ark_ff::PrimeField;
+use ark_serialize::CanonicalSerialize;
 use binary::AirPublicInput;
 use binary::CompiledProgram;
+use crypto::hash::blake2s::Blake2sHashFn;
+use crypto::hash::keccak::CanonicalKeccak256HashFn;
+use crypto::hash::pedersen::PedersenHashFn;
+use crypto::merkle::mixed::MixedMerkleDigest;
+use crypto::public_coin::cairo::CairoVerifierPublicCoin;
+use crypto::public_coin::solidity::SolidityVerifierPublicCoin;
+use input::CairoAuxInput;
 use layouts::CairoTrace;
 use layouts::CairoWitness;
 use ministark::air::AirConfig;
 use ministark::composer::DeepCompositionCoeffs;
+use ministark::hash::ElementHashFn;
+use ministark::hash::HashFn;
 use ministark::merkle::MatrixMerkleTree;
 use ministark::merkle::MerkleTree;
+use ministark::random::PublicCoin;
+use ministark::random::PublicCoinImpl;
 use ministark::stark::Stark;
 use ministark::Air;
 use ministark_gpu::GpuFftField;
-use public_coin::CairoPublicCoin;
+use ministark_gpu::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481::ark::Fp;
 use std::marker::PhantomData;
 
 pub mod claims;
 pub mod input;
-pub mod public_coin;
 
 pub struct CairoClaim<
     Fp: GpuFftField + PrimeField,
@@ -110,5 +121,47 @@ where
 
     fn get_public_inputs(&self) -> AirPublicInput<A::Fp> {
         self.air_public_input.clone()
+    }
+}
+
+pub trait CairoPublicCoin: PublicCoin {
+    fn from_public_input(
+        public_input: &AirPublicInput<<Self::Field as Field>::BasePrimeField>,
+    ) -> Self;
+}
+
+impl<F: Field, H: ElementHashFn<F>> CairoPublicCoin for PublicCoinImpl<F, H> {
+    fn from_public_input(
+        air_public_input: &AirPublicInput<<Self::Field as Field>::BasePrimeField>,
+    ) -> Self {
+        // NOTE: this generic implementation is only intended for experimentation so the
+        // implementation is rather strange
+        let mut bytes = Vec::new();
+        air_public_input.serialize_compressed(&mut bytes).unwrap();
+        Self::new(H::hash_chunks([&*bytes]))
+    }
+}
+
+impl CairoPublicCoin for SolidityVerifierPublicCoin {
+    fn from_public_input(public_input: &AirPublicInput<Fp>) -> Self {
+        let aux_input = CairoAuxInput(public_input);
+        let mut seed = Vec::new();
+        for element in aux_input.public_input_elements::<CanonicalKeccak256HashFn>() {
+            seed.extend_from_slice(&element.to_be_bytes::<32>())
+        }
+        Self::new(CanonicalKeccak256HashFn::hash_chunks([&*seed]))
+    }
+}
+
+impl CairoPublicCoin for CairoVerifierPublicCoin {
+    fn from_public_input(public_input: &AirPublicInput<Fp>) -> Self {
+        let aux_input = CairoAuxInput(public_input);
+        let mut seed = Vec::new();
+        for element in aux_input.public_input_elements::<PedersenHashFn>() {
+            seed.extend_from_slice(&element.to_be_bytes::<32>())
+        }
+        Self::new(MixedMerkleDigest::LowLevel(Blake2sHashFn::hash_chunks([
+            &*seed,
+        ])))
     }
 }

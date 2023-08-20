@@ -8,7 +8,7 @@ default = [ ]
 # enables support for experimental provers and verifiers
 # e.g. proving cairo programs over the Goldilocks field
 experimental_claims = [ ]
-asm = [ "ministark/asm" ]
+asm = [ "ministark/asm", "sandstorm/asm" ]
 gpu = [ "ministark/gpu" ]
 parallel = [ "dep:rayon", "ark-std/parallel", "ministark/parallel", "ministark-gpu/parallel", "sandstorm/parallel", "layouts/parallel" ]
 
