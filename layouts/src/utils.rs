@@ -1,5 +1,7 @@
+use ark_ff::Field;
 use ark_ff::PrimeField;
 use binary::MemoryEntry;
+use ministark::utils::FieldVariant;
 use ministark::StarkExtensionOf;
 use ministark_gpu::GpuFftField;
 use num_traits::One;
@@ -388,4 +390,18 @@ impl RangeCheckPool {
     pub fn max(&self) -> Option<u16> {
         self.0.iter().max().copied()
     }
+}
+
+/// Maps array items into `FieldVariant::Fp`
+// TODO: remove. need for const fn.
+pub const fn map_into_fp_array<Fp: Field, Fq: Field, const N: usize>(
+    arr: [Fp; N],
+) -> [FieldVariant<Fp, Fq>; N] {
+    let mut res = [FieldVariant::Fp(Fp::ZERO); N];
+    let mut i = 0;
+    while i < N {
+        res[i] = FieldVariant::Fp(arr[i]);
+        i += 1;
+    }
+    res
 }

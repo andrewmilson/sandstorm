@@ -10,8 +10,10 @@ use super::DILUTED_CHECK_STEP;
 use super::DILUTED_CHECK_N_BITS;
 use super::DILUTED_CHECK_SPACING;
 use crate::CairoAirConfig;
+use ministark::constraints::PeriodicColumn;
 use crate::utils;
 use crate::utils::compute_diluted_cumulative_value;
+use crate::utils::map_into_fp_array;
 use ark_poly::EvaluationDomain;
 use ark_poly::Radix2EvaluationDomain;
 use binary::AirPublicInput;
@@ -19,9 +21,6 @@ use builtins::pedersen;
 use ministark::constraints::CompositionConstraint;
 use ministark::constraints::CompositionItem;
 use ministark_gpu::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481::ark::Fp;
-use num_traits::One;
-use core::ops::Add;
-use core::ops::Mul;
 use ark_ff::Field;
 use ministark::challenges::Challenges;
 use ministark::constraints::AlgebraicItem;
@@ -34,8 +33,21 @@ use ministark::hints::Hints;
 use ministark::utils::FieldVariant;
 use num_bigint::BigUint;
 use num_traits::Pow;
-use num_traits::Zero;
 use strum_macros::EnumIter;
+
+const PEDERSEN_POINT_X: PeriodicColumn<'static, FieldVariant<Fp, Fp>> = {
+    const INTERVAL_SIZE: usize = super::PEDERSEN_BUILTIN_RATIO * super::CYCLE_HEIGHT;
+    const COEFFS: [FieldVariant<Fp, Fp>; 512] =
+        map_into_fp_array(pedersen::periodic::HASH_POINTS_X_COEFFS);
+    PeriodicColumn::new(&COEFFS, INTERVAL_SIZE)
+};
+
+const PEDERSEN_POINT_Y: PeriodicColumn<'static, FieldVariant<Fp, Fp>> = {
+    const INTERVAL_SIZE: usize = super::PEDERSEN_BUILTIN_RATIO * super::CYCLE_HEIGHT;
+    const COEFFS: [FieldVariant<Fp, Fp>; 512] =
+        map_into_fp_array(pedersen::periodic::HASH_POINTS_Y_COEFFS);
+    PeriodicColumn::new(&COEFFS, INTERVAL_SIZE)
+};
 
 pub struct AirConfig;
 
@@ -769,14 +781,8 @@ impl ministark::air::AirConfig for AirConfig {
         // ├───────────┼────────────────────┼────────────────────┤
         // │   ω^511   │   [P_4 * 2^3]_x    │   [P_4 * 2^3]_y    │<- unused copy of prev
         // └───────────┴────────────────────┴────────────────────┘
-        let pedersen_x_coeffs = pedersen::periodic::HASH_POINTS_X_COEFFS.map(FieldVariant::Fp);
-        let pedersen_y_coeffs = pedersen::periodic::HASH_POINTS_Y_COEFFS.map(FieldVariant::Fp);
-        let pedersen_points_x = Polynomial::new(pedersen_x_coeffs.to_vec());
-        let pedersen_points_y = Polynomial::new(pedersen_y_coeffs.to_vec());
-
-        // TODO: double check if the value that's being evaluated is correct
-        let pedersen_point_x = pedersen_points_x.horner_eval(X.pow(n / 2048));
-        let pedersen_point_y = pedersen_points_y.horner_eval(X.pow(n / 2048));
+        let pedersen_point_x = Expr::from(Periodic(PEDERSEN_POINT_X));
+        let pedersen_point_y = Expr::from(Periodic(PEDERSEN_POINT_Y));
 
         // let `P = (Px, Py)` be the point to be added (see above)
         // let `Q = (Qx, Qy)` be the partial result
@@ -1797,22 +1803,5 @@ pub enum DilutedCheckAggregation {
 impl VerifierChallenge for DilutedCheckAggregation {
     fn index(&self) -> usize {
         *self as usize
-    }
-}
-
-struct Polynomial<T>(Vec<T>);
-
-impl<T: Clone + One + Zero + Mul<Output = T> + Add<Output = T>> Polynomial<T> {
-    fn new(coeffs: Vec<T>) -> Self {
-        assert!(!coeffs.is_empty());
-        assert!(!coeffs.iter().all(|v| v.is_zero()));
-        Polynomial(coeffs)
-    }
-
-    fn horner_eval(&self, point: Expr<AlgebraicItem<T>>) -> Expr<AlgebraicItem<T>> {
-        self.0.iter().rfold(
-            Expr::Leaf(AlgebraicItem::Constant(T::zero())),
-            move |result, coeff| result * &point + AlgebraicItem::Constant(coeff.clone()),
-        )
     }
 }

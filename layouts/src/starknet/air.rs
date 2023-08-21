@@ -18,6 +18,7 @@ use super::ECDSA_SIG_CONFIG_BETA;
 use crate::CairoAirConfig;
 use crate::utils;
 use crate::utils::compute_diluted_cumulative_value;
+use crate::utils::map_into_fp_array;
 use ark_ff::MontFp;
 use ark_poly::EvaluationDomain;
 use ark_poly::Radix2EvaluationDomain;
@@ -27,10 +28,8 @@ use builtins::pedersen;
 use builtins::poseidon;
 use ministark::constraints::CompositionConstraint;
 use ministark::constraints::CompositionItem;
+use ministark::constraints::PeriodicColumn;
 use ministark_gpu::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481::ark::Fp;
-use num_traits::One;
-use core::ops::Add;
-use core::ops::Mul;
 use ark_ff::Field;
 use ministark::challenges::Challenges;
 use ministark::constraints::AlgebraicItem;
@@ -43,8 +42,66 @@ use ministark::hints::Hints;
 use ministark::utils::FieldVariant;
 use num_bigint::BigUint;
 use num_traits::Pow;
-use num_traits::Zero;
 use strum_macros::EnumIter;
+
+const PEDERSEN_POINT_X: PeriodicColumn<'static, FieldVariant<Fp, Fp>> = {
+    const INTERVAL_SIZE: usize = super::PEDERSEN_BUILTIN_RATIO * super::CYCLE_HEIGHT;
+    const COEFFS: [FieldVariant<Fp, Fp>; 512] =
+        map_into_fp_array(pedersen::periodic::HASH_POINTS_X_COEFFS);
+    PeriodicColumn::new(&COEFFS, INTERVAL_SIZE)
+};
+
+const PEDERSEN_POINT_Y: PeriodicColumn<'static, FieldVariant<Fp, Fp>> = {
+    const INTERVAL_SIZE: usize = super::PEDERSEN_BUILTIN_RATIO * super::CYCLE_HEIGHT;
+    const COEFFS: [FieldVariant<Fp, Fp>; 512] =
+        map_into_fp_array(pedersen::periodic::HASH_POINTS_Y_COEFFS);
+    PeriodicColumn::new(&COEFFS, INTERVAL_SIZE)
+};
+
+const ECDSA_GENERATOR_POINT_X: PeriodicColumn<'static, FieldVariant<Fp, Fp>> = {
+    const INTERVAL_SIZE: usize = super::ECDSA_BUILTIN_RATIO * super::CYCLE_HEIGHT;
+    const COEFFS: [FieldVariant<Fp, Fp>; 256] =
+        map_into_fp_array(ecdsa::periodic::GENERATOR_POINTS_X_COEFFS);
+    PeriodicColumn::new(&COEFFS, INTERVAL_SIZE)
+};
+
+const ECDSA_GENERATOR_POINT_Y: PeriodicColumn<'static, FieldVariant<Fp, Fp>> = {
+    const INTERVAL_SIZE: usize = super::ECDSA_BUILTIN_RATIO * super::CYCLE_HEIGHT;
+    const COEFFS: [FieldVariant<Fp, Fp>; 256] =
+        map_into_fp_array(ecdsa::periodic::GENERATOR_POINTS_Y_COEFFS);
+    PeriodicColumn::new(&COEFFS, INTERVAL_SIZE)
+};
+
+const POSEIDON_POSEIDON_FULL_ROUND_KEY0: PeriodicColumn<'static, FieldVariant<Fp, Fp>> = {
+    const INTERVAL_SIZE: usize = super::POSEIDON_RATIO * super::CYCLE_HEIGHT;
+    const COEFFS: [FieldVariant<Fp, Fp>; 8] =
+        map_into_fp_array(poseidon::periodic::FULL_ROUND_KEY_0_COEFFS);
+    PeriodicColumn::new(&COEFFS, INTERVAL_SIZE)
+};
+const POSEIDON_POSEIDON_FULL_ROUND_KEY1: PeriodicColumn<'static, FieldVariant<Fp, Fp>> = {
+    const INTERVAL_SIZE: usize = super::POSEIDON_RATIO * super::CYCLE_HEIGHT;
+    const COEFFS: [FieldVariant<Fp, Fp>; 8] =
+        map_into_fp_array(poseidon::periodic::FULL_ROUND_KEY_1_COEFFS);
+    PeriodicColumn::new(&COEFFS, INTERVAL_SIZE)
+};
+const POSEIDON_POSEIDON_FULL_ROUND_KEY2: PeriodicColumn<'static, FieldVariant<Fp, Fp>> = {
+    const INTERVAL_SIZE: usize = super::POSEIDON_RATIO * super::CYCLE_HEIGHT;
+    const COEFFS: [FieldVariant<Fp, Fp>; 8] =
+        map_into_fp_array(poseidon::periodic::FULL_ROUND_KEY_2_COEFFS);
+    PeriodicColumn::new(&COEFFS, INTERVAL_SIZE)
+};
+const POSEIDON_POSEIDON_PARTIAL_ROUND_KEY0: PeriodicColumn<'static, FieldVariant<Fp, Fp>> = {
+    const INTERVAL_SIZE: usize = super::POSEIDON_RATIO * super::CYCLE_HEIGHT;
+    const COEFFS: [FieldVariant<Fp, Fp>; 64] =
+        map_into_fp_array(poseidon::periodic::PARTIAL_ROUND_KEY_0_COEFFS);
+    PeriodicColumn::new(&COEFFS, INTERVAL_SIZE)
+};
+const POSEIDON_POSEIDON_PARTIAL_ROUND_KEY1: PeriodicColumn<'static, FieldVariant<Fp, Fp>> = {
+    const INTERVAL_SIZE: usize = super::POSEIDON_RATIO * super::CYCLE_HEIGHT;
+    const COEFFS: [FieldVariant<Fp, Fp>; 32] =
+        map_into_fp_array(poseidon::periodic::PARTIAL_ROUND_KEY_1_COEFFS);
+    PeriodicColumn::new(&COEFFS, INTERVAL_SIZE)
+};
 
 pub struct AirConfig;
 
@@ -839,14 +896,8 @@ impl ministark::air::AirConfig for AirConfig {
         // ├───────────┼────────────────────┼────────────────────┤
         // │   ω^511   │   [P_4 * 2^3]_x    │   [P_4 * 2^3]_y    │<- unused copy of prev
         // └───────────┴────────────────────┴────────────────────┘
-        let pedersen_x_coeffs = pedersen::periodic::HASH_POINTS_X_COEFFS.map(FieldVariant::Fp);
-        let pedersen_y_coeffs = pedersen::periodic::HASH_POINTS_Y_COEFFS.map(FieldVariant::Fp);
-        let pedersen_points_x = Polynomial::new(pedersen_x_coeffs.to_vec());
-        let pedersen_points_y = Polynomial::new(pedersen_y_coeffs.to_vec());
-
-        // TODO: double check if the value that's being evaluated is correct
-        let pedersen_point_x = pedersen_points_x.horner_eval(X.pow(n / 512));
-        let pedersen_point_y = pedersen_points_y.horner_eval(X.pow(n / 512));
+        let pedersen_point_x = Expr::from(Periodic(PEDERSEN_POINT_X));
+        let pedersen_point_y = Expr::from(Periodic(PEDERSEN_POINT_Y));
 
         // let `P = (Px, Py)` be the point to be added (see above)
         // let `Q = (Qx, Qy)` be the partial result
@@ -1134,16 +1185,8 @@ impl ministark::air::AirConfig for AirConfig {
         // ├───────────┼──────────────────┼──────────────────┤
         // │    ...    │         ...      │         ...      │
         // └───────────┴──────────────────┴──────────────────┘
-        let ecdsa_generator_x_coeffs =
-            ecdsa::periodic::GENERATOR_POINTS_X_COEFFS.map(FieldVariant::Fp);
-        let ecdsa_generator_y_coeffs =
-            ecdsa::periodic::GENERATOR_POINTS_Y_COEFFS.map(FieldVariant::Fp);
-        let ecdsa_generator_points_x = Polynomial::new(ecdsa_generator_x_coeffs.to_vec());
-        let ecdsa_generator_points_y = Polynomial::new(ecdsa_generator_y_coeffs.to_vec());
-
-        // TODO: double check if the value that's being evaluated is correct
-        let ecdsa_generator_point_x = ecdsa_generator_points_x.horner_eval(X.pow(n / 32768));
-        let ecdsa_generator_point_y = ecdsa_generator_points_y.horner_eval(X.pow(n / 32768));
+        let ecdsa_generator_point_x = Expr::from(Periodic(ECDSA_GENERATOR_POINT_X));
+        let ecdsa_generator_point_y = Expr::from(Periodic(ECDSA_GENERATOR_POINT_Y));
 
         // let `P = (Px, Py)` be the point to be added (see above)
         // let `Q = (Qx, Qy)` be the partial result
@@ -1905,36 +1948,16 @@ impl ministark::air::AirConfig for AirConfig {
 
         // Construct the 5 periodic columns used for Poseidon hash
         // The periodic columns encode round keys used for full and partial rounds
-        let poseidon_full_rounds_key0_coeffs =
-            poseidon::periodic::FULL_ROUND_KEY_0_COEFFS.map(FieldVariant::Fp);
-        let poseidon_full_rounds_key1_coeffs =
-            poseidon::periodic::FULL_ROUND_KEY_1_COEFFS.map(FieldVariant::Fp);
-        let poseidon_full_rounds_key2_coeffs =
-            poseidon::periodic::FULL_ROUND_KEY_2_COEFFS.map(FieldVariant::Fp);
-        let poseidon_partial_rounds_key0_coeffs =
-            poseidon::periodic::PARTIAL_ROUND_KEY_0_COEFFS.map(FieldVariant::Fp);
-        let poseidon_partial_rounds_key1_coeffs =
-            poseidon::periodic::PARTIAL_ROUND_KEY_1_COEFFS.map(FieldVariant::Fp);
-        let poseidon_full_rounds_key0_poly =
-            Polynomial::new(poseidon_full_rounds_key0_coeffs.to_vec());
-        let poseidon_full_rounds_key1_poly =
-            Polynomial::new(poseidon_full_rounds_key1_coeffs.to_vec());
-        let poseidon_full_rounds_key2_poly =
-            Polynomial::new(poseidon_full_rounds_key2_coeffs.to_vec());
-        let poseidon_partial_rounds_key0_poly =
-            Polynomial::new(poseidon_partial_rounds_key0_coeffs.to_vec());
-        let poseidon_partial_rounds_key1_poly =
-            Polynomial::new(poseidon_partial_rounds_key1_coeffs.to_vec());
         let poseidon_poseidon_full_round_key0 =
-            poseidon_full_rounds_key0_poly.horner_eval(X.pow(n / 512));
+            Expr::from(Periodic(POSEIDON_POSEIDON_FULL_ROUND_KEY0));
         let poseidon_poseidon_full_round_key1 =
-            poseidon_full_rounds_key1_poly.horner_eval(X.pow(n / 512));
+            Expr::from(Periodic(POSEIDON_POSEIDON_FULL_ROUND_KEY1));
         let poseidon_poseidon_full_round_key2 =
-            poseidon_full_rounds_key2_poly.horner_eval(X.pow(n / 512));
+            Expr::from(Periodic(POSEIDON_POSEIDON_FULL_ROUND_KEY2));
         let poseidon_poseidon_partial_round_key0 =
-            poseidon_partial_rounds_key0_poly.horner_eval(X.pow(n / 512));
+            Expr::from(Periodic(POSEIDON_POSEIDON_PARTIAL_ROUND_KEY0));
         let poseidon_poseidon_partial_round_key1 =
-            poseidon_partial_rounds_key1_poly.horner_eval(X.pow(n / 512));
+            Expr::from(Periodic(POSEIDON_POSEIDON_PARTIAL_ROUND_KEY1));
 
         // examples for trace length n=512
         // ===============================
@@ -3295,22 +3318,5 @@ pub enum DilutedCheckAggregation {
 impl VerifierChallenge for DilutedCheckAggregation {
     fn index(&self) -> usize {
         *self as usize
-    }
-}
-
-struct Polynomial<T>(Vec<T>);
-
-impl<T: Clone + One + Zero + Mul<Output = T> + Add<Output = T>> Polynomial<T> {
-    fn new(coeffs: Vec<T>) -> Self {
-        assert!(!coeffs.is_empty());
-        assert!(!coeffs.iter().all(|v| v.is_zero()));
-        Polynomial(coeffs)
-    }
-
-    fn horner_eval(&self, point: Expr<AlgebraicItem<T>>) -> Expr<AlgebraicItem<T>> {
-        self.0.iter().rfold(
-            Expr::Leaf(AlgebraicItem::Constant(T::zero())),
-            move |result, coeff| result * &point + AlgebraicItem::Constant(coeff.clone()),
-        )
     }
 }
