@@ -5,7 +5,15 @@ edition = "2021"
 
 [features]
 default = [ ]
-parallel = [ "dep:rayon", "ark-std/parallel", "ministark/parallel", "ministark-gpu/parallel" ]
+parallel = [
+    "dep:rayon",
+    "ark-std/parallel",
+    "ark-ff/parallel",
+    "ark-ec/parallel",
+    "ark-poly/parallel",
+    "ministark/parallel",
+    "ministark-gpu/parallel"
+]
 
 [dependencies]
 ministark-gpu = { version = "0.1", path = "../../ministark-mirror/gpu" }

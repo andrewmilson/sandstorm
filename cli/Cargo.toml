@@ -10,7 +10,16 @@ default = [ ]
 experimental_claims = [ ]
 asm = [ "ministark/asm", "sandstorm/asm" ]
 gpu = [ "ministark/gpu" ]
-parallel = [ "dep:rayon", "ark-std/parallel", "ministark/parallel", "ministark-gpu/parallel", "sandstorm/parallel", "layouts/parallel" ]
+parallel = [
+    "dep:rayon",
+    "ark-std/parallel",
+    "ark-ff/parallel",
+    "ark-poly/parallel",
+    "ministark/parallel",
+    "ministark-gpu/parallel",
+    "sandstorm/parallel",
+    "layouts/parallel"
+]
 
 [dependencies]
 sandstorm = { path = "../" }

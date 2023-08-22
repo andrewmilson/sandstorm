@@ -12,7 +12,16 @@ members = ["layouts", "binary", "builtins", "crypto", "cli"]
 default = [ ]
 asm = [ "ministark/asm", "crypto/asm" ]
 gpu = [ "ministark/gpu" ]
-parallel = [ "dep:rayon", "ark-std/parallel", "ministark/parallel", "ministark-gpu/parallel", "crypto/parallel", "layouts/parallel" ]
+parallel = [
+    "dep:rayon",
+    "ark-std/parallel",
+    "ark-ff/parallel",
+    "ark-poly/parallel",
+    "ministark/parallel",
+    "ministark-gpu/parallel",
+    "crypto/parallel",
+    "layouts/parallel"
+]
 
 [dependencies]
 ark-ff = "0.4"
@@ -45,8 +54,8 @@ serde_json = "1.0"
 opt-level = 3
 
 [profile.release]
-codegen-units = 1
-lto = true
+codegen-units = 8
+lto = false
 
 [profile.bench]
 codegen-units = 1
