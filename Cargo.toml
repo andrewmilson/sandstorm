@@ -54,8 +54,8 @@ serde_json = "1.0"
 opt-level = 3
 
 [profile.release]
-codegen-units = 8
-lto = false
+codegen-units = 1
+lto = true
 
 [profile.bench]
 codegen-units = 1
