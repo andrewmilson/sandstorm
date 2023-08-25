@@ -7,7 +7,7 @@ use ministark_gpu::fields::p3618502788666131213697322783095070105623107215331596
 use crypto::hash::keccak::Keccak256HashFn;
 use crypto::public_coin::cairo::CairoVerifierPublicCoin;
 
-pub const NUM_FRIENDLY_COMMITMENT_LAYERS: u32 = 23;
+pub const NUM_FRIENDLY_COMMITMENT_LAYERS: u32 = 22;
 
 pub mod starknet {
     use super::*;
