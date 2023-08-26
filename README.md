@@ -57,11 +57,11 @@ cargo +nightly run -p sandstorm-cli -r -F parallel,asm -- \
 <details>
 <summary>Proving Cairo programs with Goldilocks field</summary>
 
-## Proving Cairo programs with Goldilocks field
+## Work in Progress - ~~Proving Cairo programs with Goldilocks field~~
 
-The goldilocks field is a magical 64-bit prime field that has very fast arithmetic. This field was discovered after StarkWare built their Solidity verifier for Cairo programs. As a result Cairo uses a much larger 252-bit prime field by default. Arithmetic in this 252-bit field is slow and it can be hard to practically utilize the storage provided by each field element. 
+~~The goldilocks field is a magical 64-bit prime field that has very fast arithmetic. This field was discovered after StarkWare built their Solidity verifier for Cairo programs. As a result Cairo uses a much larger 252-bit prime field by default. Arithmetic in this 252-bit field is slow and it can be hard to practically utilize the storage provided by each field element.~~
 
-Sandstorm recently supported proving Cairo programs with the 64-bit Goldilocks field instead of StarkWare's default 252-bit field. On a M1 Max proof generation is 5x faster using the 64-bit Goldilocks field and only uses ~1/4 of the overall memory when compared against Cairo's default 252-bit field. To run and prove with Goldilocks field locally:
+~~Sandstorm recently supported proving Cairo programs with the 64-bit Goldilocks field instead of StarkWare's default 252-bit field. On a M1 Max proof generation is 5x faster using the 64-bit Goldilocks field and only uses 1/4 of the overall memory when compared against Cairo's default 252-bit field. To run and prove with Goldilocks field locally:~~
 
 ```bash
 # 1. install Cairo and activate the venv
@@ -108,5 +108,5 @@ cargo +nightly run -r -F parallel,asm -- \
 
 ## How Sandstorm works
 
-Those curious about the inner workings of Sandstorm can read the comments in [air.rs](layouts/src/layout6/air.rs#36). The comments expect some understanding of how STARK proofs are generated - if you need some background on this then [Anatomy of a STARK (part 4)](https://aszepieniec.github.io/stark-anatomy/) by [Alan Szepieniec](https://twitter.com/aszepieniec) is a great resource. The pseudo code in section 4.5 of the [Cairo whitepaper](https://eprint.iacr.org/2021/1063.pdf) provides a nice high level overview of how some pieces fit together.
+Those curious about the inner workings of Sandstorm can read the comments in [air.rs](layouts/src/starknet/air.rs#115). The comments expect some understanding of how STARK proofs are generated - if you need some background on this then [Anatomy of a STARK (part 4)](https://aszepieniec.github.io/stark-anatomy/) by [Alan Szepieniec](https://twitter.com/aszepieniec) is a great resource. The pseudo code in section 4.5 of the [Cairo whitepaper](https://eprint.iacr.org/2021/1063.pdf) provides a nice high level overview of how some pieces fit together.
 </details>
