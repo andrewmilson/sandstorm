@@ -25,8 +25,8 @@ parallel = [
 sandstorm = { path = "../" }
 layouts = { path = "../layouts", package = "sandstorm-layouts" }
 binary = { path = "../binary", package = "sandstorm-binary" }
-ministark-gpu = { version = "0.1", path = "../../ministark-mirror/gpu" }
-ministark = { path = "../../ministark-mirror" }
+ministark-gpu = { version = "0.1", git = "https://github.com/andrewmilson/ministark" }
+ministark = { git = "https://github.com/andrewmilson/ministark" }
 ark-poly = "0.4"
 ark-std = "0.4"
 ark-ff = "0.4"

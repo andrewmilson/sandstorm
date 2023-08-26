@@ -12,8 +12,8 @@ ark-ff = "0.4"
 ark-std = "0.4"
 binary = { path = "../binary", package = "sandstorm-binary" }
 builtins = { path = "../builtins", package = "sandstorm-builtins" }
-ministark-gpu = { version = "0.1", path = "../../ministark-mirror/gpu" }
-ministark = { path = "../../ministark-mirror" }
+ministark-gpu = { version = "0.1", git = "https://github.com/andrewmilson/ministark" }
+ministark = { git = "https://github.com/andrewmilson/ministark" }
 ruint = { version = "1.7", features = [ "serde", "num-bigint" ] }
 sha3 = "0.10"
 blake2 = "0.10"
