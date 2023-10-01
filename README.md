@@ -41,14 +41,14 @@ cairo-run --program example/array-sum.json \
           --proof_mode
 
 # 3. generate the proof
-cargo +nightly run -p sandstorm-cli -r -F parallel,asm -- \
+cargo +nightly run -p sandstorm-cli -r -F parallel -- \
     --program example/array-sum.json \
     --air-public-input example/air-public-input.json \
     prove --air-private-input example/air-private-input.json \
           --output example/array-sum.proof
 
 # 4. verify the proof
-cargo +nightly run -p sandstorm-cli -r -F parallel,asm -- \
+cargo +nightly run -p sandstorm-cli -r -F parallel -- \
     --program example/array-sum.json \
     --air-public-input example/air-public-input.json \
     verify --proof example/array-sum.proof
