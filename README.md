@@ -41,14 +41,14 @@ cairo-run --program example/array-sum.json \
           --proof_mode
 
 # 3. generate the proof
-cargo +nightly run -p sandstorm-cli -r -F parallel,asm -- \
+cargo +nightly run -p sandstorm-cli -r -F parallel -- \
     --program example/array-sum.json \
     --air-public-input example/air-public-input.json \
     prove --air-private-input example/air-private-input.json \
           --output example/array-sum.proof
 
 # 4. verify the proof
-cargo +nightly run -p sandstorm-cli -r -F parallel,asm -- \
+cargo +nightly run -p sandstorm-cli -r -F parallel -- \
     --program example/array-sum.json \
     --air-public-input example/air-public-input.json \
     verify --proof example/array-sum.proof
@@ -109,4 +109,12 @@ cargo +nightly run -r -F parallel,asm -- \
 ## How Sandstorm works
 
 Those curious about the inner workings of Sandstorm can read the comments in [air.rs](layouts/src/starknet/air.rs#115). The comments expect some understanding of how STARK proofs are generated - if you need some background on this then [Anatomy of a STARK (part 4)](https://aszepieniec.github.io/stark-anatomy/) by [Alan Szepieniec](https://twitter.com/aszepieniec) is a great resource. The pseudo code in section 4.5 of the [Cairo whitepaper](https://eprint.iacr.org/2021/1063.pdf) provides a nice high level overview of how some pieces fit together.
+</details>
+
+<details>
+<summary>Troubleshooting</summary>
+
+## Running on ARM64
+
+When running on ARM64 (i.e. Mac M1/M2), remove the `asm` feature from the example cli calls.
 </details>
