@@ -7,7 +7,7 @@ use crate::ecdsa::DoublingStep;
 use crate::ecdsa::EcMadPartialStep;
 use ark_ec::short_weierstrass::Affine;
 use ark_ec::short_weierstrass::SWCurveConfig;
-use ark_ec::short_weierstrass::Projective; 
+use ark_ec::short_weierstrass::Projective;
 use ark_ec::CurveGroup;
 use ark_ec::Group;
 use binary::EcOpInstance;
