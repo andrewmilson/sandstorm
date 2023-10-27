@@ -18,6 +18,70 @@ use crate::poseidon::params::PARTIAL_ROUND_KEYS_OPTIMIZED;
 use crate::utils::Mat3x3;
 use ark_ff::Field;
 use num_bigint::BigUint;
+use ruint::aliases::U256;
+
+pub fn poseidon_hash_single(x: Fp) -> Fp {
+    let instance = PoseidonInstance {
+        index: 0,
+        input0: U256::from_limbs(x.0 .0),
+        input1: U256::from(0),
+        input2: U256::from(0),
+    };
+    let result = InstanceTrace::new(instance);
+
+    result.output0
+}
+
+pub fn poseidon_hash(x: Fp, y: Fp) -> Fp {
+    let instance = PoseidonInstance {
+        index: 0,
+        input0: U256::from_limbs(x.0 .0),
+        input1: U256::from_limbs(y.0 .0),
+        input2: U256::from(0),
+    };
+    let result = InstanceTrace::new(instance);
+
+    result.output0
+}
+
+pub fn poseidon_hash_many(elements: Vec<Fp>) -> Fp {
+    let instance = PoseidonInstance {
+        index: 0,
+        input0: U256::from(0),
+        input1: U256::from(0),
+        input2: U256::from(0),
+    };
+    let mut state = InstanceTrace::new(instance);
+
+    let mut i = 0;
+    loop {
+        if i == elements.len() {
+            let result = InstanceTrace::new(PoseidonInstance {
+                index: state.instance.index,
+                input0: U256::from_limbs((state.output0 + Fp::from(1)).0 .0),
+                input1: U256::from_limbs(state.output1.0 .0),
+                input2: U256::from_limbs(state.output2.0 .0),
+            });
+            return result.output0;
+        } else if i == elements.len() - 1 {
+            let result = InstanceTrace::new(PoseidonInstance {
+                index: state.instance.index,
+                input0: U256::from_limbs((state.output0 + elements[i]).0 .0),
+                input1: U256::from_limbs((state.output1 + Fp::from(1)).0 .0),
+                input2: U256::from_limbs(state.output2.0 .0),
+            });
+            return result.output0;
+        } else {
+            state = InstanceTrace::new(PoseidonInstance {
+                index: state.instance.index,
+                input0: U256::from_limbs((state.output0 + elements[i]).0 .0),
+                input1: U256::from_limbs((state.output1 + elements[i + 1]).0 .0),
+                input2: U256::from_limbs(state.output2.0 .0),
+            });
+        }
+        i += 2;
+    }
+}
 
 /// Stores the states within a full round
 #[derive(Clone, Copy, Debug)]
@@ -243,7 +307,8 @@ fn _calc_optimized_partial_round_keys() -> [[Fp; 3]; NUM_PARTIAL_ROUNDS] {
 
 #[cfg(test)]
 mod tests {
-    use crate::poseidon::permute;
+    use crate::poseidon::{permute, poseidon_hash_many};
+    use ark_ff::BigInt;
     use ark_ff::MontFp as Fp;
     use ark_ff::Field;
     use ministark_gpu::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481::ark::Fp;
@@ -258,5 +323,71 @@ mod tests {
         ];
 
         assert_eq!(expected, permute([Fp::ZERO, Fp::ZERO, Fp::ZERO]));
+    }
+
+    #[test]
+    fn poseidon_hash_many_3_example() {
+        let elements = vec![Fp!("0"), Fp!("0"), Fp!("0")];
+
+        let expected = BigInt::new([
+            14465169880788163794,
+            3725699649495491964,
+            13957675534445258432,
+            241034705846384105,
+        ]);
+
+        assert_eq!(expected, poseidon_hash_many(elements).0);
+    }
+
+    #[test]
+    fn poseidon_hash_many_4_example() {
+        let elements = vec![Fp!("0"), Fp!("0"), Fp!("0"), Fp!("0")];
+
+        let expected = BigInt::new([
+            8177194887955547932,
+            6869494578799689646,
+            3880460167861838970,
+            331313552213051804,
+        ]);
+
+        assert_eq!(expected, poseidon_hash_many(elements).0);
+    }
+
+    #[test]
+    fn poseidon_hash_many_5_example() {
+        let elements = vec![Fp!("0"), Fp!("0"), Fp!("0"), Fp!("0"), Fp!("0")];
+
+        let expected = BigInt::new([
+            14872330746557636911,
+            10787657887407825984,
+            8559225264217750252,
+            304103888309894648,
+        ]);
+
+        assert_eq!(expected, poseidon_hash_many(elements).0);
+    }
+
+    #[test]
+    fn poseidon_hash_many_9_example() {
+        let elements = vec![
+            Fp!("0"),
+            Fp!("0"),
+            Fp!("0"),
+            Fp!("0"),
+            Fp!("0"),
+            Fp!("0"),
+            Fp!("0"),
+            Fp!("0"),
+            Fp!("0"),
+        ];
+
+        let expected = BigInt::new([
+            6218683884595264045,
+            16033324973008454317,
+            15358347862863079556,
+            557108717180864526,
+        ]);
+
+        assert_eq!(expected, poseidon_hash_many(elements).0);
     }
 }

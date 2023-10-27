@@ -1,6 +1,5 @@
 use crate::hash::blake2s::Blake2sHashFn;
-use crate::hash::pedersen::PedersenDigest;
-use crate::hash::pedersen::PedersenHashFn;
+use crate::hash::poseidon::{PoseidonDigest, PoseidonHashFn};
 use crate::merkle::mixed::MixedMerkleDigest;
 use crate::utils::from_montgomery;
 use crate::utils::to_montgomery;
@@ -58,7 +57,7 @@ impl CairoVerifierPublicCoin {
 }
 
 impl PublicCoin for CairoVerifierPublicCoin {
-    type Digest = MixedMerkleDigest<PedersenDigest, SerdeOutput<Blake2s256>>;
+    type Digest = MixedMerkleDigest<PoseidonDigest, SerdeOutput<Blake2s256>>;
     type Field = Fp;
 
     fn new(digest: Self::Digest) -> Self {
@@ -74,7 +73,7 @@ impl PublicCoin for CairoVerifierPublicCoin {
     }
 
     fn reseed_with_field_elements(&mut self, vals: &[Self::Field]) {
-        let hash_felt = PedersenHashFn::hash_elements(vals.iter().copied());
+        let hash_felt = PoseidonHashFn::hash_elements(vals.iter().copied());
         let bytes = U256::from(BigUint::from(*hash_felt)).to_be_bytes::<32>();
         self.reseed_with_bytes(bytes);
     }
