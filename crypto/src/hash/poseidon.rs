@@ -4,6 +4,7 @@ use std::iter::Iterator;
 use ark_serialize::CanonicalDeserialize;
 use ark_serialize::CanonicalSerialize;
 use builtins::poseidon::poseidon_hash_many;
+use digest::HashMarker;
 use ministark::hash::Digest;
 use ministark::hash::ElementHashFn;
 use ministark::hash::HashFn;
@@ -13,6 +14,8 @@ use ruint::aliases::U256;
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, CanonicalDeserialize, CanonicalSerialize)]
 pub struct PoseidonDigest(pub Fp);
+
+impl HashMarker for PoseidonDigest {}
 
 impl Display for PoseidonDigest {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

@@ -4,6 +4,8 @@ use crate::merkle::mixed::MixedMerkleDigest;
 use crate::utils::from_montgomery;
 use crate::utils::to_montgomery;
 use blake2::Blake2s256;
+use builtins::poseidon::poseidon_hash_many;
+use digest::generic_array::{GenericArray, typenum::U32};
 use ministark::hash::Digest;
 use ministark::hash::ElementHashFn;
 use ministark::hash::HashFn;
@@ -15,7 +17,6 @@ use ruint::aliases::U256;
 use ministark_gpu::fields::p3618502788666131213697322783095070105623107215331596699973092056135872020481::ark::Fp;
 use ruint::uint;
 use ark_ff::PrimeField;
-use digest::Digest as _;
 use std::collections::BTreeSet;
 use std::fmt::Debug;
 use std::iter;
@@ -39,20 +40,35 @@ impl Debug for CairoVerifierPublicCoin {
 
 impl CairoVerifierPublicCoin {
     fn reseed_with_bytes(&mut self, bytes: impl AsRef<[u8]>) {
-        let digest = U256::try_from_be_slice(&self.digest).unwrap();
-        let mut hasher = Blake2s256::new();
-        hasher.update((digest + uint!(1_U256)).to_be_bytes::<32>());
-        hasher.update(bytes);
-        self.digest = SerdeOutput::new(hasher.finalize());
+        let mut digest = (U256::try_from_be_slice(&self.digest).unwrap() + uint!(1_U256))
+            .to_be_bytes::<32>()
+            .to_vec();
+        digest.extend(bytes.as_ref().iter());
+        let result: GenericArray<u8, U32> = GenericArray::from_iter(
+            poseidon_hash_many(digest.iter().map(|x| Fp::from(x.to_owned())).collect())
+                .0
+                 .0
+                .iter()
+                .map(|x| x.to_be_bytes())
+                .flatten(),
+        );
+        self.digest = SerdeOutput::new(result);
         self.counter = 0;
     }
 
     fn draw_bytes(&mut self) -> [u8; 32] {
-        let mut hasher = Blake2s256::new();
-        hasher.update(*self.digest);
-        hasher.update(U256::from(self.counter).to_be_bytes::<32>());
+        let mut digest = U256::try_from_be_slice(&self.digest)
+            .unwrap()
+            .to_be_bytes::<32>()
+            .to_vec();
+        digest.extend(U256::from(self.counter).to_be_bytes::<32>().iter());
+        let result = poseidon_hash_many(digest.iter().map(|x| Fp::from(x.to_owned())).collect());
+        let mut bytes = [0u8; 32];
+        for (index, value) in result.0 .0.iter().enumerate() {
+            bytes[index * 8..(index + 1) * 8].copy_from_slice(&value.to_le_bytes());
+        }
         self.counter += 1;
-        (*hasher.finalize()).try_into().unwrap()
+        bytes
     }
 }
 
@@ -130,20 +146,32 @@ impl PublicCoin for CairoVerifierPublicCoin {
     }
 
     fn grind_proof_of_work(&self, proof_of_work_bits: u8) -> Option<u64> {
-        let mut prefix_hasher = Blake2s256::new();
-        prefix_hasher.update(0x0123456789ABCDEDu64.to_be_bytes());
-        prefix_hasher.update(*self.digest);
-        prefix_hasher.update([proof_of_work_bits]);
-        let prefix_hash = prefix_hasher.finalize();
-
-        let mut proof_of_work_hasher = Blake2s256::new();
-        proof_of_work_hasher.update(prefix_hash);
+        let mut data = 0x0123456789ABCDEDu64.to_be_bytes().to_vec();
+        data.extend(
+            U256::try_from_be_slice(&self.digest)
+                .unwrap()
+                .to_be_bytes::<32>()
+                .to_vec(),
+        );
+        data.extend(vec![proof_of_work_bits]);
+        let prefix_hash = poseidon_hash_many(data.iter().map(|x| Fp::from(x.to_owned())).collect());
 
         let is_valid = |nonce: &u64| {
-            let mut proof_of_work_hasher = proof_of_work_hasher.clone();
-            proof_of_work_hasher.update(nonce.to_be_bytes());
-            let proof_of_work_hash = proof_of_work_hasher.finalize();
-            leading_zeros(&proof_of_work_hash) >= u32::from(proof_of_work_bits)
+            let mut proof_of_work_data = vec![Fp::from(prefix_hash.0)];
+            proof_of_work_data.extend(
+                nonce
+                    .to_owned()
+                    .to_be_bytes()
+                    .iter()
+                    .map(|x| Fp::from(x.to_owned()))
+                    .collect::<Vec<Fp>>(),
+            );
+            let proof_of_work_hash = poseidon_hash_many(proof_of_work_data);
+            let mut bytes = [0u8; 32];
+            for (index, value) in proof_of_work_hash.0 .0.iter().enumerate() {
+                bytes[index * 8..(index + 1) * 8].copy_from_slice(&value.to_le_bytes());
+            }
+            leading_zeros(&bytes) >= u32::from(proof_of_work_bits)
         };
 
         #[cfg(not(feature = "parallel"))]
@@ -153,18 +181,37 @@ impl PublicCoin for CairoVerifierPublicCoin {
     }
 
     fn verify_proof_of_work(&self, proof_of_work_bits: u8, nonce: u64) -> bool {
-        let mut prefix_hasher = Blake2s256::new();
-        prefix_hasher.update(0x0123456789ABCDEDu64.to_be_bytes());
-        prefix_hasher.update(*self.digest);
-        prefix_hasher.update([proof_of_work_bits]);
-        let prefix_hash = prefix_hasher.finalize();
+        let mut data = 0x0123456789ABCDEDu64.to_be_bytes().to_vec();
+        data.extend(
+            U256::try_from_be_slice(&self.digest)
+                .unwrap()
+                .to_be_bytes::<32>()
+                .to_vec(),
+        );
+        data.extend(vec![proof_of_work_bits]);
 
-        let mut proof_of_work_hasher = Blake2s256::new();
-        proof_of_work_hasher.update(prefix_hash);
-        proof_of_work_hasher.update(nonce.to_be_bytes());
-        let proof_of_work_hash = proof_of_work_hasher.finalize();
+        let prefix_hash = poseidon_hash_many(
+            data.iter()
+                .map(|x| Fp::from(x.to_owned()))
+                .collect::<Vec<Fp>>(),
+        );
 
-        leading_zeros(&proof_of_work_hash) >= u32::from(proof_of_work_bits)
+        let mut proof_of_work_data = vec![Fp::from(prefix_hash.0)];
+        proof_of_work_data.extend(
+            nonce
+                .to_owned()
+                .to_be_bytes()
+                .iter()
+                .map(|x| Fp::from(x.to_owned()))
+                .collect::<Vec<Fp>>(),
+        );
+        let proof_of_work_hash = poseidon_hash_many(proof_of_work_data);
+
+        let mut bytes = [0u8; 32];
+        for (index, value) in proof_of_work_hash.0 .0.iter().enumerate() {
+            bytes[index * 8..(index + 1) * 8].copy_from_slice(&value.to_le_bytes());
+        }
+        leading_zeros(&bytes) >= u32::from(proof_of_work_bits)
     }
 
     fn security_level_bits() -> u32 {
