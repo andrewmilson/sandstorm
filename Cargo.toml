@@ -2,16 +2,16 @@
 name = "sandstorm"
 description = "SHARP compatible Cairo prover"
 authors = ["Andrew Milson <andrew.j.milson@gmail.com>"]
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 
 [workspace]
 members = ["layouts", "binary", "builtins", "crypto", "cli"]
 
 [features]
-default = [ ]
-asm = [ "ministark/asm", "crypto/asm" ]
-gpu = [ "ministark/gpu" ]
+default = []
+asm = ["ministark/asm", "crypto/asm"]
+gpu = ["ministark/gpu"]
 parallel = [
     "dep:rayon",
     "ark-std/parallel",
@@ -20,7 +20,7 @@ parallel = [
     "ministark/parallel",
     "ministark-gpu/parallel",
     "crypto/parallel",
-    "layouts/parallel"
+    "layouts/parallel",
 ]
 
 [dependencies]
@@ -30,9 +30,9 @@ layouts = { path = "./layouts", package = "sandstorm-layouts" }
 crypto = { path = "./crypto", package = "sandstorm-crypto" }
 builtins = { path = "./builtins", package = "sandstorm-builtins" }
 binary = { path = "./binary", package = "sandstorm-binary" }
-ministark-gpu = { version = "0.1", git = "https://github.com/andrewmilson/ministark" }
+ministark-gpu = { version = "0.2", git = "https://github.com/andrewmilson/ministark" }
 ministark = { git = "https://github.com/andrewmilson/ministark" }
-ruint = { version = "1.7", features = [ "serde", "num-bigint" ] }
+ruint = { version = "1.7", features = ["serde", "num-bigint"] }
 sha2 = "0.10"
 sha3 = "0.10"
 blake2 = "0.10"

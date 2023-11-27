@@ -1,4 +1,4 @@
-#![feature(async_fn_in_trait, allocator_api, array_chunks, int_roundings)]
+#![feature(allocator_api, array_chunks, int_roundings)]
 
 use ark_ff::Field;
 use ark_ff::PrimeField;

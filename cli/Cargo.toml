@@ -1,15 +1,15 @@
 [package]
 name = "sandstorm-cli"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 
 [features]
-default = [ ]
+default = []
 # enables support for experimental provers and verifiers
 # e.g. proving cairo programs over the Goldilocks field
-experimental_claims = [ ]
-asm = [ "ministark/asm", "sandstorm/asm" ]
-gpu = [ "ministark/gpu" ]
+experimental_claims = []
+asm = ["ministark/asm", "sandstorm/asm"]
+gpu = ["ministark/gpu"]
 parallel = [
     "dep:rayon",
     "ark-std/parallel",
@@ -18,14 +18,14 @@ parallel = [
     "ministark/parallel",
     "ministark-gpu/parallel",
     "sandstorm/parallel",
-    "layouts/parallel"
+    "layouts/parallel",
 ]
 
 [dependencies]
 sandstorm = { path = "../" }
 layouts = { path = "../layouts", package = "sandstorm-layouts" }
 binary = { path = "../binary", package = "sandstorm-binary" }
-ministark-gpu = { version = "0.1", git = "https://github.com/andrewmilson/ministark" }
+ministark-gpu = { version = "0.2", git = "https://github.com/andrewmilson/ministark" }
 ministark = { git = "https://github.com/andrewmilson/ministark" }
 ark-poly = "0.4"
 ark-std = "0.4"

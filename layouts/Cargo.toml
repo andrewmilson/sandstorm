@@ -1,10 +1,10 @@
 [package]
 name = "sandstorm-layouts"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 
 [features]
-default = [ ]
+default = []
 parallel = [
     "dep:rayon",
     "ark-std/parallel",
@@ -12,11 +12,11 @@ parallel = [
     "ark-ec/parallel",
     "ark-poly/parallel",
     "ministark/parallel",
-    "ministark-gpu/parallel"
+    "ministark-gpu/parallel",
 ]
 
 [dependencies]
-ministark-gpu = { version = "0.1", git = "https://github.com/andrewmilson/ministark" }
+ministark-gpu = { version = "0.2", git = "https://github.com/andrewmilson/ministark" }
 ministark = { git = "https://github.com/andrewmilson/ministark" }
 binary = { path = "../binary", package = "sandstorm-binary" }
 builtins = { path = "../builtins", package = "sandstorm-builtins" }
@@ -28,6 +28,6 @@ ark-ec = "0.4"
 ark-ff = "0.4"
 num-bigint = "0.4"
 ark-std = "0.4"
-ruint = { version = "1.7", features = [ "serde", "num-bigint" ] }
+ruint = { version = "1.7", features = ["serde", "num-bigint"] }
 strum_macros = "0.24"
 rayon = { version = "1.5", optional = true }
