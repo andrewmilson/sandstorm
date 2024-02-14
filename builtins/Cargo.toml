@@ -9,7 +9,7 @@ edition = "2021"
 ark-ff = "0.4"
 ark-ec = "0.4"
 starknet-crypto = "0.6"
-ministark-gpu = { version = "0.2", git = "https://github.com/andrewmilson/ministark" }
+ministark-gpu = { version = "0.3", git = "https://github.com/andrewmilson/ministark" }
 ministark = { git = "https://github.com/andrewmilson/ministark" }
 ark-poly = "0.4"
 num-bigint = "0.4"

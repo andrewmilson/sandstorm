@@ -16,7 +16,7 @@ parallel = [
 ]
 
 [dependencies]
-ministark-gpu = { version = "0.2", git = "https://github.com/andrewmilson/ministark" }
+ministark-gpu = { version = "0.3", git = "https://github.com/andrewmilson/ministark" }
 ministark = { git = "https://github.com/andrewmilson/ministark" }
 binary = { path = "../binary", package = "sandstorm-binary" }
 builtins = { path = "../builtins", package = "sandstorm-builtins" }
