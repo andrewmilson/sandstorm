@@ -2,7 +2,6 @@
 
 extern crate alloc;
 
-use alloc::vec::Vec;
 use ark_ff::Field;
 use ark_ff::PrimeField;
 use ark_serialize::CanonicalDeserialize;
