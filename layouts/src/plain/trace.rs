@@ -13,8 +13,6 @@ use crate::utils::get_ordered_memory_accesses;
 use crate::utils::RangeCheckPool;
 use crate::CairoTrace;
 use crate::CairoWitness;
-use alloc::vec;
-use alloc::vec::Vec;
 use ark_ff::batch_inversion;
 use ark_ff::FftField;
 use ark_ff::Field;

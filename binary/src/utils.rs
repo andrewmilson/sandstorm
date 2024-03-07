@@ -1,6 +1,5 @@
 use crate::errors::InvalidFieldElementError;
 use crate::MemoryEntry;
-use alloc::vec::Vec;
 use ark_ff::PrimeField;
 use num_bigint::BigUint;
 use ruint::aliases::U256;
@@ -78,6 +77,7 @@ pub fn _deserialize_vec_big_uint<'de, D: Deserializer<'de>>(
     deserializer: D,
 ) -> Result<Vec<U256>, D::Error> {
     #[derive(Deserialize)]
+    #[allow(dead_code)]
     struct Wrapper(#[serde(deserialize_with = "deserialize_big_uint")] U256);
     let v = Vec::deserialize(deserializer)?;
     Ok(v.into_iter().map(|Wrapper(a)| a).collect())

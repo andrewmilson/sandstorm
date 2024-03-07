@@ -53,8 +53,6 @@ use ark_ff::Field;
 use super::MEMORY_STEP;
 use crate::utils::get_ordered_memory_accesses;
 use crate::CairoTrace;
-use alloc::vec;
-use alloc::vec::Vec;
 use ark_ff::batch_inversion;
 use binary::CompiledProgram;
 use binary::Memory;
