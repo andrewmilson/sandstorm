@@ -1,6 +1,7 @@
 pub mod blake2s;
 pub mod keccak;
 pub mod pedersen;
+pub mod poseidon;
 
 #[inline]
 pub fn mask_least_significant_bytes<const N_UNMASKED_BYTES: u32>(bytes: &mut [u8]) {
